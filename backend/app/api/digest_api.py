@@ -17,8 +17,8 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from services.ingestion import IngestionResult, run_ingestion
-from services.ingestion.vector_store import VectorStore
+from app.services.ingestion import IngestionResult, run_ingestion
+from app.services.ingestion.vector_store import VectorStore
 
 logging.basicConfig(
     level=logging.INFO,

@@ -15,7 +15,11 @@ import pypdf
 
 logger = logging.getLogger(__name__)
 
-CACHE_DIR = Path("raw-docs-cache")
+# Anchor to backend/app/data/raw-docs-cache regardless of the working directory.
+# __file__ is  backend/app/services/ingestion/loader.py
+# → .parent.parent.parent  == backend/app
+# → / "data" / "raw-docs-cache" == backend/app/data/raw-docs-cache
+CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "raw-docs-cache"
 
 
 @dataclass

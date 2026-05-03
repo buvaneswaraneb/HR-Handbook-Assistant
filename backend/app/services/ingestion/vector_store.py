@@ -30,9 +30,13 @@ from .chunker import Chunk
 
 logger = logging.getLogger(__name__)
 
-STORE_DIR     = Path("faiss-store")
-INDEX_FILE    = STORE_DIR / "index.faiss"
-META_FILE     = STORE_DIR / "metadata.json"
+# Anchor to backend/app/data/faiss-store regardless of the working directory.
+# __file__ is  backend/app/services/ingestion/vector_store.py
+# → .parent.parent.parent  == backend/app
+# → / "data" / "faiss-store" == backend/app/data/faiss-store
+STORE_DIR      = Path(__file__).resolve().parent.parent.parent / "data" / "faiss-store"
+INDEX_FILE     = STORE_DIR / "index.faiss"
+META_FILE      = STORE_DIR / "metadata.json"
 PROCESSED_FILE = STORE_DIR / "processed.json"
 
 
