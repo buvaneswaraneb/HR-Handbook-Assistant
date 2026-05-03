@@ -1,46 +1,64 @@
+"""
+file_fetch.py — Upload / Download routes as an APIRouter.
+
+Registered in main.py via:
+    app.include_router(file_router)
+
+UPLOAD_DIR is anchored to backend/app/data/raw-docs-cache/ using __file__
+so it resolves correctly regardless of the working directory.
+"""
+
+from __future__ import annotations
+
 import os
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from pathlib import Path
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-app = FastAPI()
+# __file__ == backend/app/services/upload-downloader/file_fetch.py
+# .parent.parent.parent == backend/app
+# / "data" / "raw-docs-cache" == backend/app/data/raw-docs-cache
+UPLOAD_DIR = (
+    Path(__file__).resolve().parent.parent.parent / "data" / "raw-docs-cache"
+)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-UPLOAD_DIR = "raw-docs-cache/" 
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+file_router = APIRouter(tags=["files"])
 
 
-# 📤 Upload API
-@app.post("/upload")
+# ── Upload ────────────────────────────────────────────────────────────────────
+@file_router.post("/upload")
 async def upload_file(file: UploadFile = File(...)):
     if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename")
+        raise HTTPException(status_code=400, detail="No filename provided")
 
     filename = os.path.basename(file.filename)
-    file_path = os.path.join(UPLOAD_DIR, filename)
+    file_path = UPLOAD_DIR / filename
 
-    with open(file_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
+    content = await file.read()
+    file_path.write_bytes(content)
 
     return {"message": "Uploaded", "filename": filename}
 
 
-# Download API
-@app.get("/download/{filename}")
+# ── Download ──────────────────────────────────────────────────────────────────
+@file_router.get("/download/{filename}")
 def download_file(filename: str):
-    file_path = os.path.join(UPLOAD_DIR, filename)
+    file_path = UPLOAD_DIR / filename
 
-    if not os.path.exists(file_path):
+    if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(
-        path=file_path,
+        path=str(file_path),
         filename=filename,
-        media_type="application/octet-stream"
+        media_type="application/octet-stream",
     )
 
 
-# List files (optional but useful)
-@app.get("/files")
+# ── List files ────────────────────────────────────────────────────────────────
+@file_router.get("/files")
 def list_files():
-    files = os.listdir(UPLOAD_DIR)
+    files = [f.name for f in UPLOAD_DIR.iterdir() if f.is_file()]
     return {"files": files}
