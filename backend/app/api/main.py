@@ -28,6 +28,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+
+
+
+
 # ── ensure 'backend/' is on the path when running from repo root ──────────────
 # (uvicorn app.api.main:app already handles this via PYTHONPATH / -m; this
 #  guard is a safety net for direct `python -m app.api.main` invocations)
@@ -198,3 +202,8 @@ async def query_endpoint(body: QueryRequest):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/")
+def greetins():
+    return "hello welcome to PRJ006"

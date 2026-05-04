@@ -112,7 +112,6 @@ class VectorStore:
     def total_vectors(self) -> int:
         return self._index.ntotal
 
-    # ── retrieval (thin layer for testing; full query engine lives elsewhere) ──
     def search(self, query_vec: np.ndarray, k: int = 5) -> list[dict[str, Any]]:
         """Return the top-k metadata dicts closest to query_vec."""
         if self._index.ntotal == 0:
@@ -126,6 +125,58 @@ class VectorStore:
             entry["_score"] = float(score)
             results.append(entry)
         return results
+
+    def search_with_threshold(
+        self,
+        query_vec: np.ndarray,
+        score_threshold: float = 0.3,
+        candidate_k: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """
+        Retrieve all chunks whose cosine similarity score >= score_threshold.
+
+        Parameters
+        ----------
+        query_vec       : Normalised query embedding (shape: [dim]).
+        score_threshold : Minimum inner-product score to keep a chunk.
+                          Range 0–1 (normalised vectors → cosine similarity).
+                          0.3 keeps moderately relevant chunks;
+                          raise to 0.5+ for stricter relevance.
+        candidate_k     : How many candidates to pull from FAISS before
+                          filtering.  Defaults to min(total_vectors, 50)
+                          so we cast a wide net without unbounded memory.
+
+        Returns
+        -------
+        List of metadata dicts sorted by score descending, all with
+        _score >= score_threshold.
+        """
+        if self._index.ntotal == 0:
+            return []
+
+        k = candidate_k if candidate_k is not None else min(self._index.ntotal, 50)
+        k = min(k, self._index.ntotal)   # FAISS errors if k > ntotal
+
+        scores, indices = self._index.search(query_vec.reshape(1, -1), k)
+
+        results = []
+        for score, idx in zip(scores[0], indices[0]):
+            if idx < 0:
+                continue
+            if float(score) < score_threshold:
+                continue                  # below relevance bar — skip
+            entry = dict(self._metadata[idx])
+            entry["_score"] = float(score)
+            results.append(entry)
+
+        # Already sorted by FAISS (descending score), but sort explicitly
+        results.sort(key=lambda x: x["_score"], reverse=True)
+        logger.info(
+            "search_with_threshold: %d/%d candidates passed threshold %.2f",
+            len(results), k, score_threshold,
+        )
+        return results
+
 
     # ── private ───────────────────────────────────────────────────────────────
     def _load_index(self) -> faiss.Index:

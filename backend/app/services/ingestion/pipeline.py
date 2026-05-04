@@ -118,7 +118,7 @@ class IngestionPipeline:
         self._store.save()            # persist BEFORE deleting source
 
         logger.info("[%s] ✓ persisted — deleting from cache", name)
-        _safe_delete(pdf_path)
+        # _safe_delete(pdf_path)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
@@ -131,7 +131,18 @@ def _safe_delete(path: Path) -> None:
 
 
 # ── convenience runner ────────────────────────────────────────────────────────
-def run_ingestion(cache_dir: Path = CACHE_DIR) -> IngestionResult:
-    """Module-level shortcut — create a pipeline and run it."""
-    pipeline = IngestionPipeline(cache_dir=cache_dir)
+def run_ingestion(
+    cache_dir: Path = CACHE_DIR,
+    embedder: "Embedder | None" = None,
+    store: "VectorStore | None" = None,
+) -> IngestionResult:
+    """
+    Module-level shortcut — create a pipeline and run it.
+
+    Pass `embedder` and `store` to use a specific embedding model and its
+    corresponding FAISS store (e.g. when a non-default model is active).
+    """
+    from .embedder import Embedder       # avoid circular at module level  # noqa: F401
+    from .vector_store import VectorStore  # noqa: F401
+    pipeline = IngestionPipeline(cache_dir=cache_dir, embedder=embedder, store=store)
     return pipeline.run()

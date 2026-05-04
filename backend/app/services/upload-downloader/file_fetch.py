@@ -62,3 +62,17 @@ def download_file(filename: str):
 def list_files():
     files = [f.name for f in UPLOAD_DIR.iterdir() if f.is_file()]
     return {"files": files}
+
+
+# ── Delete ────────────────────────────────────────────────────────────────────
+@file_router.delete("/files/delete/{filename}")
+def delete_file(filename: str):
+    # os.path.basename guards against path-traversal (e.g. ../../etc/passwd)
+    safe_name = os.path.basename(filename)
+    file_path = UPLOAD_DIR / safe_name
+
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"File '{safe_name}' not found")
+
+    file_path.unlink()
+    return {"message": "Deleted", "filename": safe_name}
