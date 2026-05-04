@@ -1,0 +1,14 @@
+2026-05-04 13:20:02,113 - app.services.rag.query - INFO - Retrieved 10 relevant chunks (threshold=0.30) for: What events lead to Bran falling from the tower?
+2026-05-04 13:20:02,113 - app.services.rag.query - INFO - Context trimmed: kept 9/10 chunks within 24000-char budget
+2026-05-04 13:20:02,113 - app.services.rag.query - INFO - Token estimation: system_prompt + question + context = ~6634 tokens (max: 1024)
+2026-05-04 13:45:35,787 - app.services.rag.query - INFO - Retrieved 10 relevant chunks (threshold=0.30) for: What events lead to Bran falling from the tower?
+2026-05-04 13:45:35,787 - app.services.rag.query - INFO - Context trimmed: kept 9/10 chunks within 24000-char budget
+2026-05-04 13:45:35,787 - app.services.rag.query - INFO - Processing batch 1/1 (9 chunks)
+2026-05-04 13:45:35,787 - app.services.rag.query - DEBUG - Batch 1 token estimation: ~6634 tokens
+2026-05-04 13:46:13,168 - app.services.rag.query - INFO - Retrieved 10 relevant chunks (threshold=0.30) for: What events lead to Bran falling from the tower?
+2026-05-04 13:46:13,168 - app.services.rag.query - INFO - Context trimmed: kept 9/10 chunks within 24000-char budget
+2026-05-04 13:46:13,168 - app.services.rag.query - INFO - Processing batch 1/1 (9 chunks)
+2026-05-04 13:46:13,168 - app.services.rag.query - DEBUG - Batch 1 token estimation: ~6634 tokens
+2026-05-04 13:46:51,621 - app.services.rag.query - INFO - Retrieved 5 relevant chunks (threshold=0.30) for: What events lead to Bran falling from the tower?
+2026-05-04 13:46:51,621 - app.services.rag.query - INFO - Processing batch 1/1 (5 chunks)
+2026-05-04 13:46:51,621 - app.services.rag.query - DEBUG - Batch 1 token estimation: ~4411 tokens

@@ -1,5 +1,7 @@
-
+.env
 .venv
 **/__pycache__/
 .DS_Store
 faiss-store/
+backend/app/services/.env
+backend/app/logs
