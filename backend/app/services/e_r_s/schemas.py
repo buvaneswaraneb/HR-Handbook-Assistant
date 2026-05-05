@@ -119,6 +119,8 @@ class ProjectCreate(BaseModel):
     project_description: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    percent_complete: Optional[int] = Field(None, ge=0, le=100)
+    status: Optional[str] = "active"
 
 
 class ProjectOut(BaseModel):
@@ -129,6 +131,9 @@ class ProjectOut(BaseModel):
     project_description: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
+    percent_complete: Optional[int] = 0
+    status: Optional[str] = "active"
+    days_remaining: Optional[int] = None   # computed, not stored
     created_at: Optional[datetime] = None
     team: List[AssignmentOut] = []
 
@@ -163,6 +168,66 @@ class SearchParams(BaseModel):
     skill: Optional[str] = None
     availability: Optional[bool] = None
     min_rating: Optional[float] = Field(None, ge=0, le=5)
+
+
+# ── Analytics ────────────────────────────────────────────────────────────────
+class SkillCoverageItem(BaseModel):
+    skill_name: str
+    required: int
+    actual: int
+
+
+class AnalyticsSummary(BaseModel):
+    total_employees: int
+    active_projects: int
+    on_leave: int
+    available: int
+    skill_coverage: List[SkillCoverageItem]
+
+
+# ── Activity Feed ─────────────────────────────────────────────────────────────
+class ActivityOut(BaseModel):
+    id: UUID
+    event_type: str
+    department: Optional[str] = None
+    actor_id: Optional[UUID] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[UUID] = None
+    title: str
+    description: Optional[str] = None
+    metadata: Optional[dict] = {}
+    created_at: Optional[datetime] = None
+
+
+class ActivityCreate(BaseModel):
+    event_type: str
+    department: Optional[str] = None
+    actor_id: Optional[UUID] = None
+    entity_type: Optional[str] = None
+    entity_id: Optional[UUID] = None
+    title: str
+    description: Optional[str] = None
+    metadata: Optional[dict] = {}
+
+
+# ── Files ─────────────────────────────────────────────────────────────────────
+class FileOut(BaseModel):
+    id: UUID
+    filename: str
+    storage_path: str
+    mime_type: Optional[str] = None
+    size_bytes: Optional[int] = None
+    project_id: Optional[UUID] = None
+    department: Optional[str] = None
+    uploaded_by: Optional[UUID] = None
+    description: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class FileLinkRequest(BaseModel):
+    project_id: Optional[UUID] = None
+    department: Optional[str] = None
+    description: Optional[str] = None
 
 
 EmployeeOut.model_rebuild()
