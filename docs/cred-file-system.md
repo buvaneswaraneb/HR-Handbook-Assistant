@@ -14,7 +14,6 @@
 2. [Document Management](#document-management)
 3. [Ingestion](#ingestion)
 4. [Query](#query)
-
 ---
 
 ## Health & Status

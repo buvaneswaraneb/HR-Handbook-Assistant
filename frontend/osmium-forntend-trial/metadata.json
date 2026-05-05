@@ -1,6 +1,0 @@
-{
-  "name": "Osmium Doc Assistant",
-  "description": "Professional RAG-powered document assistant for ingesting, querying, and managing PDFs with a high-end dark dashboard.",
-  "requestFramePermissions": [],
-  "majorCapabilities": []
-}
