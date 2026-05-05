@@ -1,5 +1,6 @@
 from __future__ import annotations
 import logging
+from datetime import date
 from app.services.e_r_s.db import get_db
 from app.services.e_r_s.repositories.project_repo import ProjectRepository
 from app.services.e_r_s.schemas import ProjectCreate, AssignmentCreate
@@ -59,4 +60,9 @@ def get_project_team(project_id: str) -> list[dict]:
 # ── internal ──────────────────────────────────────────────────────────────────
 def _enrich(project: dict, repo: ProjectRepository) -> dict:
     team = get_project_team(project["id"])
-    return {**project, "team": team}
+    days_remaining: int | None = None
+    end = project.get("end_date")
+    if end:
+        end_date = date.fromisoformat(end) if isinstance(end, str) else end
+        days_remaining = (end_date - date.today()).days
+    return {**project, "team": team, "days_remaining": days_remaining}
