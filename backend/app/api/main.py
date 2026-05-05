@@ -44,6 +44,8 @@ from app.services.ingestion import IngestionResult, run_ingestion          # noq
 from app.services.ingestion.vector_store import VectorStore                # noqa: E402
 from app.services.rag import RAGQueryEngine                                # noqa: E402
 
+from app.api.routes import employees, projects, teams                      # noqa: E402
+
 # upload-downloader has a hyphen in its directory name, which is not a valid
 # Python identifier, so we load it dynamically via importlib.
 _file_fetch_path = (
@@ -94,6 +96,11 @@ app.add_middleware(
 
 # Register upload / download routes from the upload-downloader service
 app.include_router(file_router)
+
+# Register ERS routes
+app.include_router(employees.router)
+app.include_router(projects.router)
+app.include_router(teams.router)
 
 
 # ── request / response models ─────────────────────────────────────────────────
