@@ -32,6 +32,10 @@ from pydantic import BaseModel
 
 
 
+
+
+
+
 # ── ensure 'backend/' is on the path when running from repo root ──────────────
 # (uvicorn app.api.main:app already handles this via PYTHONPATH / -m; this
 #  guard is a safety net for direct `python -m app.api.main` invocations)
@@ -222,5 +226,5 @@ async def health():
 
 
 @app.get("/")
-def greetins():
+def greetings():
     return "hello welcome to PRJ006"

@@ -5,3 +5,5 @@
 faiss-store/
 backend/app/services/.env
 backend/app/logs
+settings.json
+.vscode/

@@ -37,6 +37,7 @@ def _auto_device() -> str:
         pass
     return "cpu"
 
+
 # ── defaults ──────────────────────────────────────────────────────────────────
 DEFAULT_MODEL      = "minilm"
 DEFAULT_BATCH_SIZE = 64          # sweet spot for CPU; increase for GPU
@@ -99,7 +100,7 @@ class Embedder:
         Parameters
         ----------
         texts    : Strings to embed.
-        is_query : True when embedding a search question.  Enables the
+        is_query : True when embedding a search question. Enables the
                    query-instruction prefix on models that require it
                    (e.g. Qwen/Qwen3-Embedding-8B).
         """

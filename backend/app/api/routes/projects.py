@@ -38,6 +38,7 @@ def assign_employee(project_id: UUID, body: AssignmentCreate):
         _404(e)
 
 
+<<<<<<< HEAD
 @router.put("/{project_id}")
 def update_project(project_id: UUID, body: ProjectUpdate):
     try:
@@ -46,6 +47,8 @@ def update_project(project_id: UUID, body: ProjectUpdate):
         _404(e)
 
 
+=======
+>>>>>>> 5c03473691181940f59a1c7c133d0be9d1e9c628
 @router.get("/{project_id}/team")
 def get_project_team(project_id: UUID):
     try:
