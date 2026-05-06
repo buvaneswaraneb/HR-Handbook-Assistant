@@ -24,10 +24,40 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
+def _auto_device() -> str:
+    """Auto-detect the best device: CUDA → MPS (Apple Silicon) → CPU."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
+        if torch.backends.mps.is_available():
+            return "mps"
+    except ImportError:
+        pass
+    return "cpu"
+
 # ── defaults ──────────────────────────────────────────────────────────────────
-DEFAULT_MODEL      = "all-MiniLM-L6-v2"
+DEFAULT_MODEL      = "minilm"
 DEFAULT_BATCH_SIZE = 64          # sweet spot for CPU; increase for GPU
 EMBEDDING_DIM      = 384         # MiniLM-L6 output size
+
+MODEL_PROFILES = {
+    "minilm": {
+        "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+        "dimension": 384,
+        "batch_size": 64,
+        "query_prompt_name": None,
+        "trust_remote_code": False,
+    },
+    "qwen": {
+        "model_id": "Qwen/Qwen3-Embedding-8B",
+        "dimension": 4096,
+        "batch_size": 32,
+        "query_prompt_name": "s2p_query",
+        "trust_remote_code": True,
+    },
+}
 
 
 class Embedder:
@@ -42,7 +72,11 @@ class Embedder:
 
     def __init__(
         self,
+<<<<<<< HEAD
         model_key: str = DEFAULT_MODEL_KEY,
+=======
+        model_key: str = DEFAULT_MODEL,
+>>>>>>> employee_manager
         batch_size: int | None = None,
         device: str | None = None,
     ) -> None:
@@ -125,7 +159,11 @@ class Embedder:
 _embedder_cache: dict[str, Embedder] = {}
 
 
+<<<<<<< HEAD
 def create_embedder(model_key: str = DEFAULT_MODEL_KEY) -> Embedder:
+=======
+def create_embedder(model_key: str = DEFAULT_MODEL) -> Embedder:
+>>>>>>> employee_manager
     """Return a (cached) Embedder for the given profile key."""
     if model_key not in _embedder_cache:
         _embedder_cache[model_key] = Embedder(model_key=model_key)
@@ -134,4 +172,8 @@ def create_embedder(model_key: str = DEFAULT_MODEL_KEY) -> Embedder:
 
 def get_default_embedder() -> Embedder:
     """Backwards-compatible convenience — always returns the minilm embedder."""
+<<<<<<< HEAD
     return create_embedder(DEFAULT_MODEL_KEY)
+=======
+    return create_embedder(DEFAULT_MODEL)
+>>>>>>> employee_manager
