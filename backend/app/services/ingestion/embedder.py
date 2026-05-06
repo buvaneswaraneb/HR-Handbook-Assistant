@@ -1,16 +1,18 @@
 """
-embedder.py — Lightweight batch embedding via sentence-transformers.
+embedder.py — Batch embedding via sentence-transformers with multi-model support.
 
-Model: all-MiniLM-L6-v2
-  • 384-dim vectors — small FAISS index
-  • ~22 M params — fast CPU inference
-  • No API key / no token cost
-  • Solid retrieval quality for RAG
+Supported model profiles
+------------------------
+  "minilm"  : sentence-transformers/all-MiniLM-L6-v2
+                384-dim | ~22M params | fast CPU | good retrieval quality
+  "qwen"    : Qwen/Qwen3-Embedding-8B
+                4096-dim | ~8B params | high accuracy | GPU recommended
 
 Design choices:
-  • Model loaded once, reused across calls (singleton pattern).
-  • encode() is called in batches to maximise throughput.
-  • Returns numpy float32 arrays directly (FAISS-ready).
+  • Each profile has its own Embedder instance (cached in _embedder_cache).
+  • Qwen3-Embedding uses a separate query instruction prefix — pass
+    is_query=True when embedding search questions.
+  • Device auto-detection: CUDA → MPS (Apple Silicon) → CPU.
 """
 
 from __future__ import annotations
@@ -22,10 +24,40 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
+def _auto_device() -> str:
+    """Auto-detect the best device: CUDA → MPS (Apple Silicon) → CPU."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return "cuda"
+        if torch.backends.mps.is_available():
+            return "mps"
+    except ImportError:
+        pass
+    return "cpu"
+
 # ── defaults ──────────────────────────────────────────────────────────────────
-DEFAULT_MODEL      = "all-MiniLM-L6-v2"
+DEFAULT_MODEL      = "minilm"
 DEFAULT_BATCH_SIZE = 64          # sweet spot for CPU; increase for GPU
 EMBEDDING_DIM      = 384         # MiniLM-L6 output size
+
+MODEL_PROFILES = {
+    "minilm": {
+        "model_id": "sentence-transformers/all-MiniLM-L6-v2",
+        "dimension": 384,
+        "batch_size": 64,
+        "query_prompt_name": None,
+        "trust_remote_code": False,
+    },
+    "qwen": {
+        "model_id": "Qwen/Qwen3-Embedding-8B",
+        "dimension": 4096,
+        "batch_size": 32,
+        "query_prompt_name": "s2p_query",
+        "trust_remote_code": True,
+    },
+}
 
 
 class Embedder:
@@ -40,64 +72,96 @@ class Embedder:
 
     def __init__(
         self,
-        model_name: str = DEFAULT_MODEL,
-        batch_size: int = DEFAULT_BATCH_SIZE,
-        device: str | None = None,   # None → auto-detect (cpu / cuda)
+        model_key: str = DEFAULT_MODEL,
+        batch_size: int | None = None,
+        device: str | None = None,
     ) -> None:
-        self._model_name = model_name
-        self._batch_size = batch_size
-        self._device = device
-        self._model = None           # lazy-loaded
+        if model_key not in MODEL_PROFILES:
+            raise ValueError(
+                f"Unknown model_key '{model_key}'. "
+                f"Choose from: {list(MODEL_PROFILES)}"
+            )
+        profile = MODEL_PROFILES[model_key]
+        self._model_key        = model_key
+        self._model_id         = profile["model_id"]
+        self._dim              = profile["dimension"]
+        self._batch_size       = batch_size or profile["batch_size"]
+        self._query_prompt     = profile["query_prompt_name"]
+        self._trust_remote     = profile["trust_remote_code"]
+        self._device           = device or _auto_device()
+        self._model            = None    # lazy-loaded
 
     # ── public ────────────────────────────────────────────────────────────────
-    def embed(self, texts: Sequence[str]) -> np.ndarray:
+    def embed(self, texts: Sequence[str], is_query: bool = False) -> np.ndarray:
         """
-        Embed a list of texts in batches.
+        Embed a list of texts.
 
-        Returns
-        -------
-        np.ndarray  shape (N, EMBEDDING_DIM), dtype float32
+        Parameters
+        ----------
+        texts    : Strings to embed.
+        is_query : True when embedding a search question.  Enables the
+                   query-instruction prefix on models that require it
+                   (e.g. Qwen/Qwen3-Embedding-8B).
         """
         if not texts:
-            return np.empty((0, EMBEDDING_DIM), dtype=np.float32)
+            return np.empty((0, self._dim), dtype=np.float32)
 
         model = self._get_model()
         logger.info(
-            "Embedding %d texts with model '%s' (batch_size=%d)",
-            len(texts), self._model_name, self._batch_size,
+            "Embedding %d texts with model '%s' on %s (is_query=%s)",
+            len(texts), self._model_id, self._device, is_query,
         )
 
-        vectors = model.encode(
-            list(texts),
-            batch_size=self._batch_size,
-            show_progress_bar=False,
-            convert_to_numpy=True,
-            normalize_embeddings=True,   # cosine similarity via dot-product
+        encode_kwargs: dict = dict(
+            batch_size           = self._batch_size,
+            show_progress_bar    = False,
+            convert_to_numpy     = True,
+            normalize_embeddings = True,   # cosine similarity via dot-product
         )
+        if is_query and self._query_prompt:
+            encode_kwargs["prompt_name"] = self._query_prompt
+
+        vectors = model.encode(list(texts), **encode_kwargs)
         return vectors.astype(np.float32)
 
     @property
     def dimension(self) -> int:
-        return EMBEDDING_DIM
+        return self._dim
+
+    @property
+    def model_key(self) -> str:
+        return self._model_key
+
+    @property
+    def model_id(self) -> str:
+        return self._model_id
 
     # ── internal ──────────────────────────────────────────────────────────────
     def _get_model(self):
         if self._model is None:
-            from sentence_transformers import SentenceTransformer  # deferred import
-            logger.info("Loading embedding model '%s' …", self._model_name)
-            self._model = SentenceTransformer(
-                self._model_name,
-                device=self._device,
+            from sentence_transformers import SentenceTransformer
+            logger.info(
+                "Loading embedding model '%s' on device '%s' …",
+                self._model_id, self._device,
             )
+            kwargs: dict = {"device": self._device}
+            if self._trust_remote:
+                kwargs["trust_remote_code"] = True
+            self._model = SentenceTransformer(self._model_id, **kwargs)
         return self._model
 
 
-# ── module-level singleton (optional convenience) ─────────────────────────────
-_default_embedder: Embedder | None = None
+# ── factories ─────────────────────────────────────────────────────────────────
+_embedder_cache: dict[str, Embedder] = {}
+
+
+def create_embedder(model_key: str = DEFAULT_MODEL) -> Embedder:
+    """Return a (cached) Embedder for the given profile key."""
+    if model_key not in _embedder_cache:
+        _embedder_cache[model_key] = Embedder(model_key=model_key)
+    return _embedder_cache[model_key]
 
 
 def get_default_embedder() -> Embedder:
-    global _default_embedder
-    if _default_embedder is None:
-        _default_embedder = Embedder()
-    return _default_embedder
+    """Backwards-compatible convenience — always returns the minilm embedder."""
+    return create_embedder(DEFAULT_MODEL)
