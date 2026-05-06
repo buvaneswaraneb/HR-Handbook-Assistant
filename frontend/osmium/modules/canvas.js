@@ -1,12 +1,17 @@
 // ============================================================
 // canvas.js — Infinite 2D Canvas Engine
 // Pan · Zoom · Node Drag · Multi-select · Edges · Groups
+// Side Panel · Hover Glow · Edge Bubbles · Hierarchy
 // ============================================================
 
 import { State } from '../utils/state.js';
 import { uid, clamp, snap, throttle } from '../utils/helpers.js';
-import { showContextMenu } from './ui.js';
-import { escHtml, initials, avatarColor, avatarTextColor, ratingStars } from '../utils/helpers.js';
+import { showContextMenu, showToast } from './ui.js';
+import { escHtml, initials, avatarColor, avatarTextColor } from '../utils/helpers.js';
+import { getEmployees, getProjects, assignToProject } from './api.js';
+
+// Hierarchy maps per project: { projId: { managerId, teamLeadId, memberIds[] } }
+const projectAssignments = {};
 
 let world, svgLayer, bgEl, zoomLabel, selBox;
 let isPanning = false, isSpacePanning = false, isSpaceDown = false;
@@ -72,6 +77,7 @@ export function initCanvas() {
   State.on('canvas:selection:change', updateSelectionStyles);
   State.on('canvas:reset', resetView);
   State.on('canvas:fit', fitToScreen);
+  State.on('view:canvas', initSidePanel);
 
   // ─ Toolbar ─
   document.getElementById('btn-zoom-in')?.addEventListener('click', () => zoomAt(0.5, 0.5, 1));
@@ -79,6 +85,13 @@ export function initCanvas() {
   document.getElementById('btn-zoom-reset')?.addEventListener('click', resetView);
   document.getElementById('btn-fit-screen')?.addEventListener('click', fitToScreen);
   document.getElementById('btn-snap-grid')?.addEventListener('click', toggleSnapGrid);
+
+  // ─ Hover glow on background dots ─
+  container.addEventListener('mousemove', onBgHover);
+  container.addEventListener('mouseleave', clearGlow);
+
+  // ─ Side panel toggle ─
+  document.getElementById('canvas-panel-toggle')?.addEventListener('click', toggleCanvasPanel);
 }
 
 // ─── TRANSFORM ────────────────────────────────────────────────
@@ -301,6 +314,86 @@ export function fitToScreen() {
   applyTransform();
 }
 
+// ─── HOVER GLOW ───────────────────────────────────────────────
+let glowEl = null;
+function onBgHover(e) {
+  if (!bgEl) return;
+  const rect = bgEl.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  if (!glowEl) {
+    glowEl = document.createElement('div');
+    glowEl.style.cssText = `position:absolute;pointer-events:none;border-radius:50%;background:radial-gradient(circle, rgba(90,191,232,0.18) 0%, transparent 70%);transition:opacity 0.1s;z-index:1`;
+    bgEl.appendChild(glowEl);
+  }
+  const r = 120;
+  glowEl.style.width  = r * 2 + 'px';
+  glowEl.style.height = r * 2 + 'px';
+  glowEl.style.left   = (x - r) + 'px';
+  glowEl.style.top    = (y - r) + 'px';
+  glowEl.style.opacity = '1';
+}
+function clearGlow() { if (glowEl) glowEl.style.opacity = '0'; }
+
+// ─── SIDE PANEL ───────────────────────────────────────────────
+let panelOpen = true;
+
+function toggleCanvasPanel() {
+  const panel = document.getElementById('canvas-side-panel');
+  if (!panel) return;
+  panelOpen = !panelOpen;
+  panel.style.transform = panelOpen ? 'translateX(0)' : 'translateX(-100%)';
+  const icon = document.getElementById('canvas-panel-toggle')?.querySelector('.material-symbols-outlined');
+  if (icon) icon.textContent = panelOpen ? 'chevron_left' : 'chevron_right';
+}
+
+async function initSidePanel() {
+  const projList = document.getElementById('canvas-proj-list');
+  const empList  = document.getElementById('canvas-emp-list');
+  if (!projList && !empList) return;
+
+  try {
+    const [emps, projs] = await Promise.all([
+      State.employees.length ? State.employees : getEmployees(),
+      State.projects.length  ? State.projects  : getProjects(),
+    ]);
+
+    if (projList) {
+      projList.innerHTML = projs.length
+        ? projs.map(p => `
+          <div class="canvas-panel-item" draggable="true"
+            ondragstart="window._canvasDragStart(event,'project','${p.id}')"
+            onclick="window._addProjToCanvas('${p.id}')"
+            title="Click or drag to canvas">
+            <span class="material-symbols-outlined" style="font-size:14px;color:#5abfe8">folder</span>
+            <span style="font-size:0.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.project_name)}</span>
+          </div>`).join('')
+        : `<div style="padding:12px;font-size:0.75rem;color:var(--gl-on-surface-4)">No projects</div>`;
+    }
+
+    if (empList) {
+      empList.innerHTML = emps.length
+        ? emps.map(e => {
+            const bg = avatarColor(e.name), fc = avatarTextColor(e.name);
+            return `
+              <div class="canvas-panel-item" draggable="true"
+                ondragstart="window._canvasDragStart(event,'employee','${e.id}')"
+                onclick="window._addToCanvasById('${e.id}')"
+                title="Click or drag to canvas">
+                <div style="width:20px;height:20px;border-radius:50%;background:${bg};color:${fc};display:flex;align-items:center;justify-content:center;font-size:0.55rem;font-weight:700;flex-shrink:0">${initials(e.name)}</div>
+                <span style="font-size:0.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(e.name)}</span>
+                <span style="font-size:9px;color:${e.availability ? '#3dd68c' : 'var(--gl-on-surface-4)'}">●</span>
+              </div>`;
+          }).join('')
+        : `<div style="padding:12px;font-size:0.75rem;color:var(--gl-on-surface-4)">No employees</div>`;
+    }
+  } catch {}
+}
+
+window._canvasDragStart = function(e, type, id) {
+  e.dataTransfer.setData('text/plain', JSON.stringify({ type, id }));
+};
+
 // ─── GRID SNAP ────────────────────────────────────────────────
 function toggleSnapGrid() {
   State.canvas.snapToGrid = !State.canvas.snapToGrid;
@@ -356,7 +449,7 @@ function createNodeElement(node) {
         <div class="node-role truncate">${escHtml(emp.role || '')}</div>
       </div>
     </div>
-    <div class="node-body">
+      <div class="node-body">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
         ${availBadge}
         ${rating}
@@ -373,7 +466,12 @@ function createNodeElement(node) {
           <span class="material-symbols-outlined" style="font-size:14px">open_in_new</span>
         </button>
       </div>
-    </div>`;
+    </div>
+    <!-- Edge port bubbles (shown on hover via CSS) -->
+    <div class="node-port node-port-t" data-node="${node.id}" title="Connect from top"></div>
+    <div class="node-port node-port-r" data-node="${node.id}" title="Connect from right"></div>
+    <div class="node-port node-port-b" data-node="${node.id}" title="Connect from bottom"></div>
+    <div class="node-port node-port-l" data-node="${node.id}" title="Connect from left"></div>`;
 
   el.addEventListener('click', e => {
     if (e.target.closest('button')) return;
@@ -490,25 +588,55 @@ function showEdgeCtxMenu(e, edgeId) {
   ]);
 }
 
-// ─── CONNECT NODES ────────────────────────────────────────────
+// ─── CONNECT NODES (Hierarchy-Aware) ─────────────────────────
 window._startConnect = function(fromId) {
   isConnecting = true;
   connectFromId = fromId;
   const container = document.getElementById('canvas-view');
   container.style.cursor = 'crosshair';
-  showToastMsg('Click a node to connect, or press Escape to cancel.');
+
+  // Ask what role this connection represents
+  const role = prompt('Connection type: manager | teamlead | member', 'member');
+  if (!role) { cancel(); return; }
+  const normalRole = role.trim().toLowerCase();
+
+  showToastMsg('Click a node to connect, or Escape to cancel.');
 
   function onNodeClick(e) {
     const nodeEl = e.target.closest('.canvas-node');
     if (!nodeEl) { cancel(); return; }
     const toId = nodeEl.dataset.id;
-    if (toId !== fromId) {
-      State.addCanvasEdge({
-        id: uid(), fromId, toId,
-        type: 'member',
-        label: 'reports to',
-      });
+    if (toId === fromId) { cancel(); return; }
+
+    // Hierarchy enforcement — prompt for target project
+    const projId = prompt('Enter project ID to assign this connection (leave blank for generic link):')?.trim() || null;
+
+    if (projId) {
+      if (!projectAssignments[projId]) {
+        projectAssignments[projId] = { managerId: null, teamLeadId: null, memberIds: [] };
+      }
+      const asgn = projectAssignments[projId];
+
+      if (normalRole === 'manager') {
+        if (asgn.managerId && asgn.managerId !== toId) {
+          showToastMsg('This project already has a manager!');
+          cancel(); return;
+        }
+        asgn.managerId = toId;
+      } else if (normalRole === 'teamlead') {
+        if (asgn.teamLeadId && asgn.teamLeadId !== toId) {
+          showToastMsg('This project already has a team lead!');
+          cancel(); return;
+        }
+        asgn.teamLeadId = toId;
+      } else {
+        asgn.memberIds.push(toId);
+      }
     }
+
+    const edgeType  = normalRole === 'manager' ? 'manager' : normalRole === 'teamlead' ? 'teamlead' : 'member';
+    const edgeLabel = normalRole === 'manager' ? 'Manager' : normalRole === 'teamlead' ? 'Team Lead' : 'Member';
+    State.addCanvasEdge({ id: uid(), fromId, toId, type: edgeType, label: edgeLabel });
     cancel();
   }
 

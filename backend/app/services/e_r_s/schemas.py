@@ -63,6 +63,7 @@ class EmployeeCreate(BaseModel):
     role: str
     team: Optional[str] = None
     manager_id: Optional[UUID] = None
+    team_lead_id: Optional[UUID] = None
     linkedin_url: Optional[str] = None
     rating: Optional[float] = Field(None, ge=0, le=5)
     total_experience_years: Optional[float] = None
@@ -71,6 +72,10 @@ class EmployeeCreate(BaseModel):
     project_end_date: Optional[date] = None
     work_start_time: Optional[time] = None
     work_end_time: Optional[time] = None
+    google_calendar_email: Optional[EmailStr] = None
+    google_calendar_sync_enabled: bool = False
+    google_calendar_synced_at: Optional[datetime] = None
+    skills: List[EmployeeSkillCreate] = Field(default_factory=list)
 
 
 class EmployeeUpdate(EmployeeCreate):
@@ -90,6 +95,7 @@ class EmployeeOut(BaseModel):
     role: str
     team: Optional[str] = None
     manager_id: Optional[UUID] = None
+    team_lead_id: Optional[UUID] = None
     linkedin_url: Optional[str] = None
     rating: Optional[float] = None
     total_experience_years: Optional[float] = None
@@ -98,6 +104,9 @@ class EmployeeOut(BaseModel):
     project_end_date: Optional[date] = None
     work_start_time: Optional[time] = None
     work_end_time: Optional[time] = None
+    google_calendar_email: Optional[str] = None
+    google_calendar_sync_enabled: bool = False
+    google_calendar_synced_at: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     skills: List[EmployeeSkillOut] = []
@@ -121,6 +130,27 @@ class ProjectCreate(BaseModel):
     end_date: Optional[date] = None
     percent_complete: Optional[int] = Field(None, ge=0, le=100)
     status: Optional[str] = "active"
+    required_skills: List[str] = Field(default_factory=list)
+    required_roles: List[str] = Field(default_factory=list)
+    manager_id: Optional[UUID] = None
+    team_lead_id: Optional[UUID] = None
+    team_member_ids: List[UUID] = Field(default_factory=list)
+
+
+class ProjectUpdate(BaseModel):
+    project_name: Optional[str] = None
+    client_name: Optional[str] = None
+    client_email: Optional[EmailStr] = None
+    project_description: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    percent_complete: Optional[int] = Field(None, ge=0, le=100)
+    status: Optional[str] = None
+    required_skills: Optional[List[str]] = None
+    required_roles: Optional[List[str]] = None
+    manager_id: Optional[UUID] = None
+    team_lead_id: Optional[UUID] = None
+    team_member_ids: Optional[List[UUID]] = None
 
 
 class ProjectOut(BaseModel):
@@ -133,6 +163,8 @@ class ProjectOut(BaseModel):
     end_date: Optional[date] = None
     percent_complete: Optional[int] = 0
     status: Optional[str] = "active"
+    required_skills: List[str] = Field(default_factory=list)
+    required_roles: List[str] = Field(default_factory=list)
     days_remaining: Optional[int] = None   # computed, not stored
     created_at: Optional[datetime] = None
     team: List[AssignmentOut] = []
@@ -146,8 +178,35 @@ class AssignmentCreate(BaseModel):
 class AssignmentOut(BaseModel):
     employee_id: UUID
     employee_name: str
+    name: Optional[str] = None
     role_in_project: str
     assigned_date: Optional[date] = None
+    availability: Optional[bool] = None
+    role: Optional[str] = None
+
+
+# ── Leave Management ─────────────────────────────────────────────────────────
+class LeaveRecordCreate(BaseModel):
+    employee_id: UUID
+    start_date: date
+    end_date: date
+    leave_type: Optional[str] = "leave"
+    status: Optional[str] = "approved"
+    notes: Optional[str] = None
+
+
+class LeaveSummaryDay(BaseModel):
+    date: date
+    count: int
+    percent: float
+    status: str
+
+
+class LeaveSummary(BaseModel):
+    total_members: int
+    on_leave_count: int
+    leave_people: List[dict] = []
+    calendar: List[LeaveSummaryDay] = []
 
 
 # ── Bulk upload ───────────────────────────────────────────────────────────────
@@ -183,6 +242,7 @@ class AnalyticsSummary(BaseModel):
     on_leave: int
     available: int
     skill_coverage: List[SkillCoverageItem]
+    google_calendar: dict = {}
 
 
 # ── Activity Feed ─────────────────────────────────────────────────────────────

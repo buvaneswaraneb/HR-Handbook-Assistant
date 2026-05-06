@@ -44,7 +44,7 @@ from app.services.ingestion import IngestionResult, run_ingestion          # noq
 from app.services.ingestion.vector_store import VectorStore                # noqa: E402
 from app.services.rag import RAGQueryEngine                                # noqa: E402
 
-from app.api.routes import employees, projects, teams, activity, analytics, files  # noqa: E402
+from app.api.routes import employees, projects, teams, activity, analytics, files, leave, auth, calendar, supabase_auth  # noqa: E402
 
 # upload-downloader has a hyphen in its directory name, which is not a valid
 # Python identifier, so we load it dynamically via importlib.
@@ -97,6 +97,12 @@ app.add_middleware(
 # Register upload / download routes from the upload-downloader service
 app.include_router(file_router)
 
+# Register Supabase authentication routes (replaces manual auth)
+app.include_router(supabase_auth.router)
+
+# Register calendar routes
+app.include_router(calendar.router)
+
 # Register ERS routes
 app.include_router(employees.router)
 app.include_router(projects.router)
@@ -104,6 +110,7 @@ app.include_router(teams.router)
 app.include_router(activity.router)
 app.include_router(analytics.router)
 app.include_router(files.router)
+app.include_router(leave.router)
 
 
 # ── request / response models ─────────────────────────────────────────────────

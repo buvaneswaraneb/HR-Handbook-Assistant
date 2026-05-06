@@ -8,6 +8,9 @@ import { escHtml, ratingStars, initials, avatarColor, avatarTextColor, fmtDate, 
 import { showToast, openModal, closeModal } from './ui.js';
 import { addEmployeeToCanvas } from './canvas.js';
 
+// Tag input state for skills
+let empSkillTags = [];
+
 export function initEmployees() {
   State.on('view:employees', loadEmployees);
   State.on('data:employees:refresh', () => { if (State.currentView === 'employees') loadEmployees(); });
@@ -15,6 +18,56 @@ export function initEmployees() {
   document.getElementById('emp-reset-btn')?.addEventListener('click', loadEmployees);
   document.getElementById('emp-search-skill')?.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
   document.getElementById('add-emp-form')?.addEventListener('submit', e => { e.preventDefault(); submitEmployee(); });
+
+  // Skills tag input
+  initSkillTagInput('emp-skill-input', 'emp-skill-tags', () => empSkillTags, v => { empSkillTags = v; });
+
+  // Populate manager / team lead dropdowns when modal opens
+  document.querySelector('[onclick*="add-employee-modal"]')?.addEventListener('click', populateEmpDropdowns);
+}
+
+function initSkillTagInput(inputId, tagsId, getArr, setArr) {
+  const input = document.getElementById(inputId);
+  const tagsEl = document.getElementById(tagsId);
+  if (!input || !tagsEl) return;
+
+  const renderTags = () => {
+    tagsEl.innerHTML = getArr().map((t, i) =>
+      `<span class="skill-tag">${escHtml(t)}<button type="button" onclick="this.parentElement.remove();window._removeSkillTag('${inputId}',${i})">×</button></span>`
+    ).join('');
+  };
+
+  window[`_removeSkillTag_${inputId}`] = (idx) => {
+    setArr(getArr().filter((_, i) => i !== idx));
+    renderTags();
+  };
+
+  input.addEventListener('keydown', e => {
+    if ((e.key === 'Enter' || e.key === ',') && input.value.trim()) {
+      e.preventDefault();
+      const val = input.value.trim().replace(/,$/, '');
+      if (val && !getArr().includes(val)) {
+        setArr([...getArr(), val]);
+        renderTags();
+      }
+      input.value = '';
+    } else if (e.key === 'Backspace' && !input.value && getArr().length) {
+      setArr(getArr().slice(0, -1));
+      renderTags();
+    }
+  });
+}
+
+export async function populateEmpDropdowns() {
+  try {
+    const emps = State.employees.length ? State.employees : await getEmployees();
+    const managerSel = document.getElementById('new-emp-manager');
+    const teamLeadSel = document.getElementById('new-emp-teamlead');
+    const opts = `<option value="">— None —</option>` +
+      emps.map(e => `<option value="${e.id}">${escHtml(e.name)} (${escHtml(e.role || '—')})</option>`).join('');
+    if (managerSel) managerSel.innerHTML = opts;
+    if (teamLeadSel) teamLeadSel.innerHTML = opts;
+  } catch {}
 }
 
 export async function loadEmployees() {
@@ -65,7 +118,7 @@ function employeeCard(emp) {
   const init = initials(emp.name);
   const avail = emp.availability;
   const skills = (emp.skills || []).slice(0, 5).map(s =>
-    `<span class="chip">${escHtml(s.skill_name)}</span>`
+    `<span class="chip">${escHtml(typeof s === 'string' ? s : s.skill_name)}</span>`
   ).join('');
 
   return `
@@ -85,7 +138,7 @@ function employeeCard(emp) {
             <span class="chip" style="font-size:10px">${escHtml(emp.team || 'No team')}</span>
           </div>
         </div>
-        ${emp.rating ? `<span style="font-size:0.78rem;color:var(--gl-tertiary);font-weight:600;flex-shrink:0">★ ${emp.rating}</span>` : ''}
+        ${emp.rating ? `<span style="font-size:0.78rem;color:#f5a623;font-weight:600;flex-shrink:0">★ ${emp.rating}</span>` : ''}
       </div>
       ${skills ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">${skills}</div>` : ''}
       <div style="display:flex;gap:6px;margin-top:auto">
@@ -114,6 +167,9 @@ async function submitEmployee() {
     linkedin_url: get('new-emp-linkedin'),
     work_start_time: get('new-emp-start') || null,
     work_end_time:   get('new-emp-end') || null,
+    manager_id:   get('new-emp-manager') || null,
+    team_lead_id: get('new-emp-teamlead') || null,
+    skills: empSkillTags,
   };
 
   if (!body.name) { showToast('Name is required.', 'error'); return; }
@@ -125,6 +181,8 @@ async function submitEmployee() {
     await createEmployee(body);
     showToast('Employee created!');
     closeModal('add-employee-modal');
+    empSkillTags = [];
+    document.getElementById('emp-skill-tags').innerHTML = '';
     loadEmployees();
     State.emit('data:employees:refresh');
   } catch (e) { showToast(e.message, 'error'); }
@@ -140,4 +198,12 @@ window._openEmpInspector = async function(empId) {
 window._addToCanvasById = function(empId) {
   const emp = State.employees.find(e => e.id === empId);
   if (emp) { addEmployeeToCanvas(emp); showToast('Added to canvas'); }
+};
+
+window._removeSkillTag = function(inputId, idx) {
+  empSkillTags = empSkillTags.filter((_, i) => i !== idx);
+  const tagsEl = document.getElementById('emp-skill-tags');
+  if (tagsEl) tagsEl.innerHTML = empSkillTags.map((t, i) =>
+    `<span class="skill-tag">${escHtml(t)}<button type="button" onclick="window._removeSkillTag('emp-skill-input',${i})">×</button></span>`
+  ).join('');
 };

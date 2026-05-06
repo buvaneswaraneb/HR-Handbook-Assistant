@@ -43,4 +43,5 @@ def get_summary() -> dict:
         "on_leave":         counts["on_leave"],
         "available":        counts["available"],
         "skill_coverage":   skill_coverage,
+        "google_calendar":  repo.google_calendar_status(),
     }

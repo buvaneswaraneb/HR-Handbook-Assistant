@@ -80,7 +80,11 @@
   </div>
 
   <div class="nav-section-label" style="margin-top:8px">Tools</div>
-  <div class="nav-item" data-view="ai" onclick="window.toggleAIWindow?.()">
+  <div class="nav-item" data-view="leave" onclick="switchViewGlobal('leave')">
+    <span class="material-symbols-outlined nav-icon">event_busy</span>
+    <span>Leave</span>
+  </div>
+  <div class="nav-item" data-view="ai" onclick="switchViewGlobal('ai')">
     <span class="material-symbols-outlined nav-icon">smart_toy</span>
     <span>AI Assistant</span>
     <span class="nav-badge">AI</span>
@@ -194,22 +198,27 @@
         </div>
       </div>
 
-      <!-- Skill chart + Deadlines + Quick actions -->
+      <!-- Google Calendar + Deadlines -->
       <div style="display:grid;grid-template-columns:1fr 1fr 300px;gap:20px;margin-bottom:24px">
 
-        <!-- Skill coverage chart -->
+        <!-- Google Calendar Widget -->
         <div class="card" style="grid-column:span 2">
-          <div style="padding:18px 20px 16px;border-bottom:1px solid var(--gl-outline);display:flex;align-items:center;justify-content:space-between">
-            <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface)">Skill Coverage Analysis</div>
-            <div style="display:flex;gap:12px">
-              <span style="display:flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--gl-on-surface-3)"><span class="legend-dot" style="background:var(--gl-primary)"></span>Actual</span>
-              <span style="display:flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--gl-on-surface-3)"><span class="legend-dot" style="background:var(--gl-primary);opacity:0.4"></span>Required</span>
+          <div style="padding:16px 20px;border-bottom:1px solid var(--gl-outline);display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="material-symbols-outlined" style="color:#4285f4;font-size:20px">calendar_month</span>
+              <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface)">Google Calendar</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span id="calendar-date-header" style="font-size:0.75rem;color:var(--gl-on-surface-4)"></span>
+              <button class="btn btn-secondary btn-sm" onclick="window._syncCalendar?.()">
+                <span class="material-symbols-outlined" style="font-size:14px">sync</span> Sync
+              </button>
             </div>
           </div>
-          <div id="skill-chart" style="padding:16px 20px;min-height:200px;display:flex;align-items:center"></div>
-          <div id="skill-gap-alert" style="display:none;margin:0 20px 16px;background:var(--gl-warning-muted);border:1px solid rgba(245,166,35,0.2);border-radius:var(--r-md);padding:10px 14px;display:none;align-items:center;gap:10px">
-            <span class="material-symbols-outlined" style="color:var(--gl-warning);font-size:18px">warning</span>
-            <span style="font-size:0.78rem;color:var(--gl-on-surface-2)"><strong>Skill Gap:</strong> <span id="skill-gap-text"></span></span>
+          <div id="calendar-widget" style="padding:12px 20px;min-height:160px">
+            <div style="display:flex;align-items:center;gap:10px;color:var(--gl-on-surface-4);padding:20px 0">
+              <span class="spinner-sm spinner"></span> Loading calendar…
+            </div>
           </div>
         </div>
 
@@ -217,16 +226,55 @@
         <div class="card">
           <div style="padding:18px 18px 14px;border-bottom:1px solid var(--gl-outline);display:flex;align-items:center;justify-content:space-between">
             <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface)">Deadlines</div>
-            <span style="font-size:0.68rem;font-weight:700;letter-spacing:0.06em;color:var(--gl-error);text-transform:uppercase">Critical</span>
+            <span style="font-size:0.68rem;font-weight:700;letter-spacing:0.06em;color:#f5574a;text-transform:uppercase">Critical</span>
           </div>
-          <div id="deadlines-list" style="padding:14px 16px;display:flex;align-items:center;gap:10px;color:var(--gl-on-surface-4)">
-            <span class="spinner-sm spinner"></span> Loading…
+          <div id="deadlines-list" style="padding:14px 16px">
+            <div style="display:flex;align-items:center;gap:10px;color:var(--gl-on-surface-4)">
+              <span class="spinner-sm spinner"></span> Loading…
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Quick actions + Activity -->
+      <!-- Quick actions + Skill Coverage -->
       <div style="display:grid;grid-template-columns:220px 1fr;gap:20px">
+        <!-- Quick actions -->
+        <div class="card" style="padding:18px">
+          <div style="font-size:0.9rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:14px">Quick Actions</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="openModal('add-employee-modal')">
+              <span class="material-symbols-outlined" style="color:#5abfe8">person_add</span>
+              <span style="font-size:0.82rem">Add Employee</span>
+            </button>
+            <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="openModal('add-project-modal');window._onAddProjectModalOpen?.()">
+              <span class="material-symbols-outlined" style="color:#3dd68c">create_new_folder</span>
+              <span style="font-size:0.82rem">New Project</span>
+            </button>
+            <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="switchViewGlobal('canvas')">
+              <span class="material-symbols-outlined" style="color:#f5a623">hub</span>
+              <span style="font-size:0.82rem">Open Canvas</span>
+            </button>
+            <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="switchViewGlobal('leave')">
+              <span class="material-symbols-outlined" style="color:#f5574a">event_busy</span>
+              <span style="font-size:0.82rem">Leave Management</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Skill Coverage Chart -->
+        <div class="card" style="overflow:hidden">
+          <div style="padding:18px 20px 14px;border-bottom:1px solid var(--gl-outline);display:flex;align-items:center;gap:12px">
+            <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface);flex:1">Skill Coverage</div>
+            <span style="display:flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--gl-on-surface-3)"><span class="legend-dot" style="background:#3dd68c"></span>Actual</span>
+            <span style="display:flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--gl-on-surface-3)"><span class="legend-dot" style="background:#5abfe8;opacity:0.5"></span>Required</span>
+          </div>
+          <div id="skill-chart" style="padding:16px 20px;min-height:180px;display:flex;align-items:center"></div>
+          <div id="skill-gap-alert" style="display:none;margin:0 20px 16px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);border-radius:var(--r-md);padding:10px 14px;align-items:center;gap:10px">
+            <span class="material-symbols-outlined" style="color:#f5a623;font-size:18px">warning</span>
+            <span style="font-size:0.78rem;color:var(--gl-on-surface-2)"><strong>Skill Gap:</strong> <span id="skill-gap-text"></span></span>
+          </div>
+        </div>
+      </div>
         <!-- Quick actions -->
         <div class="card" style="padding:18px">
           <div style="font-size:0.9rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:14px">Quick Actions</div>
@@ -280,12 +328,28 @@
       <span style="font-size:0.72rem;color:var(--gl-on-surface-4)">Space+Drag=Pan · Scroll=Zoom · G=Grid</span>
     </div>
 
+    <!-- Canvas side panel -->
+    <div id="canvas-side-panel">
+      <div class="canvas-panel-section">
+        <div class="canvas-panel-title">Projects</div>
+        <div id="canvas-proj-list" class="canvas-panel-scroll" style="max-height:220px;overflow-y:auto"></div>
+      </div>
+      <div class="canvas-panel-sep"></div>
+      <div class="canvas-panel-section">
+        <div class="canvas-panel-title">Employees</div>
+        <div id="canvas-emp-list" class="canvas-panel-scroll" style="max-height:340px;overflow-y:auto"></div>
+      </div>
+      <button id="canvas-panel-toggle" title="Toggle panel">
+        <span class="material-symbols-outlined" style="font-size:16px">chevron_left</span>
+      </button>
+    </div>
+
     <!-- Canvas surface -->
     <div id="canvas-view" style="position:relative;width:100%;height:100%;overflow:hidden">
       <div id="canvas-bg" style="position:absolute;inset:0"></div>
       <svg id="canvas-svg-layer" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5"></svg>
       <div id="canvas-world" style="position:absolute;transform-origin:0 0;will-change:transform;z-index:10"></div>
-      <div id="selection-box" style="position:absolute;border:1.5px solid var(--gl-primary);background:rgba(9,129,167,0.1);border-radius:3px;pointer-events:none;display:none;z-index:15"></div>
+      <div id="selection-box" style="position:absolute;border:1.5px solid #5abfe8;background:rgba(90,191,232,0.08);border-radius:3px;pointer-events:none;display:none;z-index:15"></div>
     </div>
 
     <!-- Canvas bottom toolbar -->
@@ -428,6 +492,87 @@
     <div id="tree-view-container" style="width:100%;height:100%;overflow:auto;padding:24px 28px"></div>
   </div>
 
+  <!-- ── LEAVE MANAGEMENT ───────────────────────────── -->
+  <div id="view-leave" class="view-panel">
+    <div class="view-scroll" style="padding:24px 28px;max-width:1100px;margin:0 auto">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px">
+        <div>
+          <div style="font-size:1.5rem;font-weight:700;letter-spacing:-0.025em;color:var(--gl-on-surface)">Leave Management</div>
+          <div style="font-size:0.8rem;color:var(--gl-on-surface-3);margin-top:2px">Track employee absences and resource availability</div>
+        </div>
+        <button class="btn btn-primary" onclick="openModal('add-leave-modal')">
+          <span class="material-symbols-outlined" style="font-size:16px">add</span> Add Leave
+        </button>
+      </div>
+
+      <div class="card" style="margin-bottom:24px">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--gl-outline);font-size:0.95rem;font-weight:700;color:var(--gl-on-surface)">52-Week Absence Heatmap</div>
+        <div id="leave-calendar" style="padding:20px;display:flex;justify-content:center">
+          <span class="spinner-sm spinner" style="margin-right:10px"></span> Loading calendar...
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--gl-outline);font-size:0.95rem;font-weight:700;color:var(--gl-on-surface)">Active & Upcoming Leave</div>
+        <div id="leave-list" style="padding:16px 20px">
+          <span class="spinner-sm spinner" style="margin-right:10px"></span> Loading records...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── AI ASSISTANT (FULL PAGE) ───────────────────── -->
+  <div id="view-ai" class="view-panel">
+    <div id="ai-chat-panel">
+      <div id="ai-chat-header">
+        <span class="material-symbols-outlined" style="color:#5abfe8;font-size:24px">smart_toy</span>
+        <div>
+          <div style="font-size:0.9rem;font-weight:700;color:var(--gl-on-surface)">Osmium Intelligence</div>
+          <div style="font-size:0.7rem;color:var(--gl-on-surface-4)">Enterprise RAG Assistant</div>
+        </div>
+      </div>
+      <div id="ai-messages">
+        <div class="ai-msg ai-msg-bot">
+          <div style="margin-bottom:8px">Hello! I am the Osmium AI Assistant.</div>
+          <div>I have full context of your enterprise data. You can ask me questions about employees, projects, or attach documents to query against them.</div>
+        </div>
+      </div>
+      <div id="ai-input-area">
+        <div class="ai-chips">
+          <div class="ai-chip" data-q="Who is available for a new React project?">Available React devs?</div>
+          <div class="ai-chip" data-q="List all active projects in the Engineering department">Active engineering projects</div>
+          <div class="ai-chip" data-q="What are the critical deadlines this week?">Critical deadlines</div>
+        </div>
+        <div style="position:relative">
+          <textarea id="ai-input" placeholder="Ask a question or request analysis... (Shift+Enter for new line)"></textarea>
+          <div id="ai-input-actions">
+            <button class="btn btn-ghost btn-sm" id="ai-attach-btn" style="color:var(--gl-on-surface-3)">
+              <span class="material-symbols-outlined" style="font-size:18px">attach_file</span> Attach
+            </button>
+            <input type="file" id="ai-file-input" style="display:none">
+            <div id="ai-attach-indicator"></div>
+            <div style="flex:1"></div>
+            <button class="btn btn-primary btn-sm" id="ai-send" style="padding:6px 16px;background:#5abfe8">
+              <span class="material-symbols-outlined" style="font-size:16px">send</span> Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="ai-files-sidebar">
+      <div id="ai-files-header">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--gl-on-surface)">Injected Context</div>
+        <span id="ai-context-badge" style="font-size:0.65rem;color:var(--gl-on-surface-4);font-weight:600">0 files</span>
+      </div>
+      <div id="ai-files-panel">
+        <div style="padding:24px;text-align:center;color:var(--gl-on-surface-4)">
+          <span class="spinner-sm spinner"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <!-- ══════════════════════════════════════════════
@@ -442,44 +587,6 @@
 </footer>
 
 </div><!-- #app -->
-
-<!-- ══════════════════════════════════════════════
-     AI WINDOW (floating)
-══════════════════════════════════════════════ -->
-<div id="ai-window">
-  <div class="ai-titlebar">
-    <div class="ai-icon">
-      <span class="material-symbols-outlined" style="font-size:15px;color:#fff;font-variation-settings:'FILL' 1">smart_toy</span>
-    </div>
-    <div style="flex:1;min-width:0">
-      <div style="font-size:0.85rem;font-weight:600;color:var(--gl-on-surface)">Osmium AI Assistant</div>
-      <div style="font-size:0.68rem;color:var(--gl-on-surface-4)">RAG · HR Docs</div>
-    </div>
-    <button class="btn btn-ghost btn-icon" id="ai-minimize" title="Minimize">
-      <span class="material-symbols-outlined" style="font-size:16px">remove</span>
-    </button>
-    <button class="btn btn-ghost btn-icon" id="ai-close" title="Close">
-      <span class="material-symbols-outlined" style="font-size:16px">close</span>
-    </button>
-  </div>
-  <div id="ai-messages">
-    <div class="ai-msg ai-msg-bot">
-      Hi! I'm your Osmium AI assistant. Ask me anything about HR policies, team capabilities, resource availability, or your uploaded documents.
-    </div>
-  </div>
-  <div class="ai-chips">
-    <span class="ai-chip" data-q="Who is available in Engineering?">Who's available in Engineering?</span>
-    <span class="ai-chip" data-q="What are the HR leave policies?">Leave policies</span>
-    <span class="ai-chip" data-q="Summarize team skill gaps">Skill gaps</span>
-    <span class="ai-chip" data-q="Which projects are overdue?">Overdue projects</span>
-  </div>
-  <div class="ai-input-row">
-    <input id="ai-input" placeholder="Ask about policies, skills, availability… (Enter to send)"/>
-    <button class="btn btn-primary btn-icon" id="ai-send">
-      <span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">send</span>
-    </button>
-  </div>
-</div>
 
 <!-- ══════════════════════════════════════════════
      SETTINGS PANEL
@@ -605,11 +712,14 @@
         <div><div class="label">Email</div><input      id="new-emp-email"    class="input" placeholder="arun@company.com" type="email"/></div>
         <div><div class="label">Role</div><input       id="new-emp-role"     class="input" placeholder="Backend Developer"/></div>
         <div><div class="label">Team</div><input       id="new-emp-team"     class="input" placeholder="Platform"/></div>
+        <div><div class="label">Manager</div><select id="new-emp-manager" class="select"><option value="">— None —</option></select></div>
+        <div><div class="label">Team Lead</div><select id="new-emp-teamlead" class="select"><option value="">— None —</option></select></div>
         <div><div class="label">Rating (0–5)</div><input id="new-emp-rating" class="input" type="number" step="0.1" min="0" max="5" placeholder="4.2"/></div>
         <div><div class="label">Experience (yrs)</div><input id="new-emp-exp" class="input" type="number" step="0.5" min="0" placeholder="3.5"/></div>
         <div><div class="label">Work Start</div><input id="new-emp-start"    class="input" type="time" value="09:00"/></div>
         <div><div class="label">Work End</div><input   id="new-emp-end"      class="input" type="time" value="18:00"/></div>
       </div>
+      <div style="margin-top:12px"><div class="label">Skills</div><div class="skill-tag-wrap" id="emp-skill-wrap"><div id="emp-skill-tags" style="display:inline-flex;flex-wrap:wrap;gap:4px"></div><input id="emp-skill-input" class="skill-tag-input" placeholder="Type a skill and press Enter..."></div></div>
       <div style="margin-top:12px"><div class="label">LinkedIn URL</div><input id="new-emp-linkedin" class="input" placeholder="https://linkedin.com/in/…"/></div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
         <label class="toggle">
@@ -644,6 +754,8 @@
         <div><div class="label">Client Email</div><input   id="proj-client-email" class="input" placeholder="pm@acme.com" type="email"/></div>
         <div><div class="label">Start Date</div><input     id="proj-start"        class="input" type="date"/></div>
         <div><div class="label">End Date</div><input       id="proj-end"          class="input" type="date"/></div>
+        <div><div class="label">Manager</div><select id="proj-manager" class="select"><option value="">— None —</option></select></div>
+        <div><div class="label">Team Lead</div><select id="proj-teamlead" class="select"><option value="">— None —</option></select></div>
         <div>
           <div class="label">Status</div>
           <select id="proj-status" class="select">
@@ -655,11 +767,55 @@
         </div>
         <div><div class="label">Progress (%)</div><input id="proj-pct" class="input" type="number" min="0" max="100" placeholder="0"/></div>
       </div>
+      <div style="margin-top:12px"><div class="label">Required Skills</div><div class="skill-tag-wrap"><div id="proj-skill-tags" style="display:inline-flex;flex-wrap:wrap;gap:4px"></div><input id="proj-skill-input" class="skill-tag-input" placeholder="e.g. React, Node.js"></div></div>
+      <div style="margin-top:12px"><div class="label">Roles Needed</div><div class="skill-tag-wrap"><div id="proj-role-tags" style="display:inline-flex;flex-wrap:wrap;gap:4px"></div><input id="proj-role-input" class="skill-tag-input" placeholder="e.g. Designer, QA"></div></div>
+      <div style="margin-top:12px">
+        <div class="label" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Assign Team Members</span>
+          <input id="proj-member-search" class="input" style="width:140px;padding:2px 8px;font-size:0.7rem;min-height:24px" placeholder="Search members...">
+        </div>
+        <div class="member-select-wrap" id="proj-member-list">
+          <div style="padding:10px;text-align:center;color:var(--gl-on-surface-4);font-size:0.75rem">Loading employees...</div>
+        </div>
+      </div>
       <div style="margin-top:12px"><div class="label">Description</div><textarea id="proj-desc" class="input" rows="3" placeholder="Project description…" style="resize:vertical"></textarea></div>
     </form>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="closeModal('add-project-modal')">Cancel</button>
       <button class="btn btn-primary" id="proj-submit-btn" type="submit" form="add-proj-form">Create Project</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Leave Modal -->
+<div id="add-leave-modal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="material-symbols-outlined" style="color:#f5574a">event_busy</span>
+      <span style="font-size:1rem;font-weight:700;color:var(--gl-on-surface);flex:1">Add Leave</span>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('add-leave-modal')">
+        <span class="material-symbols-outlined" style="font-size:18px">close</span>
+      </button>
+    </div>
+    <form id="add-leave-form" class="modal-body">
+      <div><div class="label">Employee Name (if not in system)</div><input id="leave-emp-name" class="input" placeholder="John Doe"/></div>
+      <div style="margin-top:12px"><div class="label">Or Select Employee</div><select id="leave-emp-select" class="select"><option value="">— Select Employee —</option></select></div>
+      <div class="grid-2" style="margin-top:12px">
+        <div><div class="label">Start Date *</div><input id="leave-start" class="input" type="date" required/></div>
+        <div><div class="label">End Date *</div><input id="leave-end" class="input" type="date" required/></div>
+      </div>
+      <div style="margin-top:12px">
+        <div class="label">Leave Type</div>
+        <select id="leave-type" class="select">
+          <option value="Annual">Annual Leave</option>
+          <option value="Sick">Sick Leave</option>
+          <option value="Unpaid">Unpaid Leave</option>
+        </select>
+      </div>
+    </form>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('add-leave-modal')">Cancel</button>
+      <button class="btn btn-primary" id="leave-submit-btn" type="submit" form="add-leave-form" style="background:#f5574a">Add Leave</button>
     </div>
   </div>
 </div>
@@ -682,6 +838,7 @@
   import { initTree } from './modules/tree.js';
   import { initAI } from './modules/ai.js';
   import { initSettings } from './modules/settings.js';
+  import { initLeave } from './modules/leave.js';
   import { debounce } from './utils/helpers.js';
 
   // ── Load settings first ─────────────────────────
@@ -701,6 +858,7 @@
   initTree();
   initAI();
   initSettings();
+  initLeave();
 
   // ── Global functions exposed for onclick attrs ──
   window.switchViewGlobal  = switchView;

@@ -149,6 +149,34 @@ export async function linkFile(fileId, body) {
 }
 
 // ─── RAG / AI ─────────────────────────────────────────────────
-export async function queryRAG(question) {
-  return request('/query', { method: 'POST', body: JSON.stringify({ question }) });
+export async function queryRAG(question, fileIds = []) {
+  return request('/query', {
+    method: 'POST',
+    body: JSON.stringify({ question, file_ids: fileIds }),
+  });
+}
+
+// ─── LEAVE MANAGEMENT ─────────────────────────────────────────
+export async function getLeaveRecords() {
+  const data = await request('/leave');
+  return Array.isArray(data) ? data : (data.records || []);
+}
+
+export async function createLeaveRecord(body) {
+  return request('/leave', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function deleteLeaveRecord(id) {
+  return request(`/leave/${id}`, { method: 'DELETE' });
+}
+
+// ─── CALENDAR EVENTS ──────────────────────────────────────────
+export async function getCalendarEvents(date = null) {
+  let url = '/calendar/events';
+  if (date) url += `?date=${date}`;
+  return request(url);
+}
+
+export async function syncGoogleCalendar() {
+  return request('/calendar/sync', { method: 'POST', body: JSON.stringify({}) });
 }

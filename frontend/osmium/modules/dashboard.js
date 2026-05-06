@@ -1,10 +1,10 @@
 // ============================================================
 // dashboard.js — Dashboard View
-// Analytics · Skill Chart · Deadlines · Activity Feed
+// Analytics · Google Calendar · Skill Coverage · Deadlines
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getAnalytics, getProjects, getActivityFeed } from './api.js';
+import { getAnalytics, getProjects, getCalendarEvents, syncGoogleCalendar } from './api.js';
 import { escHtml, fmtDate, daysUntil, urgencyBorderClass, relTime, eventIcon, deptColor, emptyState } from '../utils/helpers.js';
 
 // ─── INIT ─────────────────────────────────────────────────────
@@ -13,7 +13,7 @@ export function initDashboard() {
 }
 
 export async function loadDashboard() {
-  await Promise.all([loadAnalytics(), loadDeadlines(), loadActivityFeed(null)]);
+  await Promise.all([loadAnalytics(), loadDeadlines(), loadCalendarWidget()]);
 }
 
 // ─── ANALYTICS ────────────────────────────────────────────────
@@ -31,11 +31,11 @@ async function loadAnalytics() {
     const el = document.getElementById('metric-available-pct');
     if (el) el.textContent = pct + '% of total';
 
+    // Render skill coverage in the lower section (replaces activity feed)
     renderSkillChart(data.skill_coverage || []);
   } catch {
     ['metric-employees','metric-projects','metric-available','metric-on-leave']
       .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
-    document.getElementById('skill-chart')?.replaceChildren();
   }
 }
 
@@ -49,7 +49,7 @@ function renderSkillChart(coverage) {
   const container = document.getElementById('skill-chart');
   if (!container) return;
   if (!coverage.length) {
-    container.innerHTML = `<div style="color:var(--gl-on-surface-4);font-size:0.82rem;text-align:center;padding:32px 0">No skill coverage data.</div>`;
+    container.innerHTML = `<div style="color:var(--gl-on-surface-4);font-size:0.82rem;text-align:center;padding:32px 0">No skill coverage data yet.<br><span style="font-size:0.72rem">Add employees with skills to see coverage.</span></div>`;
     return;
   }
 
@@ -68,10 +68,10 @@ function renderSkillChart(coverage) {
            title="${escHtml(s.skill_name)}: Required ${s.required}, Actual ${s.actual}">
         <div style="width:100%;height:160px;display:flex;align-items:flex-end;gap:3px">
           <div style="flex:1;background:var(--gl-surface-high);border-radius:4px 4px 0 0;height:100%;display:flex;align-items:flex-end;overflow:hidden">
-            <div style="width:100%;border-radius:4px 4px 0 0;background:${gap ? 'var(--gl-error)' : 'var(--gl-primary)'};height:${actPct}%;transition:height 0.7s var(--ease-out)"></div>
+            <div style="width:100%;border-radius:4px 4px 0 0;background:${gap ? '#f5574a' : '#3dd68c'};height:${actPct}%;transition:height 0.7s var(--ease-out)"></div>
           </div>
           <div style="flex:1;background:var(--gl-surface-high);border-radius:4px 4px 0 0;height:100%;display:flex;align-items:flex-end;overflow:hidden;opacity:0.4">
-            <div style="width:100%;border-radius:4px 4px 0 0;background:var(--gl-primary);height:${reqPct}%;transition:height 0.7s var(--ease-out)"></div>
+            <div style="width:100%;border-radius:4px 4px 0 0;background:#5abfe8;height:${reqPct}%;transition:height 0.7s var(--ease-out)"></div>
           </div>
         </div>
         <div style="font-size:10px;font-weight:600;color:var(--gl-on-surface-4);text-align:center;letter-spacing:0.02em">${escHtml(s.skill_name)}</div>
@@ -117,17 +117,17 @@ async function loadDeadlines() {
 
       return `
         <div style="padding:10px 12px;border-radius:var(--r-md);background:var(--gl-surface-high);
-          border-left:3px solid ${isUrgent ? 'var(--gl-error)' : isWarn ? 'var(--gl-warning)' : 'var(--gl-outline-2)'};
+          border-left:3px solid ${isUrgent ? '#f5574a' : isWarn ? '#f5a623' : 'var(--gl-outline-2)'};
           cursor:pointer;transition:all 0.15s;margin-bottom:6px"
           onclick="window.switchViewGlobal('projects')"
           onmouseenter="this.style.background='var(--gl-surface-highest)'"
           onmouseleave="this.style.background='var(--gl-surface-high)'">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
             <div style="font-size:0.82rem;font-weight:600;color:var(--gl-on-surface);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65%">${escHtml(p.project_name)}</div>
-            <span style="font-size:0.72rem;color:${isUrgent ? 'var(--gl-error)' : isWarn ? 'var(--gl-warning)' : 'var(--gl-on-surface-4)'}; font-weight:600;flex-shrink:0">${label}</span>
+            <span style="font-size:0.72rem;color:${isUrgent ? '#f5574a' : isWarn ? '#f5a623' : 'var(--gl-on-surface-4)'}; font-weight:600;flex-shrink:0">${label}</span>
           </div>
           <div style="height:4px;background:var(--gl-surface-bright);border-radius:var(--r-full);overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:var(--gl-primary);border-radius:var(--r-full)"></div>
+            <div style="height:100%;width:${pct}%;background:#5abfe8;border-radius:var(--r-full)"></div>
           </div>
           <div style="font-size:0.7rem;color:var(--gl-on-surface-4);margin-top:4px">${pct}% complete</div>
         </div>`;
@@ -137,49 +137,74 @@ async function loadDeadlines() {
   }
 }
 
-// ─── ACTIVITY FEED ────────────────────────────────────────────
-export async function loadActivityFeed(department) {
-  const el = document.getElementById('activity-feed');
+// ─── GOOGLE CALENDAR WIDGET ────────────────────────────────────
+async function loadCalendarWidget() {
+  const el = document.getElementById('calendar-widget');
   if (!el) return;
 
-  // Update filter buttons
-  ['all','engineering','design','hr'].forEach(d => {
-    const btn = document.getElementById(`feed-btn-${d}`);
-    if (!btn) return;
-    const active = (!department && d === 'all') || (department?.toLowerCase() === d);
-    btn.style.background = active ? 'var(--gl-primary-muted)' : 'var(--gl-surface-high)';
-    btn.style.color = active ? 'var(--gl-primary-light)' : 'var(--gl-on-surface-3)';
-  });
-
-  el.innerHTML = `<div style="padding:24px;display:flex;align-items:center;gap:10px;color:var(--gl-on-surface-4)"><span class="spinner-sm spinner"></span> Loading…</div>`;
+  // Render today's date header
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-GB', { weekday: 'long', month: 'long', day: 'numeric' });
+  const dateHeader = document.getElementById('calendar-date-header');
+  if (dateHeader) dateHeader.textContent = dateStr;
 
   try {
-    const items = await getActivityFeed(department, 9);
-    if (!items.length) {
-      el.innerHTML = emptyState('history', 'No activity yet', 'Events will appear here as your team works.');
-      return;
-    }
-
-    el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0">
-      ${items.slice(0, 6).map(item => {
-        const col = deptColor(item.department);
-        return `
-          <div style="padding:16px;border-right:1px solid var(--gl-outline);border-bottom:1px solid var(--gl-outline)">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-              <div style="width:8px;height:32px;border-radius:4px;background:${col};flex-shrink:0"></div>
-              <div>
-                <div style="font-size:0.82rem;font-weight:600;color:var(--gl-on-surface);line-height:1.3">${escHtml(item.title || '')}</div>
-                <div style="font-size:0.7rem;color:var(--gl-on-surface-4)">${escHtml(item.department || '')} · ${relTime(item.created_at)}</div>
-              </div>
-            </div>
-            ${item.description ? `<div style="font-size:0.75rem;color:var(--gl-on-surface-3);line-height:1.5">${escHtml(item.description)}</div>` : ''}
-          </div>`;
-      }).join('')}
-    </div>`;
+    const todayStr = today.toISOString().slice(0, 10);
+    const events = await getCalendarEvents(todayStr);
+    renderCalendarEvents(el, events);
   } catch {
-    el.innerHTML = emptyState('history', 'Could not load activity', 'Check API connection.');
+    // Show offline state — calendar not connected
+    renderCalendarOffline(el);
   }
 }
 
-// expose for inline onclick
-window.loadActivityFeedGlobal = loadActivityFeed;
+function renderCalendarEvents(el, events) {
+  if (!events || !events.length) {
+    el.innerHTML = `
+      <div style="padding:20px;text-align:center;color:var(--gl-on-surface-4)">
+        <span class="material-symbols-outlined" style="font-size:32px;display:block;margin-bottom:8px;opacity:0.4">event_available</span>
+        <div style="font-size:0.82rem">No events today</div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = events.slice(0, 6).map(ev => {
+    const start = ev.start_time ? new Date(ev.start_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+    const end = ev.end_time ? new Date(ev.end_time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '';
+    return `
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gl-outline)">
+        <div style="width:3px;height:36px;border-radius:2px;background:#5abfe8;flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:0.83rem;font-weight:600;color:var(--gl-on-surface);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(ev.title)}</div>
+          <div style="font-size:0.72rem;color:var(--gl-on-surface-4)">${start}${end ? ' – ' + end : ''}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderCalendarOffline(el) {
+  el.innerHTML = `
+    <div style="padding:16px;text-align:center;color:var(--gl-on-surface-4)">
+      <span class="material-symbols-outlined" style="font-size:28px;display:block;margin-bottom:8px;color:var(--gl-on-surface-4)">calendar_month</span>
+      <div style="font-size:0.8rem;margin-bottom:12px">Google Calendar not synced</div>
+      <button class="btn btn-sm" style="background:#4285f4;color:#fff;border:none;cursor:pointer" onclick="window._syncCalendar?.()">
+        <span class="material-symbols-outlined" style="font-size:14px">sync</span>
+        Connect Calendar
+      </button>
+    </div>`;
+}
+
+window._syncCalendar = async function() {
+  const btn = document.querySelector('#calendar-widget button');
+  if (btn) btn.textContent = 'Syncing…';
+  try {
+    await syncGoogleCalendar();
+    await loadCalendarWidget();
+    const { showToast } = await import('./ui.js');
+    showToast('Calendar synced!');
+  } catch (e) {
+    const { showToast } = await import('./ui.js');
+    showToast('Calendar sync failed: ' + e.message, 'error');
+    if (btn) btn.textContent = 'Connect Calendar';
+  }
+};

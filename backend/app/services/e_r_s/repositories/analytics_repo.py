@@ -39,3 +39,22 @@ class AnalyticsRepository:
             .execute()
             .data
         )
+
+    def google_calendar_status(self) -> dict:
+        try:
+            rows = (
+                self.db.table("employees")
+                .select("google_calendar_sync_enabled, google_calendar_synced_at")
+                .execute()
+                .data
+            )
+        except Exception:
+            return {"synced": 0, "pending": 0, "last_synced_at": None}
+
+        synced_rows = [
+            r for r in rows
+            if r.get("google_calendar_sync_enabled") and r.get("google_calendar_synced_at")
+        ]
+        pending = sum(1 for r in rows if r.get("google_calendar_sync_enabled") and not r.get("google_calendar_synced_at"))
+        last_synced = max((r.get("google_calendar_synced_at") for r in synced_rows), default=None)
+        return {"synced": len(synced_rows), "pending": pending, "last_synced_at": last_synced}

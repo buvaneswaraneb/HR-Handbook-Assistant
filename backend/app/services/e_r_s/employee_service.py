@@ -36,14 +36,23 @@ def get_employee(emp_id: str) -> dict:
 
 def create_employee(data: EmployeeCreate) -> dict:
     emp_repo, _ = _repos()
-    emp = emp_repo.create(data.model_dump(exclude_none=True, mode="json"))
+    payload = data.model_dump(exclude_none=True, mode="json")
+    skills = payload.pop("skills", [])
+    emp = emp_repo.create(payload)
+    for skill in skills:
+        add_skill(emp["id"], EmployeeSkillCreate(**skill))
     return _enrich(emp, emp_repo)
 
 
 def update_employee(emp_id: str, data: EmployeeUpdate) -> dict:
     emp_repo, _ = _repos()
     payload = data.model_dump(exclude_none=True, mode="json")
-    emp = emp_repo.update(emp_id, payload)
+    skills = payload.pop("skills", [])
+    emp = emp_repo.update(emp_id, payload) if payload else emp_repo.get_by_id(emp_id)
+    if not emp:
+        raise ValueError(f"Employee {emp_id} not found")
+    for skill in skills:
+        add_skill(emp_id, EmployeeSkillCreate(**skill))
     return _enrich(emp, emp_repo)
 
 

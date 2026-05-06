@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException
 
 from app.services.e_r_s import project_service as svc
-from app.services.e_r_s.schemas import ProjectCreate, AssignmentCreate
+from app.services.e_r_s.schemas import ProjectCreate, ProjectUpdate, AssignmentCreate
 
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
@@ -34,6 +34,14 @@ def get_project(project_id: UUID):
 def assign_employee(project_id: UUID, body: AssignmentCreate):
     try:
         return svc.assign_employee(str(project_id), body)
+    except ValueError as e:
+        _404(e)
+
+
+@router.put("/{project_id}")
+def update_project(project_id: UUID, body: ProjectUpdate):
+    try:
+        return svc.update_project(str(project_id), body)
     except ValueError as e:
         _404(e)
 
