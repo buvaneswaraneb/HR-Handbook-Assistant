@@ -144,6 +144,9 @@ IMPORTANT RULES:
 - If you cannot find the answer in the context, say:
   "I don't have the answer based on the provided documents."
 
+- If you cannot find the answer in the context, say:
+  "I don't have the answer based on the provided documents."
+
 If the user greets (e.g., "hi", "hello"), respond with a brief greeting and ask how you can help.
 Otherwise, answer using ONLY the provided context.
 
