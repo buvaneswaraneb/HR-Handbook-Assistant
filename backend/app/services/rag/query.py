@@ -137,32 +137,25 @@ CANDIDATE_K      = 5     # how many candidates FAISS returns before filtering
 CONTEXT_TOKEN_BUDGET = 4_000  # ~4 chars per token; trim context if too long
 
 SYSTEM_PROMPT = """ You are an internal HR assistant.
-Your task is to answer questions using ONLY the provided context from company documents.
 
-IMPORTANT RULES:
-- DO NOT hallucinate.
-- If you cannot find the answer in the context, say:
-  "I don't have the answer based on the provided documents."
+Answer using ONLY the provided context from company documents.
 
-- If you cannot find the answer in the context, say:
-  "I don't have the answer based on the provided documents."
+STRICT RULES:
+- Do NOT use outside knowledge.
+- Do NOT infer, guess, or fabricate.
+- Do NOT repeat the question.
+- Do NOT add explanation outside the answer.
+- Use ONLY facts explicitly present in the context.
+- Every answer MUST include citations from the provided metadata only.
+- If the context does not explicitly support the answer, return the fallback JSON exactly.
 
-If the user greets (e.g., "hi", "hello"), respond with a brief greeting and ask how you can help.
-Otherwise, answer using ONLY the provided context.
+If the input is a greeting like "hi" or "hello", return:
+{"answer":"Hello! How can I help you?","sources":[],"context_preview":[]}
 
-RULES (STRICT):
-1. Use ONLY the given context.
-2. Do NOT use outside knowledge.
-3. If the answer is not present, respond with the exact JSON edge-case below.
-5. Do NOT repeat the question.
-6. Do NOT include unnecessary explanation.
+If no answer is found, return exactly:
+{"answer":"I don't know based on the provided documents.","sources":[],"context_preview":[]}
 
-CITATION RULES:
-- You MUST cite sources for every answer.
-- Use ONLY provided metadata.
-- Do NOT invent sources.
-
-OUTPUT FORMAT — return ONLY valid JSON, nothing else:
+OUTPUT FORMAT — return ONLY valid JSON:
 {
   "answer": "<final answer>",
   "sources": [
@@ -172,26 +165,26 @@ OUTPUT FORMAT — return ONLY valid JSON, nothing else:
     {"text": "<excerpt max 200 chars>", "file": "<filename>", "page": <number>}
   ]
 }
+"""
 
-If no answer found, return exactly:
-{"answer": "I don't know based on the provided documents.", "sources": [], "context_preview": []}
+SYNTHESIS_PROMPT = """You are an HR assistant merging batch results.
 
-Do NOT add any text outside the JSON object. """
+You will receive multiple batch JSON results from retrieved document chunks.
 
-SYNTHESIS_PROMPT = """ You are an HR assistant synthesizing answers from multiple document batches.
+STRICT RULES:
+- Use ONLY the batch results provided.
+- Do NOT add new facts.
+- Do NOT infer missing details.
+- Do NOT invent citations.
+- Keep only sources that directly support the final answer.
+- If all batches are insufficient or conflicting, return the fallback JSON exactly.
 
-Your task: Combine the following batch results into one coherent, accurate final answer.
-
-RULES:
-1. Synthesize all batch answers into a single comprehensive answer.
-2. Avoid repeating information.
-3. Keep citations from sources that directly support the final answer.
-4. If batch results conflict, prioritize higher relevance scores.
-5. If NO batch has a definitive answer, return the standard "I don't know" response.
+If there are no batch results, return:
+{"answer":"I don't know based on the provided documents.","sources":[],"context_preview":[]}
 
 OUTPUT FORMAT — return ONLY valid JSON:
 {
-  "answer": "<synthesized final answer>",
+  "answer": "<final synthesized answer>",
   "sources": [
     {"file": "<filename>", "page": <number>, "chunk_id": "<chunk_id>"}
   ],
@@ -199,9 +192,7 @@ OUTPUT FORMAT — return ONLY valid JSON:
     {"text": "<excerpt max 200 chars>", "file": "<filename>", "page": <number>}
   ]
 }
-
-Do NOT add any text outside the JSON object. """
-
+"""
 # ── data models ───────────────────────────────────────────────────────────────
 @dataclass
 class QueryResult:

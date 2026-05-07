@@ -11,6 +11,7 @@ from app.services.e_r_s.schemas import (
     EmployeeOut, BulkEmployeeItem, BulkUploadResult,
 )
 from app.services.e_r_s.utils.serializer import build_employee_out
+from app.services.e_r_s.cache import cached, cache_clear, cache_delete
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +21,14 @@ def _repos():
     return EmployeeRepository(db), SkillRepository(db)
 
 
+@cached(ttl_seconds=30, key_prefix="list_employees")
 def list_employees() -> list[dict]:
     emp_repo, _ = _repos()
     employees = emp_repo.get_all()
     return [_enrich(e, emp_repo) for e in employees]
 
 
+@cached(ttl_seconds=30, key_prefix="get_employee")
 def get_employee(emp_id: str) -> dict:
     emp_repo, _ = _repos()
     emp = emp_repo.get_by_id(emp_id)
@@ -39,6 +42,7 @@ def create_employee(data: EmployeeCreate) -> dict:
     payload = data.model_dump(exclude_none=True, mode="json")
     skills = payload.pop("skills", [])
     emp = emp_repo.create(payload)
+    cache_clear("list_employees")
     for skill in skills:
         add_skill(emp["id"], EmployeeSkillCreate(**skill))
     return _enrich(emp, emp_repo)
@@ -51,6 +55,8 @@ def update_employee(emp_id: str, data: EmployeeUpdate) -> dict:
     emp = emp_repo.update(emp_id, payload) if payload else emp_repo.get_by_id(emp_id)
     if not emp:
         raise ValueError(f"Employee {emp_id} not found")
+    cache_clear("list_employees")
+    cache_delete(f"get_employee:{emp_id}")
     for skill in skills:
         add_skill(emp_id, EmployeeSkillCreate(**skill))
     return _enrich(emp, emp_repo)
@@ -59,6 +65,8 @@ def update_employee(emp_id: str, data: EmployeeUpdate) -> dict:
 def patch_availability(emp_id: str, data: AvailabilityUpdate) -> dict:
     emp_repo, _ = _repos()
     emp = emp_repo.update(emp_id, {"availability": data.availability})
+    cache_clear("list_employees")
+    cache_delete(f"get_employee:{emp_id}")
     return _enrich(emp, emp_repo)
 
 
@@ -73,12 +81,14 @@ def add_skill(emp_id: str, data: EmployeeSkillCreate) -> dict:
         "notes": data.notes,
     }
     emp_repo.upsert_skill({k: v for k, v in payload.items() if v is not None})
+    cache_delete(f"get_employee:{emp_id}")
     return get_employee(emp_id)
 
 
 def update_skill(emp_id: str, skill_id: str, data: EmployeeSkillUpdate) -> dict:
     emp_repo, _ = _repos()
     emp_repo.update_skill(emp_id, skill_id, data.model_dump(exclude_none=True))
+    cache_delete(f"get_employee:{emp_id}")
     return get_employee(emp_id)
 
 
@@ -87,6 +97,7 @@ def add_experience(emp_id: str, data: ExperienceCreate) -> dict:
     payload = data.model_dump(exclude_none=True, mode="json")
     payload["employee_id"] = emp_id
     emp_repo.add_experience(payload)
+    cache_delete(f"get_employee:{emp_id}")
     return get_employee(emp_id)
 
 
@@ -98,13 +109,7 @@ def search_employees(filters: dict) -> list[dict]:
     employees = emp_repo.search(filters)
 
     if skill_name:
-        db = get_db()
-        skill_rows = db.table("skills").select("id").eq("name", skill_name).execute().data
-        if not skill_rows:
-            return []
-        skill_id = skill_rows[0]["id"]
-        emp_skill_rows = db.table("employee_skills").select("employee_id").eq("skill_id", skill_id).execute().data
-        emp_ids = {r["employee_id"] for r in emp_skill_rows}
+        emp_ids = skill_repo.get_employee_ids_by_skill(skill_name)
         employees = [e for e in employees if e["id"] in emp_ids]
 
     return [_enrich(e, emp_repo) for e in employees]
@@ -124,6 +129,7 @@ def bulk_upload(items: list[BulkEmployeeItem]) -> BulkUploadResult:
         except Exception as e:
             logger.warning("Bulk upload failed for %s: %s", item.email, e)
             result.failed.append({"email": item.email, "error": str(e)})
+    cache_clear("list_employees")
     return result
 
 

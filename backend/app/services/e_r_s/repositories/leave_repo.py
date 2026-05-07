@@ -22,5 +22,8 @@ class LeaveRepository:
     def create(self, payload: dict) -> dict:
         return self.db.table("leave_records").insert(payload).execute().data[0]
 
+    def delete(self, leave_id: str) -> dict:
+        return self.db.table("leave_records").delete().eq("id", leave_id).execute().data
+
     def total_members(self) -> int:
         return len(self.db.table("employees").select("id").execute().data)

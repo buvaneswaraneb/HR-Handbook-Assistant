@@ -197,3 +197,36 @@ export async function getCalendarEvents(date = null) {
 export async function syncGoogleCalendar() {
   return request('/calendar/sync', { method: 'POST', body: JSON.stringify({}) });
 }
+
+// ─── GOOGLE CALENDAR INTEGRATION ──────────────────────────────
+export async function getGoogleCalendarAuthUrl(redirectUri) {
+  return request(`/auth/google/calendar/connect?redirect_uri=${encodeURIComponent(redirectUri)}`, {
+    method: 'GET',
+  });
+}
+
+export async function handleGoogleCalendarCallback(code, state) {
+  return request(`/auth/google/calendar/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`);
+}
+
+export async function syncCalendarEvents() {
+  return request('/auth/google/calendar/sync', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function getGoogleCalendarEvents(days = 30) {
+  return request(`/auth/google/calendar/events?days=${days}`);
+}
+
+export async function getGoogleCalendarStatus() {
+  return request('/auth/google/calendar/status');
+}
+
+export async function disconnectGoogleCalendar() {
+  return request('/auth/google/calendar/disconnect', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}

@@ -52,7 +52,7 @@ from app.services.ingestion import IngestionResult, run_ingestion          # noq
 from app.services.ingestion.vector_store import VectorStore                # noqa: E402
 from app.services.rag import RAGQueryEngine                                # noqa: E402
 
-from app.api.routes import employees, projects, teams, activity, analytics, files, leave, auth, calendar, supabase_auth  # noqa: E402
+from app.api.routes import employees, projects, teams, activity, analytics, files, leave, auth, calendar, supabase_auth, google_calendar  # noqa: E402
 
 # upload-downloader has a hyphen in its directory name, which is not a valid
 # Python identifier, so we load it dynamically via importlib.
@@ -111,6 +111,7 @@ app.include_router(auth.router)
 
 # Register calendar routes
 app.include_router(calendar.router)
+app.include_router(google_calendar.router)
 
 # Register ERS routes
 app.include_router(employees.router)

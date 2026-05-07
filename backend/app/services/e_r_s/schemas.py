@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import date, time, datetime
 from typing import Optional, List
 from uuid import UUID
-from pydantic import BaseModel, EmailStr, Field, condecimal
+from pydantic import BaseModel, EmailStr, Field, condecimal, model_validator
 
 
 # ── Skills ────────────────────────────────────────────────────────────────────
@@ -193,6 +193,12 @@ class LeaveRecordCreate(BaseModel):
     leave_type: Optional[str] = "leave"
     status: Optional[str] = "approved"
     notes: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_dates(self):
+        if self.start_date > self.end_date:
+            raise ValueError("End date must be on or after the start date")
+        return self
 
 
 class LeaveSummaryDay(BaseModel):

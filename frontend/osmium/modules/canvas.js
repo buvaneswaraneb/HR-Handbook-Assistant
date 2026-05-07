@@ -26,11 +26,11 @@ const ZOOM_STEP = 0.1;
 // ─── INIT ─────────────────────────────────────────────────────
 export function initCanvas() {
   const container = document.getElementById('canvas-view');
-  bgEl     = document.getElementById('canvas-bg');
-  world    = document.getElementById('canvas-world');
+  bgEl = document.getElementById('canvas-bg');
+  world = document.getElementById('canvas-world');
   svgLayer = document.getElementById('canvas-svg-layer');
   zoomLabel = document.getElementById('canvas-zoom-label');
-  selBox   = document.getElementById('selection-box');
+  selBox = document.getElementById('selection-box');
 
   // Setup SVG arrowhead marker
   svgLayer.innerHTML = `
@@ -190,7 +190,7 @@ function _onMouseMoveRaw(e) {
 
   if (isDragging && dragNodeId) {
     const worldX = (e.clientX - container.left - State.canvas.panX) / State.canvas.zoom;
-    const worldY = (e.clientY - container.top  - State.canvas.panY) / State.canvas.zoom;
+    const worldY = (e.clientY - container.top - State.canvas.panY) / State.canvas.zoom;
     let newX = worldX - dragOffsetX;
     let newY = worldY - dragOffsetY;
 
@@ -257,7 +257,7 @@ function finishBoxSelect() {
     if (!el) return;
     const nr = el.getBoundingClientRect();
     if (nr.left < selRect.right && nr.right > selRect.left &&
-        nr.top < selRect.bottom && nr.bottom > selRect.top) {
+      nr.top < selRect.bottom && nr.bottom > selRect.top) {
       newSelected.add(node.id);
     }
   });
@@ -271,7 +271,7 @@ function onWheel(e) {
   e.preventDefault();
   const container = document.getElementById('canvas-view').getBoundingClientRect();
   const cx = (e.clientX - container.left) / container.width;
-  const cy = (e.clientY - container.top)  / container.height;
+  const cy = (e.clientY - container.top) / container.height;
   const dir = e.deltaY < 0 ? 1 : -1;
   zoomAt(cx, cy, dir);
 }
@@ -327,10 +327,10 @@ function onBgHover(e) {
     bgEl.appendChild(glowEl);
   }
   const r = 120;
-  glowEl.style.width  = r * 2 + 'px';
+  glowEl.style.width = r * 2 + 'px';
   glowEl.style.height = r * 2 + 'px';
-  glowEl.style.left   = (x - r) + 'px';
-  glowEl.style.top    = (y - r) + 'px';
+  glowEl.style.left = (x - r) + 'px';
+  glowEl.style.top = (y - r) + 'px';
   glowEl.style.opacity = '1';
 }
 function clearGlow() { if (glowEl) glowEl.style.opacity = '0'; }
@@ -349,13 +349,13 @@ function toggleCanvasPanel() {
 
 async function initSidePanel() {
   const projList = document.getElementById('canvas-proj-list');
-  const empList  = document.getElementById('canvas-emp-list');
+  const empList = document.getElementById('canvas-emp-list');
   if (!projList && !empList) return;
 
   try {
     const [emps, projs] = await Promise.all([
       State.employees.length ? State.employees : getEmployees(),
-      State.projects.length  ? State.projects  : getProjects(),
+      State.projects.length ? State.projects : getProjects(),
     ]);
 
     if (projList) {
@@ -374,8 +374,8 @@ async function initSidePanel() {
     if (empList) {
       empList.innerHTML = emps.length
         ? emps.map(e => {
-            const bg = avatarColor(e.name), fc = avatarTextColor(e.name);
-            return `
+          const bg = avatarColor(e.name), fc = avatarTextColor(e.name);
+          return `
               <div class="canvas-panel-item" draggable="true"
                 ondragstart="window._canvasDragStart(event,'employee','${e.id}')"
                 onclick="window._addToCanvasById('${e.id}')"
@@ -384,13 +384,13 @@ async function initSidePanel() {
                 <span style="font-size:0.78rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(e.name)}</span>
                 <span style="font-size:9px;color:${e.availability ? '#3dd68c' : 'var(--gl-on-surface-4)'}">●</span>
               </div>`;
-          }).join('')
+        }).join('')
         : `<div style="padding:12px;font-size:0.75rem;color:var(--gl-on-surface-4)">No employees</div>`;
     }
-  } catch {}
+  } catch { }
 }
 
-window._canvasDragStart = function(e, type, id) {
+window._canvasDragStart = function (e, type, id) {
   e.dataTransfer.setData('text/plain', JSON.stringify({ type, id }));
 };
 
@@ -416,7 +416,7 @@ export function renderNodes() {
       world.appendChild(el);
     }
     el.style.left = node.x + 'px';
-    el.style.top  = node.y + 'px';
+    el.style.top = node.y + 'px';
   });
 }
 
@@ -437,8 +437,8 @@ function createNodeElement(node) {
 
   const rating = emp.rating ? `<span style="font-size:11px;color:var(--gl-tertiary)">★ ${emp.rating}</span>` : '';
 
-  const bg   = avatarColor(emp.name || '?');
-  const fc   = avatarTextColor(emp.name || '?');
+  const bg = avatarColor(emp.name || '?');
+  const fc = avatarTextColor(emp.name || '?');
   const init = initials(emp.name || '?');
 
   el.innerHTML = `
@@ -507,14 +507,14 @@ export function renderEdges() {
 
   State.canvas.edges.forEach(edge => {
     const fromNode = State.canvas.nodes.find(n => n.id === edge.fromId);
-    const toNode   = State.canvas.nodes.find(n => n.id === edge.toId);
+    const toNode = State.canvas.nodes.find(n => n.id === edge.toId);
     if (!fromNode || !toNode) return;
 
     const nodeW = 200, nodeH = 100;
     const x1 = fromNode.x + nodeW / 2;
     const y1 = fromNode.y + nodeH / 2;
-    const x2 = toNode.x   + nodeW / 2;
-    const y2 = toNode.y   + nodeH / 2;
+    const x2 = toNode.x + nodeW / 2;
+    const y2 = toNode.y + nodeH / 2;
 
     // Bezier control points
     const dx = x2 - x1, dy = y2 - y1;
@@ -524,8 +524,8 @@ export function renderEdges() {
     const d = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
     const isManager = edge.type === 'manager';
     const marker = isManager ? 'url(#arrowhead-primary)' : 'url(#arrowhead)';
-    const stroke  = isManager ? 'var(--gl-primary)' : 'var(--gl-outline-3)';
-    const width   = isManager ? '2' : '1.5';
+    const stroke = isManager ? 'var(--gl-primary)' : 'var(--gl-outline-3)';
+    const width = isManager ? '2' : '1.5';
 
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.classList.add('canvas-edge-group');
@@ -574,11 +574,11 @@ export function renderEdges() {
 // ─── CONTEXT MENUS ────────────────────────────────────────────
 function showNodeCtxMenu(e, nodeId) {
   showContextMenu(e.clientX, e.clientY, [
-    { icon: 'open_in_new', label: 'Inspect',      action: () => window._inspectNode(nodeId) },
-    { icon: 'cable',       label: 'Connect to…',  action: () => window._startConnect(nodeId) },
-    { icon: 'content_copy',label: 'Duplicate',    action: () => duplicateNode(nodeId) },
+    { icon: 'open_in_new', label: 'Inspect', action: () => window._inspectNode(nodeId) },
+    { icon: 'cable', label: 'Connect to…', action: () => window._startConnect(nodeId) },
+    { icon: 'content_copy', label: 'Duplicate', action: () => duplicateNode(nodeId) },
     'divider',
-    { icon: 'delete',      label: 'Remove from canvas', action: () => State.removeCanvasNode(nodeId), danger: true },
+    { icon: 'delete', label: 'Remove from canvas', action: () => State.removeCanvasNode(nodeId), danger: true },
   ]);
 }
 
@@ -589,7 +589,7 @@ function showEdgeCtxMenu(e, edgeId) {
 }
 
 // ─── CONNECT NODES (Hierarchy-Aware) ─────────────────────────
-window._startConnect = function(fromId) {
+window._startConnect = function (fromId) {
   isConnecting = true;
   connectFromId = fromId;
   const container = document.getElementById('canvas-view');
@@ -634,7 +634,7 @@ window._startConnect = function(fromId) {
       }
     }
 
-    const edgeType  = normalRole === 'manager' ? 'manager' : normalRole === 'teamlead' ? 'teamlead' : 'member';
+    const edgeType = normalRole === 'manager' ? 'manager' : normalRole === 'teamlead' ? 'teamlead' : 'member';
     const edgeLabel = normalRole === 'manager' ? 'Manager' : normalRole === 'teamlead' ? 'Team Lead' : 'Member';
     State.addCanvasEdge({ id: uid(), fromId, toId, type: edgeType, label: edgeLabel });
     cancel();
@@ -731,7 +731,7 @@ function duplicateNode(id) {
 }
 
 // ─── EXPOSE GLOBAL ────────────────────────────────────────────
-window._inspectNode = function(nodeId) {
+window._inspectNode = function (nodeId) {
   const node = State.canvas.nodes.find(n => n.id === nodeId);
   if (!node) return;
   const emp = State.employees.find(e => e.id === node.empId);

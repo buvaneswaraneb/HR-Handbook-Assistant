@@ -1,5 +1,6 @@
 from __future__ import annotations
 from datetime import date
+from uuid import UUID
 from fastapi import APIRouter, Query
 
 from app.services.e_r_s import leave_service as svc
@@ -19,3 +20,8 @@ def list_leave(
 @router.post("", status_code=201)
 def create_leave(body: LeaveRecordCreate):
     return svc.create_leave(body)
+
+
+@router.delete("/{leave_id}")
+def delete_leave(leave_id: UUID):
+    return svc.delete_leave(str(leave_id))

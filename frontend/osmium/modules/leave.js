@@ -4,7 +4,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getLeaveRecords, createLeaveRecord, deleteLeaveRecord } from './api.js';
+import { getLeaveRecords, createLeaveRecord, deleteLeaveRecord, getEmployees } from './api.js';
 import { escHtml, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js';
 import { showToast, openModal, closeModal } from './ui.js';
 
@@ -14,6 +14,23 @@ export function initLeave() {
     e.preventDefault();
     submitLeave();
   });
+  
+  // Populate employee dropdown when modal opens
+  document.querySelector('[onclick*="add-leave-modal"]')?.addEventListener('click', populateLeaveEmployeeDropdown);
+}
+
+async function populateLeaveEmployeeDropdown() {
+  try {
+    const emps = State.employees.length ? State.employees : await getEmployees();
+    const select = document.getElementById('leave-emp-select');
+    if (!select) return;
+    
+    const opts = `<option value="">— Select Employee —</option>` +
+      emps.map(e => `<option value="${e.id}">${escHtml(e.name)} (${escHtml(e.role || '—')})</option>`).join('');
+    select.innerHTML = opts;
+  } catch (e) {
+    console.error('Failed to populate employee dropdown:', e);
+  }
 }
 
 export async function loadLeave() {
@@ -32,13 +49,14 @@ async function loadLeaveCalendar() {
     ]);
 
     const totalEmployees = analytics.total_employees || 1;
-    renderCalendarHeatmap(container, records, totalEmployees);
+    const currentYear = new Date().getFullYear();
+    renderCalendarHeatmap(container, records, totalEmployees, currentYear);
   } catch (e) {
     container.innerHTML = `<div style="color:var(--gl-error);font-size:0.83rem">Could not load calendar: ${escHtml(e.message)}</div>`;
   }
 }
 
-function renderCalendarHeatmap(container, records, totalEmployees) {
+function renderCalendarHeatmap(container, records, totalEmployees, selectedYear) {
   // Build a map: date string → count of people on leave
   const leaveByDate = {};
   records.forEach(rec => {
@@ -51,16 +69,19 @@ function renderCalendarHeatmap(container, records, totalEmployees) {
     }
   });
 
-  // Render last 52 weeks
-  const today = new Date();
-  const startDate = new Date(today);
-  startDate.setDate(startDate.getDate() - 364);
-  // Align to Sunday
+  // Generate calendar from Dec 1 (previous year) to Dec 31 (selected year)
+  const startDate = new Date(selectedYear - 1, 11, 1); // Dec 1 of previous year
+  const endDate = new Date(selectedYear, 11, 31);     // Dec 31 of selected year
+  
+  // Align start to Sunday
   startDate.setDate(startDate.getDate() - startDate.getDay());
+  
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
   const weeks = [];
   let current = new Date(startDate);
-  while (current <= today) {
+  while (current <= endDate) {
     const week = [];
     for (let d = 0; d < 7; d++) {
       week.push(new Date(current));
@@ -92,48 +113,69 @@ function renderCalendarHeatmap(container, records, totalEmployees) {
       const key = day.toISOString().slice(0, 10);
       const count = leaveByDate[key] || 0;
       const pct = (count / totalEmployees) * 100;
+      const isPast = day < today;
       const isFuture = day > today;
 
-      let bg, title;
-      if (isFuture || day < startDate) {
-        bg = 'var(--gl-surface-high)';
-        title = '';
-      } else if (count === 0) {
-        bg = 'var(--gl-surface-high)';
+      let bg, title, opacity = '1';
+      
+      if (count === 0) {
+        bg = isFuture ? 'var(--gl-surface-high)' : 'var(--gl-surface-high)';
         title = `${key}: No leaves`;
+        if (isFuture) opacity = '0.5';
       } else if (pct < 5) {
         bg = '#3dd68c';  // green
         title = `${key}: ${count} on leave (${pct.toFixed(1)}%)`;
+        if (isFuture) opacity = '0.6';
       } else if (pct < 10) {
         bg = '#f5a623';  // yellow
         title = `${key}: ${count} on leave (${pct.toFixed(1)}%)`;
+        if (isFuture) opacity = '0.6';
       } else {
         bg = '#f5574a';  // red
         title = `${key}: ${count} on leave (${pct.toFixed(1)}%)`;
+        if (isFuture) opacity = '0.6';
       }
 
       cellsHtml += `<div
-        style="grid-column:${wi + 2};grid-row:${di + 2};width:13px;height:13px;border-radius:2px;background:${bg};cursor:${count > 0 ? 'pointer' : 'default'};transition:opacity 0.15s"
+        style="grid-column:${wi + 2};grid-row:${di + 2};width:13px;height:13px;border-radius:2px;background:${bg};opacity:${opacity};cursor:${count > 0 ? 'pointer' : 'default'};transition:opacity 0.15s;border:${isPast ? '1px solid var(--gl-on-surface-4)' : '1px solid transparent'}"
         title="${escHtml(title)}"
-        onmouseenter="this.style.opacity='0.7'"
-        onmouseleave="this.style.opacity='1'">
+        onmouseenter="this.style.opacity='${isFuture ? '0.8' : '0.7'}'"
+        onmouseleave="this.style.opacity='${opacity}'">
       </div>`;
     });
   });
 
-  // Legend
+  // Year selector
+  const currentYear = new Date().getFullYear();
+  const yearOptions = [];
+  for (let y = currentYear - 2; y <= currentYear + 1; y++) {
+    const nextY = y + 1;
+    yearOptions.push(`<option value="${y}" ${y === selectedYear ? 'selected' : ''}>${y} - ${nextY}</option>`);
+  }
+
+  const yearSelectorHtml = `
+    <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+      <label style="font-size:0.88rem;font-weight:600;color:var(--gl-on-surface)">Calendar Year:</label>
+      <select style="padding:4px 8px;border-radius:4px;border:1px solid var(--gl-on-surface-4);background:var(--gl-surface);color:var(--gl-on-surface);font-size:0.83rem" onchange="window._changeLeaveCalendarYear(this.value)">
+        ${yearOptions.join('')}
+      </select>
+    </div>`;
+
+  // Legend with past/future indicators
   const legendHtml = `
-    <div style="display:flex;align-items:center;gap:12px;margin-top:12px;font-size:11px;color:var(--gl-on-surface-4)">
+    <div style="display:flex;align-items:center;gap:12px;margin-top:12px;font-size:11px;color:var(--gl-on-surface-4);flex-wrap:wrap">
       <span>Less</span>
-      <div style="width:13px;height:13px;border-radius:2px;background:var(--gl-surface-high)"></div>
-      <div style="width:13px;height:13px;border-radius:2px;background:#3dd68c"></div>
-      <div style="width:13px;height:13px;border-radius:2px;background:#f5a623"></div>
-      <div style="width:13px;height:13px;border-radius:2px;background:#f5574a"></div>
+      <div style="width:13px;height:13px;border-radius:2px;background:var(--gl-surface-high);border:1px solid var(--gl-on-surface-4)"></div>
+      <div style="width:13px;height:13px;border-radius:2px;background:#3dd68c;border:1px solid var(--gl-on-surface-4)"></div>
+      <div style="width:13px;height:13px;border-radius:2px;background:#f5a623;border:1px solid var(--gl-on-surface-4)"></div>
+      <div style="width:13px;height:13px;border-radius:2px;background:#f5574a;border:1px solid var(--gl-on-surface-4)"></div>
       <span>More</span>
       <span style="margin-left:8px">Green: 1–5% · Yellow: 5–9% · Red: ≥10%</span>
+      <span style="margin-left:16px;border-left:1px solid var(--gl-on-surface-4);padding-left:12px">Past (outlined) · Future (dimmed)</span>
     </div>`;
 
   container.innerHTML = `
+    ${yearSelectorHtml}
     <div style="overflow-x:auto;padding-bottom:4px">
       <div style="display:grid;grid-template-columns:28px repeat(${weeks.length}, 13px);grid-template-rows:16px repeat(7, 13px);gap:2px;min-width:fit-content">
         ${monthLabels}
@@ -143,6 +185,16 @@ function renderCalendarHeatmap(container, records, totalEmployees) {
     </div>
     ${legendHtml}`;
 }
+
+window._changeLeaveCalendarYear = async function(year) {
+  const container = document.getElementById('leave-calendar');
+  const records = await getLeaveRecords();
+  const analyticsRes = await fetch(State.apiBase + '/analytics/summary').catch(() => ({}));
+  const analytics = analyticsRes.ok ? await analyticsRes.json() : {};
+  const totalEmployees = analytics.total_employees || 1;
+  renderCalendarHeatmap(container, records, totalEmployees, parseInt(year));
+};
+
 
 // ─── LEAVE LIST ───────────────────────────────────────────────
 async function loadLeaveList() {
@@ -200,6 +252,7 @@ async function submitLeave() {
   };
 
   if (!body.start_date || !body.end_date) { showToast('Dates required.', 'error'); return; }
+  if (new Date(body.start_date) > new Date(body.end_date)) { showToast('End date must be on or after the start date.', 'error'); return; }
   if (!body.employee_name && !body.employee_id) { showToast('Employee required.', 'error'); return; }
 
   const btn = document.getElementById('leave-submit-btn');
