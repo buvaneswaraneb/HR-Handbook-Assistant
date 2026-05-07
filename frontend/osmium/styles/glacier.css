@@ -1262,7 +1262,7 @@ body:not(.auth-required) #auth-screen {
   flex-direction: column;
   gap: 6px;
 }
-.auth-feature-card .material-symbols-outlined { color: var(--gl-primary); }
+.auth-feature-card .material-symbols-outlined { color: #3dd68c; }
 .auth-feature-card strong { color: var(--gl-on-surface); font-size: 0.82rem; }
 .auth-feature-card span:last-child { color: var(--gl-on-surface-4); font-size: 0.72rem; line-height: 1.4; }
 @media (max-width: 900px) {

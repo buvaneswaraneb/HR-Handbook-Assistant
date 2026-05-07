@@ -1,5 +1,8 @@
 from __future__ import annotations
-from fastapi import APIRouter, HTTPException, Header
+import os
+from urllib.parse import urlencode
+from fastapi import APIRouter, HTTPException, Header, Query
+from fastapi.responses import RedirectResponse
 from typing import Optional
 from pydantic import BaseModel
 
@@ -52,15 +55,36 @@ def _get_current_user(authorization: Optional[str]) -> dict:
     raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
+@router.get("/google/login")
+def google_login(
+    redirect_to: str = Query(..., description="Frontend URL that will receive the Supabase OAuth hash")
+):
+    """
+    Start Google OAuth through Supabase without exposing Supabase project keys
+    in the frontend. The browser opens this endpoint in a popup; FastAPI then
+    redirects to Supabase's hosted Google provider flow.
+    """
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    if not supabase_url:
+        raise HTTPException(status_code=500, detail="SUPABASE_URL is not configured")
+
+    query = urlencode({
+        "provider": "google",
+        "redirect_to": redirect_to,
+        "scopes": "email profile",
+    })
+    return RedirectResponse(f"{supabase_url}/auth/v1/authorize?{query}")
+
+
 @router.post("/callback")
 def oauth_callback():
     """
-    Supabase OAuth callback endpoint.
-    Frontend handles the callback — this is for reference.
-    Supabase redirects to: http://localhost:3000/auth/callback
+    Supabase OAuth callback reference endpoint.
+    The browser receives Supabase's URL fragment and posts the session back to
+    the opener window; use /auth/me with the JWT to load the backend profile.
     """
     return {
-        "message": "OAuth callback handled by frontend. Use /auth/me to get user profile."
+        "message": "OAuth callback handled by frontend popup. Use /auth/me to get user profile."
     }
 
 
@@ -83,7 +107,7 @@ def get_me(authorization: Optional[str] = Header(None)):
     """
     Get current authenticated user's profile.
     Uses Supabase JWT token from Authorization header.
-    
+
     Returns user profile with employee and workspace info.
     """
     user = _get_current_user(authorization)
@@ -103,7 +127,7 @@ def link_employee(
     """
     Link authenticated user to an employee record.
     This associates the logged-in user with their employee profile.
-    
+
     Required after initial OAuth signup.
     """
     user = _get_current_user(authorization)

@@ -39,7 +39,7 @@
       </div>
     </div>
     <div style="max-width:540px">
-      <div style="font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--gl-primary);margin-bottom:10px">Welcome to Osmium</div>
+      <div style="font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#3dd68c;margin-bottom:10px">Welcome to Osmium</div>
       <h1 style="font-size:2.6rem;line-height:1.08;letter-spacing:-0.04em;color:var(--gl-on-surface);margin-bottom:16px">A focused employee management workspace.</h1>
       <p style="font-size:0.96rem;line-height:1.7;color:var(--gl-on-surface-3);max-width:500px">Osmium helps teams manage employees, project hierarchy, leave visibility, documents, and AI-assisted HR knowledge in one secure operational dashboard.</p>
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:28px;max-width:520px">
@@ -54,11 +54,11 @@
     <div class="auth-card" role="dialog" aria-labelledby="auth-title" aria-modal="true">
       <div style="margin-bottom:18px">
         <div id="auth-title" style="font-size:1.25rem;font-weight:800;letter-spacing:-0.025em;color:var(--gl-on-surface)">Sign in to Osmium</div>
-        <div style="font-size:0.82rem;color:var(--gl-on-surface-3);margin-top:4px">Use Google via Supabase Auth or your employee email credentials.</div>
+        <div style="font-size:0.82rem;color:var(--gl-on-surface-3);margin-top:4px">Use Google or your employee email credentials.</div>
       </div>
 
       <button id="auth-google-btn" class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:14px" type="button">
-        <span class="material-symbols-outlined" style="font-size:18px;color:#4285f4">account_circle</span> Continue with Google
+        <span class="material-symbols-outlined" style="font-size:18px;color:#3dd68c">account_circle</span> Continue with Google
       </button>
 
       <div style="display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--gl-on-surface-4);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em">
@@ -73,15 +73,9 @@
         <button id="auth-email-btn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" type="submit">Sign in with email</button>
       </form>
 
-      <form id="auth-config-form" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--gl-outline)">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">
-          <div class="label" style="margin:0">Supabase OAuth Configuration</div>
-          <span style="font-size:0.68rem;color:var(--gl-on-surface-4)">Stored locally</span>
-        </div>
-        <input id="auth-supabase-url" class="input" placeholder="https://your-project.supabase.co" style="margin-bottom:8px"/>
-        <input id="auth-supabase-key" class="input" placeholder="Supabase anon key" type="password"/>
-        <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center;margin-top:10px" type="submit">Save Supabase Settings</button>
-      </form>
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--gl-outline);font-size:0.74rem;color:var(--gl-on-surface-4);line-height:1.5">
+        Google OAuth is routed through FastAPI. Provider keys are configured on the backend, not in the browser.
+      </div>
     </div>
   </div>
 </section>
@@ -346,7 +340,7 @@
           <div style="padding:22px 24px;display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:170px">
             <div style="max-width:560px">
               <div style="font-size:1.05rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:8px">Calendar sync placeholder</div>
-              <div style="font-size:0.84rem;color:var(--gl-on-surface-3);line-height:1.6">OAuth is now handled through Supabase Auth. Direct Google Calendar sync will be added later without changing this dashboard layout.</div>
+              <div style="font-size:0.84rem;color:var(--gl-on-surface-3);line-height:1.6">OAuth is now handled through the backend auth flow. Direct Google Calendar sync will be added later without changing this dashboard layout.</div>
             </div>
             <button class="btn btn-secondary" disabled style="opacity:0.55;cursor:not-allowed">
               <span class="material-symbols-outlined" style="font-size:16px">sync_disabled</span> Connect Calendar
