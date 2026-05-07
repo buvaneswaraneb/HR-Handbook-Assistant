@@ -323,7 +323,7 @@ function onBgHover(e) {
   const y = e.clientY - rect.top;
   if (!glowEl) {
     glowEl = document.createElement('div');
-    glowEl.style.cssText = `position:absolute;pointer-events:none;border-radius:50%;background:radial-gradient(circle, rgba(90,191,232,0.18) 0%, transparent 70%);transition:opacity 0.1s;z-index:1`;
+    glowEl.style.cssText = `position:absolute;pointer-events:none;border-radius:50%;background:rgba(90,191,232,0.08);box-shadow:0 0 42px 28px rgba(90,191,232,0.08);transition:opacity 0.1s;z-index:1`;
     bgEl.appendChild(glowEl);
   }
   const r = 120;

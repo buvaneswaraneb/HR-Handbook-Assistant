@@ -101,8 +101,9 @@ app.add_middleware(
 # Register upload / download routes from the upload-downloader service
 app.include_router(file_router)
 
-# Register Supabase authentication routes (replaces manual auth)
+# Register Supabase authentication routes and email/password auth routes
 app.include_router(supabase_auth.router)
+app.include_router(auth.router)
 
 # Register calendar routes
 app.include_router(calendar.router)

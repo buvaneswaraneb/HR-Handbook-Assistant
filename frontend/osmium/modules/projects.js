@@ -26,6 +26,8 @@ export function initProjects() {
 
   // Member chip selector
   document.getElementById('proj-member-search')?.addEventListener('input', filterMemberSearch);
+  document.getElementById('proj-manager')?.addEventListener('change', renderAssignmentSummary);
+  document.getElementById('proj-teamlead')?.addEventListener('change', renderAssignmentSummary);
 }
 
 function initTagInput(inputId, tagsId, getArr, setArr) {
@@ -92,13 +94,31 @@ async function populateProjDropdowns() {
           </label>`;
       }).join('');
     }
+    renderAssignmentSummary();
   } catch {}
 }
 
 window._toggleMember = function(empId) {
   if (projMemberIds.has(empId)) projMemberIds.delete(empId);
   else projMemberIds.add(empId);
+  renderAssignmentSummary();
 };
+
+function employeeName(id) {
+  return State.employees.find(e => e.id === id)?.name || 'Selected employee';
+}
+
+function renderAssignmentSummary() {
+  const el = document.getElementById('proj-assignment-summary');
+  if (!el) return;
+  const managerId = document.getElementById('proj-manager')?.value || '';
+  const leadId = document.getElementById('proj-teamlead')?.value || '';
+  const chips = [];
+  if (managerId) chips.push(`<span class="chip" style="border-color:#5abfe844;color:#5abfe8">Manager: ${escHtml(employeeName(managerId))}</span>`);
+  if (leadId) chips.push(`<span class="chip" style="border-color:#f5a62344;color:#f5a623">Lead: ${escHtml(employeeName(leadId))}</span>`);
+  [...projMemberIds].forEach(id => chips.push(`<span class="chip">Member: ${escHtml(employeeName(id))}<button type="button" onclick="window._toggleMember('${id}')" style="margin-left:5px;border:none;background:transparent;color:inherit;cursor:pointer">×</button></span>`));
+  el.innerHTML = chips.length ? chips.join('') : '<span style="font-size:0.72rem;color:var(--gl-on-surface-4)">No assignments selected yet.</span>';
+}
 
 function filterMemberSearch() {
   const q = document.getElementById('proj-member-search')?.value.toLowerCase() || '';
@@ -210,6 +230,9 @@ async function submitProject() {
   };
 
   if (!body.project_name) { showToast('Project name required.', 'error'); return; }
+  if (body.manager_id && body.team_lead_id && body.manager_id === body.team_lead_id) { showToast('Manager and team leader must be separate employees.', 'error'); return; }
+  if (body.manager_id && body.member_ids.includes(body.manager_id)) { showToast('Manager cannot also be assigned as a team member.', 'error'); return; }
+  if (body.team_lead_id && body.member_ids.includes(body.team_lead_id)) { showToast('Team leader cannot also be assigned as a team member.', 'error'); return; }
 
   const btn = document.getElementById('proj-submit-btn');
   if (btn) { btn.textContent = 'Creating…'; btn.disabled = true; }
@@ -227,6 +250,7 @@ async function submitProject() {
     projSkillTags = [];
     projRoleTags = [];
     projMemberIds = new Set();
+    renderAssignmentSummary();
     loadProjects();
   } catch (e) { showToast(e.message, 'error'); }
   finally { if (btn) { btn.textContent = 'Create Project'; btn.disabled = false; } }
