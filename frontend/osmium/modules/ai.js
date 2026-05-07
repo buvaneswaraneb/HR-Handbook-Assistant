@@ -208,18 +208,22 @@ async function sendMessage() {
     // Format answer with line breaks preserved
     let html = `<div style="line-height:1.7;white-space:pre-wrap">${escHtml(answer)}</div>`;
 
-    if (data.sources?.length) {
+    const validSources = (data.sources || []).filter(s => (s.file || s.filename || s.source) && (s.page || s.page_number));
+    if (validSources.length) {
       html += `<div class="ai-sources">
-        <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gl-on-surface-4);margin-bottom:6px">Sources</div>
-        <div style="display:flex;flex-wrap:wrap;gap:4px">
-          ${data.sources.map(s => {
-            // Validate file name exists in our file list
-            const cleanFile = s.file || '';
-            const page = s.page ? `· p.${s.page}` : '';
-            return `<span class="ai-source-chip">
-              <span class="material-symbols-outlined" style="font-size:11px">description</span>
-              ${escHtml(cleanFile)} ${page}
-            </span>`;
+        <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gl-on-surface-4);margin-bottom:8px">Sources</div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${validSources.map(s => {
+            const fileName = s.file || s.filename || s.source;
+            const page = s.page || s.page_number;
+            const snippet = s.preview || s.snippet || s.text || '';
+            return `<div class="ai-source-chip" style="display:block;line-height:1.45">
+              <div style="display:flex;align-items:center;gap:5px;font-weight:700">
+                <span class="material-symbols-outlined" style="font-size:12px">description</span>
+                ${escHtml(fileName)} · Page ${escHtml(String(page))}
+              </div>
+              ${snippet ? `<div style="margin-top:3px;color:var(--gl-on-surface-3);font-weight:400">${escHtml(String(snippet).slice(0, 180))}</div>` : ''}
+            </div>`;
           }).join('')}
         </div>
       </div>`;
