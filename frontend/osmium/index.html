@@ -11,7 +11,7 @@
   /* Metric card pulse animation */
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
   .metric-card { position:relative; overflow:hidden; }
-  .metric-card::after { content:''; position:absolute; inset:0; background:linear-gradient(135deg, transparent 60%, rgba(9,129,167,0.03)); pointer-events:none; }
+  .metric-card::after { content:''; position:absolute; inset:0; background:rgba(9,129,167,0.03); pointer-events:none; }
   /* Legend dot */
   .legend-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
   /* Separator */
@@ -25,7 +25,60 @@
   #canvas-view, #canvas-world { position:absolute; }
 </style>
 </head>
-<body>
+<body class="auth-required">
+<!-- ══════════════════════════════════════════════
+     AUTH SCREEN
+══════════════════════════════════════════════ -->
+<section id="auth-screen" aria-hidden="false">
+  <div class="auth-welcome">
+    <div class="sidebar-logo" style="border-bottom:none;margin-bottom:26px;padding:0">
+      <div class="sidebar-logo-icon"><span class="material-symbols-outlined" style="font-size:18px;color:#fff">token</span></div>
+      <div class="sidebar-logo-text">
+        <div class="sidebar-logo-name">Osmium</div>
+        <div class="sidebar-logo-sub">Enterprise RM</div>
+      </div>
+    </div>
+    <div style="max-width:540px">
+      <div style="font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#3dd68c;margin-bottom:10px">Welcome to Osmium</div>
+      <h1 style="font-size:2.6rem;line-height:1.08;letter-spacing:-0.04em;color:var(--gl-on-surface);margin-bottom:16px">A focused employee management workspace.</h1>
+      <p style="font-size:0.96rem;line-height:1.7;color:var(--gl-on-surface-3);max-width:500px">Osmium helps teams manage employees, project hierarchy, leave visibility, documents, and AI-assisted HR knowledge in one secure operational dashboard.</p>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:28px;max-width:520px">
+        <div class="auth-feature-card"><span class="material-symbols-outlined">verified_user</span><strong>Protected</strong><span>JWT-backed FastAPI access</span></div>
+        <div class="auth-feature-card"><span class="material-symbols-outlined">hub</span><strong>Organized</strong><span>Project hierarchy and teams</span></div>
+        <div class="auth-feature-card"><span class="material-symbols-outlined">smart_toy</span><strong>Contextual</strong><span>File-aware AI assistant</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-card-wrap">
+    <div class="auth-card" role="dialog" aria-labelledby="auth-title" aria-modal="true">
+      <div style="margin-bottom:18px">
+        <div id="auth-title" style="font-size:1.25rem;font-weight:800;letter-spacing:-0.025em;color:var(--gl-on-surface)">Sign in to Osmium</div>
+        <div style="font-size:0.82rem;color:var(--gl-on-surface-3);margin-top:4px">Use Google or your employee email credentials.</div>
+      </div>
+
+      <button id="auth-google-btn" class="btn btn-secondary" style="width:100%;justify-content:center;margin-bottom:14px" type="button">
+        <span class="material-symbols-outlined" style="font-size:18px;color:#3dd68c">account_circle</span> Continue with Google
+      </button>
+
+      <div style="display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--gl-on-surface-4);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em">
+        <div style="height:1px;background:var(--gl-outline);flex:1"></div>or<div style="height:1px;background:var(--gl-outline);flex:1"></div>
+      </div>
+
+      <form id="auth-email-form">
+        <div class="label">Email</div>
+        <input id="auth-email" class="input" type="email" autocomplete="email" placeholder="you@company.com" required/>
+        <div class="label" style="margin-top:12px">Password</div>
+        <input id="auth-password" class="input" type="password" autocomplete="current-password" placeholder="••••••••" required/>
+        <button id="auth-email-btn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" type="submit">Sign in with email</button>
+      </form>
+
+      <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--gl-outline);font-size:0.74rem;color:var(--gl-on-surface-4);line-height:1.5">
+        Google OAuth is routed through FastAPI. Provider keys are configured on the backend, not in the browser.
+      </div>
+    </div>
+  </div>
+</section>
 
 <div id="app">
 
@@ -118,6 +171,14 @@
     <input id="global-search" placeholder="Search employees, skills, teams… (⌘K)" onkeyup="handleGlobalSearch(this.value)" onkeydown="if(event.key==='Enter')doGlobalSearch(this.value)"/>
   </div>
   <div class="topbar-spacer"></div>
+  <div id="auth-user-pill" style="display:flex;align-items:center;gap:9px;padding:5px 9px;border:1px solid var(--gl-outline);border-radius:var(--r-full);background:var(--gl-surface-low)">
+    <div id="auth-user-avatar" style="width:26px;height:26px;border-radius:50%;background:var(--gl-primary-muted);color:var(--gl-primary);display:flex;align-items:center;justify-content:center"></div>
+    <div style="line-height:1.1;max-width:160px">
+      <div id="auth-user-name" style="font-size:0.74rem;font-weight:700;color:var(--gl-on-surface);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Not signed in</div>
+      <div id="auth-user-email" style="font-size:0.62rem;color:var(--gl-on-surface-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Protected workspace</div>
+    </div>
+    <button id="logout-btn" class="btn btn-ghost btn-icon btn-sm" title="Logout" type="button"><span class="material-symbols-outlined" style="font-size:16px">logout</span></button>
+  </div>
   <!-- Topbar actions -->
   <button class="topbar-btn" title="Add Employee (quick)" onclick="openModal('add-employee-modal')">
     <span class="material-symbols-outlined">person_add</span>
@@ -174,7 +235,7 @@
             <span style="font-size:0.72rem;font-weight:600;color:var(--gl-tertiary)">Live</span>
           </div>
           <div id="metric-projects" style="font-size:2rem;font-weight:800;color:var(--gl-on-surface);letter-spacing:-0.03em"><span class="spinner"></span></div>
-          <div style="font-size:0.78rem;color:var(--gl-on-surface-3);margin-top:4px">Active Projects</div>
+          <div style="font-size:0.78rem;color:var(--gl-on-surface-3);margin-top:4px">Total Projects</div>
         </div>
         <div class="card metric-card" style="padding:18px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -185,6 +246,16 @@
           </div>
           <div id="metric-available" style="font-size:2rem;font-weight:800;color:var(--gl-on-surface);letter-spacing:-0.03em"><span class="spinner"></span></div>
           <div style="font-size:0.78rem;color:var(--gl-on-surface-3);margin-top:4px">Available</div>
+        </div>
+        <div class="card metric-card" style="padding:18px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+            <div style="width:36px;height:36px;border-radius:var(--r-md);background:var(--gl-primary-muted);display:flex;align-items:center;justify-content:center;color:var(--gl-primary)">
+              <span class="material-symbols-outlined">assignment_ind</span>
+            </div>
+            <span style="font-size:0.72rem;color:var(--gl-primary)">Active</span>
+          </div>
+          <div id="metric-assignments" style="font-size:2rem;font-weight:800;color:var(--gl-on-surface);letter-spacing:-0.03em"><span class="spinner"></span></div>
+          <div style="font-size:0.78rem;color:var(--gl-on-surface-3);margin-top:4px">Active Assignments</div>
         </div>
         <div class="card metric-card" style="padding:18px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -236,9 +307,8 @@
         </div>
       </div>
 
-      <!-- Quick actions + Skill Coverage -->
+      <!-- Quick actions + Google Calendar Sync Placeholder -->
       <div style="display:grid;grid-template-columns:220px 1fr;gap:20px">
-        <!-- Quick actions -->
         <div class="card" style="padding:18px">
           <div style="font-size:0.9rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:14px">Quick Actions</div>
           <div style="display:flex;flex-direction:column;gap:6px">
@@ -254,61 +324,27 @@
               <span class="material-symbols-outlined" style="color:#f5a623">hub</span>
               <span style="font-size:0.82rem">Open Canvas</span>
             </button>
-            <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="switchViewGlobal('leave')">
-              <span class="material-symbols-outlined" style="color:#f5574a">event_busy</span>
-              <span style="font-size:0.82rem">Leave Management</span>
+            <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="switchViewGlobal('ai')">
+              <span class="material-symbols-outlined" style="color:#5abfe8">smart_toy</span>
+              <span style="font-size:0.82rem">AI Assistant</span>
             </button>
           </div>
         </div>
 
-        <!-- Skill Coverage Chart -->
         <div class="card" style="overflow:hidden">
           <div style="padding:18px 20px 14px;border-bottom:1px solid var(--gl-outline);display:flex;align-items:center;gap:12px">
-            <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface);flex:1">Skill Coverage</div>
-            <span style="display:flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--gl-on-surface-3)"><span class="legend-dot" style="background:#3dd68c"></span>Actual</span>
-            <span style="display:flex;align-items:center;gap:5px;font-size:0.72rem;color:var(--gl-on-surface-3)"><span class="legend-dot" style="background:#5abfe8;opacity:0.5"></span>Required</span>
+            <span class="material-symbols-outlined" style="color:#4285f4">calendar_month</span>
+            <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface);flex:1">Google Calendar Sync</div>
+            <span class="badge" style="background:rgba(245,166,35,0.12);border-color:rgba(245,166,35,0.25);color:#f5a623">Coming Soon</span>
           </div>
-          <div id="skill-chart" style="padding:16px 20px;min-height:180px;display:flex;align-items:center"></div>
-          <div id="skill-gap-alert" style="display:none;margin:0 20px 16px;background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);border-radius:var(--r-md);padding:10px 14px;align-items:center;gap:10px">
-            <span class="material-symbols-outlined" style="color:#f5a623;font-size:18px">warning</span>
-            <span style="font-size:0.78rem;color:var(--gl-on-surface-2)"><strong>Skill Gap:</strong> <span id="skill-gap-text"></span></span>
-          </div>
-        </div>
-      </div>
-        <!-- Quick actions -->
-        <div class="card" style="padding:18px">
-          <div style="font-size:0.9rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:14px">Quick Actions</div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="openModal('add-employee-modal')">
-              <span class="material-symbols-outlined" style="color:var(--gl-primary)">person_add</span>
-              <span style="font-size:0.82rem">Add Employee</span>
+          <div style="padding:22px 24px;display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:170px">
+            <div style="max-width:560px">
+              <div style="font-size:1.05rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:8px">Calendar sync placeholder</div>
+              <div style="font-size:0.84rem;color:var(--gl-on-surface-3);line-height:1.6">OAuth is now handled through the backend auth flow. Direct Google Calendar sync will be added later without changing this dashboard layout.</div>
+            </div>
+            <button class="btn btn-secondary" disabled style="opacity:0.55;cursor:not-allowed">
+              <span class="material-symbols-outlined" style="font-size:16px">sync_disabled</span> Connect Calendar
             </button>
-            <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="openModal('add-project-modal')">
-              <span class="material-symbols-outlined" style="color:var(--gl-primary)">create_new_folder</span>
-              <span style="font-size:0.82rem">New Project</span>
-            </button>
-            <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="switchViewGlobal('canvas')">
-              <span class="material-symbols-outlined" style="color:var(--gl-primary)">hub</span>
-              <span style="font-size:0.82rem">Open Canvas</span>
-            </button>
-            <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px" onclick="switchViewGlobal('files')">
-              <span class="material-symbols-outlined" style="color:var(--gl-primary)">upload_file</span>
-              <span style="font-size:0.82rem">Upload File</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Activity feed -->
-        <div class="card" style="overflow:hidden">
-          <div style="padding:18px 20px 14px;border-bottom:1px solid var(--gl-outline);display:flex;align-items:center;gap:12px">
-            <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface);flex:1">Activity Feed</div>
-            <button id="feed-btn-all" onclick="loadActivityFeedGlobal(null)" style="padding:4px 10px;border-radius:var(--r-full);border:1px solid var(--gl-outline);background:var(--gl-primary-muted);color:var(--gl-primary);font-size:0.72rem;cursor:pointer;font-family:inherit;font-weight:600">All</button>
-            <button id="feed-btn-engineering" onclick="loadActivityFeedGlobal('Engineering')" style="padding:4px 10px;border-radius:var(--r-full);border:1px solid var(--gl-outline);background:var(--gl-surface-high);color:var(--gl-on-surface-3);font-size:0.72rem;cursor:pointer;font-family:inherit">Engineering</button>
-            <button id="feed-btn-design" onclick="loadActivityFeedGlobal('Design')" style="padding:4px 10px;border-radius:var(--r-full);border:1px solid var(--gl-outline);background:var(--gl-surface-high);color:var(--gl-on-surface-3);font-size:0.72rem;cursor:pointer;font-family:inherit">Design</button>
-            <button id="feed-btn-hr" onclick="loadActivityFeedGlobal('HR')" style="padding:4px 10px;border-radius:var(--r-full);border:1px solid var(--gl-outline);background:var(--gl-surface-high);color:var(--gl-on-surface-3);font-size:0.72rem;cursor:pointer;font-family:inherit">HR</button>
-          </div>
-          <div id="activity-feed" style="display:flex;align-items:center;gap:10px;padding:20px;color:var(--gl-on-surface-4);font-size:0.82rem">
-            <span class="spinner-sm spinner"></span> Loading activity…
           </div>
         </div>
       </div>
@@ -719,7 +755,13 @@
         <div><div class="label">Work Start</div><input id="new-emp-start"    class="input" type="time" value="09:00"/></div>
         <div><div class="label">Work End</div><input   id="new-emp-end"      class="input" type="time" value="18:00"/></div>
       </div>
-      <div style="margin-top:12px"><div class="label">Skills</div><div class="skill-tag-wrap" id="emp-skill-wrap"><div id="emp-skill-tags" style="display:inline-flex;flex-wrap:wrap;gap:4px"></div><input id="emp-skill-input" class="skill-tag-input" placeholder="Type a skill and press Enter..."></div></div>
+      <div style="margin-top:12px">
+        <div class="label" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Skill Set</span>
+          <button type="button" class="btn btn-secondary btn-sm" onclick="window._addEmpSkillRow?.()"><span class="material-symbols-outlined" style="font-size:14px">add</span> Add Skill</button>
+        </div>
+        <div id="emp-skill-rows" style="display:flex;flex-direction:column;gap:8px"></div>
+      </div>
       <div style="margin-top:12px"><div class="label">LinkedIn URL</div><input id="new-emp-linkedin" class="input" placeholder="https://linkedin.com/in/…"/></div>
       <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
         <label class="toggle">
@@ -777,6 +819,7 @@
         <div class="member-select-wrap" id="proj-member-list">
           <div style="padding:10px;text-align:center;color:var(--gl-on-surface-4);font-size:0.75rem">Loading employees...</div>
         </div>
+        <div id="proj-assignment-summary" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
       </div>
       <div style="margin-top:12px"><div class="label">Description</div><textarea id="proj-desc" class="input" rows="3" placeholder="Project description…" style="resize:vertical"></textarea></div>
     </form>
@@ -831,7 +874,7 @@
   import { initModalOverlays, switchView, initApiStatus, initKeyboardShortcuts, showToast, openModal, closeModal, applyTheme } from './modules/ui.js';
   import { initCanvas, addEmployeeToCanvas, renderNodes } from './modules/canvas.js';
   import { initInspector } from './modules/inspector.js';
-  import { initDashboard, loadDashboard, loadActivityFeed } from './modules/dashboard.js';
+  import { initDashboard, loadDashboard } from './modules/dashboard.js';
   import { initEmployees, loadEmployees } from './modules/employees.js';
   import { initProjects } from './modules/projects.js';
   import { initFiles } from './modules/files.js';
@@ -840,6 +883,7 @@
   import { initSettings } from './modules/settings.js';
   import { initLeave } from './modules/leave.js';
   import { debounce } from './utils/helpers.js';
+  import { initAuth } from './modules/auth.js';
 
   // ── Load settings first ─────────────────────────
   State.loadSettings();
@@ -896,7 +940,8 @@
   };
 
   // ── Bootstrap ───────────────────────────────────
-  loadDashboard();
+  const authed = await initAuth();
+  if (authed) loadDashboard();
 </script>
 
 </body>

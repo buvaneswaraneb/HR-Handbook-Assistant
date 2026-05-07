@@ -34,56 +34,30 @@ async function loadTree() {
 
 // ─── BUILD LEVEL BUCKETS ──────────────────────────────────────
 function buildLevels(emps) {
-  const empMap = {};
-  emps.forEach(e => { empMap[e.id] = { ...e, children: [] }; });
+  const managerIds = new Set(emps.map(e => e.manager_id).filter(Boolean));
+  const leadIds = new Set(emps.map(e => e.team_lead_id).filter(Boolean));
+  const levels = { 0: [], 1: [], 2: [] };
 
-  // Assign children
-  emps.forEach(e => {
-    if (e.manager_id && empMap[e.manager_id]) {
-      empMap[e.manager_id].children.push(empMap[e.id]);
-    }
+  emps.forEach(emp => {
+    if (managerIds.has(emp.id) || (!emp.manager_id && !emp.team_lead_id)) levels[0].push(emp);
+    else if (leadIds.has(emp.id) || emp.manager_id) levels[1].push(emp);
+    else levels[2].push(emp);
   });
 
-  // BFS to assign levels
-  const levelMap = {};
-  const roots = emps.filter(e => !e.manager_id || !empMap[e.manager_id]);
-
-  const queue = roots.map(r => ({ node: empMap[r.id], level: 0 }));
-  const visited = new Set();
-
-  while (queue.length) {
-    const { node, level } = queue.shift();
-    if (visited.has(node.id)) continue;
-    visited.add(node.id);
-
-    if (!levelMap[level]) levelMap[level] = [];
-    levelMap[level].push(node);
-
-    node.children.forEach(child => {
-      queue.push({ node: child, level: level + 1 });
-    });
-  }
-
-  // Any unvisited nodes (orphans / circular refs) go in last level
-  const allVisited = new Set(Object.values(levelMap).flat().map(n => n.id));
-  const orphans = emps.filter(e => !allVisited.has(e.id));
-  if (orphans.length) {
-    const maxLevel = Math.max(...Object.keys(levelMap).map(Number), 0) + 1;
-    levelMap[maxLevel] = orphans.map(e => empMap[e.id]);
-  }
-
-  return levelMap;
+  const assigned = new Set([...levels[0], ...levels[1], ...levels[2]].map(e => e.id));
+  emps.filter(e => !assigned.has(e.id)).forEach(e => levels[2].push(e));
+  return levels;
 }
 
 // ─── RENDER TREE ──────────────────────────────────────────────
 function renderOrgTree(container, levelMap, emps) {
   const levelCount = Object.keys(levelMap).length;
-  const levelLabels = ['Executive / CEO', 'Managers', 'Team Leads', 'Team Members', 'Contributor'];
+  const levelLabels = ['Managers', 'Team Leaders', 'Team Members'];
 
   container.innerHTML = `
     <div style="margin-bottom:24px;display:flex;align-items:center;justify-content:space-between">
       <div>
-        <div style="font-size:1.4rem;font-weight:700;color:var(--gl-on-surface);letter-spacing:-0.02em">Org Chart</div>
+        <div style="font-size:1.4rem;font-weight:700;color:var(--gl-on-surface);letter-spacing:-0.02em">Static Org Tree</div>
         <div style="font-size:0.8rem;color:var(--gl-on-surface-3);margin-top:2px">${emps.length} employees · ${levelCount} level${levelCount > 1 ? 's' : ''}</div>
       </div>
     </div>

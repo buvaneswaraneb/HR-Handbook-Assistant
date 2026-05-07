@@ -8,6 +8,10 @@ export const State = {
   apiBase: 'http://localhost:8000',
   apiConnected: false,
 
+  // Auth
+  auth: null,
+  authProfile: null,
+
   // Navigation
   currentView: 'dashboard',
 
