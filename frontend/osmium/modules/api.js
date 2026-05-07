@@ -5,10 +5,14 @@
 
 import { State } from '../utils/state.js';
 
+function authHeaders() {
+  return State.auth?.accessToken ? { Authorization: `Bearer ${State.auth.accessToken}` } : {};
+}
+
 async function request(path, opts = {}) {
   const url = State.apiBase + path;
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(opts.headers || {}) },
     ...opts,
   });
   if (!res.ok) {
@@ -20,6 +24,18 @@ async function request(path, opts = {}) {
 }
 
 // ─── HEALTH ──────────────────────────────────────────────────
+export async function loginWithEmail(body) {
+  return request('/auth/login', { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function getAuthProfile() {
+  return request('/auth/me');
+}
+
+export async function logoutBackend() {
+  return request('/auth/logout', { method: 'POST', body: JSON.stringify({}) });
+}
+
 export async function checkHealth() {
   try {
     await request('/health');
@@ -131,6 +147,7 @@ export async function getFiles(department = null) {
 export async function uploadFile(formData) {
   const res = await fetch(State.apiBase + '/upload', {
     method: 'POST',
+    headers: authHeaders(),
     body: formData,
   });
   if (!res.ok) {
