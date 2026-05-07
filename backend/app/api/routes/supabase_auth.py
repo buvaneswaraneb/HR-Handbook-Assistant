@@ -5,7 +5,8 @@ from pydantic import BaseModel
 
 from app.services.e_r_s.auth_middleware import get_auth_middleware
 from app.services.e_r_s import supabase_auth_service as svc
-from app.services.e_r_s.auth_schemas import UserProfile
+from app.services.e_r_s import auth_service
+from app.services.e_r_s.auth_schemas import UserProfile, LoginRequest
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -25,17 +26,30 @@ def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
 
 
 def _get_current_user(authorization: Optional[str]) -> dict:
-    """Validate Supabase JWT and get user."""
+    """Validate token and get user (supports both Supabase JWT and custom tokens)."""
     token = _extract_bearer_token(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    # Try Supabase JWT first
     middleware = get_auth_middleware()
     user = middleware.get_user_from_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if user:
+        return user
 
-    return user
+    # Fall back to custom token from email/password login
+    try:
+        auth_user = auth_service.get_current_user_from_token(token)
+        if auth_user:
+            return {
+                "user_id": auth_user["id"],
+                "email": auth_user["email"],
+                "raw_token": auth_user,
+            }
+    except Exception:
+        pass
+
+    raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
 @router.post("/callback")
@@ -48,6 +62,20 @@ def oauth_callback():
     return {
         "message": "OAuth callback handled by frontend. Use /auth/me to get user profile."
     }
+
+
+@router.post("/login")
+def login(body: LoginRequest):
+    """
+    Login with email and password (fallback if Supabase not configured).
+    Returns access token that can be used with /auth/me.
+    """
+    try:
+        return auth_service.login(body)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Login failed")
 
 
 @router.get("/me")

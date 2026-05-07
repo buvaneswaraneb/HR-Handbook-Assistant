@@ -5,6 +5,7 @@ from datetime import date
 
 from app.services.e_r_s import calendar_service as svc
 from app.services.e_r_s.auth_middleware import get_auth_middleware
+from app.services.e_r_s import auth_service
 
 router = APIRouter(prefix="/calendar", tags=["Calendar"])
 
@@ -20,17 +21,30 @@ def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
 
 
 def _get_current_user(authorization: Optional[str]) -> dict:
-    """Validate Supabase JWT and get user."""
+    """Validate token and get user (supports both Supabase JWT and custom tokens)."""
     token = _extract_bearer_token(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    # Try Supabase JWT first
     middleware = get_auth_middleware()
     user = middleware.get_user_from_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if user:
+        return user
 
-    return user
+    # Fall back to custom token from email/password login
+    try:
+        auth_user = auth_service.get_current_user_from_token(token)
+        if auth_user:
+            return {
+                "user_id": auth_user["id"],
+                "email": auth_user["email"],
+                "raw_token": auth_user,
+            }
+    except Exception:
+        pass
+
+    raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 
 @router.get("/email")
