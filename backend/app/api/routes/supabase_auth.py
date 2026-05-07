@@ -76,6 +76,69 @@ def google_login(
     return RedirectResponse(f"{supabase_url}/auth/v1/authorize?{query}")
 
 
+@router.get("/google/login")
+def google_login(
+    redirect_to: str = Query(..., description="Frontend URL that will receive the Supabase OAuth hash")
+):
+    """
+    Start Google OAuth through Supabase without exposing Supabase project keys
+    in the frontend. The browser opens this endpoint in a popup; FastAPI then
+    redirects to Supabase's hosted Google provider flow.
+    """
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    if not supabase_url:
+        raise HTTPException(status_code=500, detail="SUPABASE_URL is not configured")
+
+    query = urlencode({
+        "provider": "google",
+        "redirect_to": redirect_to,
+        "scopes": "email profile",
+    })
+    return RedirectResponse(f"{supabase_url}/auth/v1/authorize?{query}")
+
+
+@router.get("/google/login")
+def google_login(
+    redirect_to: str = Query(..., description="Frontend URL that will receive the Supabase OAuth hash")
+):
+    """
+    Start Google OAuth through Supabase without exposing Supabase project keys
+    in the frontend. The browser opens this endpoint in a popup; FastAPI then
+    redirects to Supabase's hosted Google provider flow.
+    """
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    if not supabase_url:
+        raise HTTPException(status_code=500, detail="SUPABASE_URL is not configured")
+
+    query = urlencode({
+        "provider": "google",
+        "redirect_to": redirect_to,
+        "scopes": "email profile",
+    })
+    return RedirectResponse(f"{supabase_url}/auth/v1/authorize?{query}")
+
+
+@router.get("/google/login")
+def google_login(
+    redirect_to: str = Query(..., description="Frontend URL that will receive the Supabase OAuth hash")
+):
+    """
+    Start Google OAuth through Supabase without exposing Supabase project keys
+    in the frontend. The browser opens this endpoint in a popup; FastAPI then
+    redirects to Supabase's hosted Google provider flow.
+    """
+    supabase_url = os.getenv("SUPABASE_URL", "").rstrip("/")
+    if not supabase_url:
+        raise HTTPException(status_code=500, detail="SUPABASE_URL is not configured")
+
+    query = urlencode({
+        "provider": "google",
+        "redirect_to": redirect_to,
+        "scopes": "email profile",
+    })
+    return RedirectResponse(f"{supabase_url}/auth/v1/authorize?{query}")
+
+
 @router.post("/callback")
 def oauth_callback():
     """

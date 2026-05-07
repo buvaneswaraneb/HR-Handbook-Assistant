@@ -11,7 +11,9 @@ export const State = {
   // Auth
   auth: null,
   authProfile: null,
+
   supabaseConfigured: false,
+
 
   // Navigation
   currentView: 'dashboard',

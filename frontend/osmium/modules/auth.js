@@ -99,7 +99,7 @@ async function applyOAuthSession(session) {
         id: profile.user_id,
         email: profile.email,
         name: [profile.first_name, profile.last_name].filter(Boolean).join(' ') || profile.email,
-        avatar: null,
+        avatar: profile.avatar_url || null,
       },
     };
     State.set('auth', nextAuth);

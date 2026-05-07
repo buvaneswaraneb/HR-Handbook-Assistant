@@ -1,58 +1,58 @@
 /* ============================================================
    GLACIER — Design System CSS
-   Osmium ERM · Enterprise Resource Management
+   Osmium HR · Human Resource Management
    ============================================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /* ─── TOKENS ──────────────────────────────────────────────── */
 :root {
-  /* Glacier Palette */
-  --gl-primary:          #565656;
-  --gl-primary-dark:     #1a1b1c;
-  --gl-primary-light:    #12aad8;
-  --gl-primary-muted:    rgba(9,129,167,0.15);
-  --gl-primary-glow:     rgba(9,129,167,0.25);
+  /* Dark Theme Palette */
+  --gl-primary:          #1a1b1c;           /* dark background */
+  --gl-primary-dark:     #0a0b0c;           /* deeper */
+  --gl-primary-light:    #2e2f30;           /* lighter for accents */
+  --gl-primary-muted:    rgba(255,255,255,0.08);
+  --gl-primary-glow:     rgba(255,255,255,0.12);
 
-  --gl-secondary:        #5C7B8C;
-  --gl-secondary-muted:  rgba(0, 0, 0, 0.15);
+  --gl-secondary:        #3a3b3c;           /* secondary gray */
+  --gl-secondary-muted:  rgba(255,255,255,0.15);
 
-  --gl-tertiary:         #DA9142;
-  --gl-tertiary-dark:    #b57430;
-  --gl-tertiary-muted:   rgba(218,145,66,0.15);
+  --gl-tertiary:         #0d6efd;           /* blue accent */
+  --gl-tertiary-dark:    #0a58ca;
+  --gl-tertiary-muted:   rgba(13,111,253,0.15);
 
-  --gl-neutral:          #74787B;
-  --gl-neutral-muted:    rgba(116,120,123,0.15);
+  --gl-neutral:          #5a5b5c;           /* neutral gray */
+  --gl-neutral-muted:    rgba(255,255,255,0.15);
 
   /* Surfaces */
-  --gl-bg:               #0b1318;
-  --gl-surface-lowest:   #0e1a20;
-  --gl-surface:          #131c22;
-  --gl-surface-low:      #162028;
-  --gl-surface-high:     #1e2d36;
-  --gl-surface-highest:  #253744;
-  --gl-surface-bright:   #2e4452;
+  --gl-bg:               #0b0c0d;           /* page background */
+  --gl-surface-lowest:   #111213;
+  --gl-surface:          #1e1f20;
+  --gl-surface-low:      #252627;
+  --gl-surface-high:     #2e2f30;
+  --gl-surface-highest:  #363738;
+  --gl-surface-bright:   #3f4041;
 
   /* Text */
-  --gl-on-surface:       #e8f1f5;
-  --gl-on-surface-2:     #b8cfd9;
-  --gl-on-surface-3:     #8fa8b4;
-  --gl-on-surface-4:     #5f7d8a;
+  --gl-on-surface:       #e8e9ea;
+  --gl-on-surface-2:     #c0c1c2;
+  --gl-on-surface-3:     #999a9b;
+  --gl-on-surface-4:     #6a6b6c;
 
   /* Borders */
-  --gl-outline:          #1e3040;
-  --gl-outline-2:        #2e4452;
-  --gl-outline-3:        #3d5a6b;
+  --gl-outline:          #2a2b2c;
+  --gl-outline-2:        #38393a;
+  --gl-outline-3:        #48494a;
 
   /* Status */
-  --gl-success:          #3dd68c;
-  --gl-success-muted:    rgba(61,214,140,0.12);
-  --gl-warning:          #f5a623;
-  --gl-warning-muted:    rgba(245,166,35,0.12);
-  --gl-error:            #f5574a;
-  --gl-error-muted:      rgba(245,87,74,0.12);
-  --gl-info:             #5abfe8;
-  --gl-info-muted:       rgba(90,191,232,0.12);
+  --gl-success:          #28a745;   /* green */
+  --gl-success-muted:    rgba(40,167,69,0.12);
+  --gl-warning:          #ffc107;   /* yellow */
+  --gl-warning-muted:    rgba(255,193,7,0.12);
+  --gl-error:            #dc3545;   /* red */
+  --gl-error-muted:      rgba(220,53,69,0.12);
+  --gl-info:             #17a2b8;   /* cyan */
+  --gl-info-muted:       rgba(23,162,184,0.12);
 
   /* Radius */
   --r-sm:   6px;
@@ -368,12 +368,12 @@ body {
 }
 
 .btn-primary {
-  background: var(--gl-primary);
+  background: var(--gl-tertiary);
   color: #fff;
-  box-shadow: 0 2px 8px var(--gl-primary-glow);
+  box-shadow: 0 2px 8px var(--gl-tertiary-muted);
 }
-.btn-primary:hover  { background: var(--gl-primary-light); box-shadow: 0 4px 12px var(--gl-primary-glow); }
-.btn-primary:active { background: var(--gl-primary-dark); transform: translateY(1px); }
+.btn-primary:hover  { background: var(--gl-tertiary-dark); box-shadow: 0 4px 12px var(--gl-tertiary-muted); }
+.btn-primary:active { background: var(--gl-tertiary-dark); transform: translateY(1px); }
 
 .btn-secondary {
   background: var(--gl-surface-high);
@@ -389,11 +389,11 @@ body {
 .btn-ghost:hover { background: var(--gl-surface-high); color: var(--gl-on-surface-2); }
 
 .btn-danger {
-  background: var(--gl-error-muted);
-  color: var(--gl-error);
-  border: 1px solid rgba(245,87,74,0.2);
+  background: var(--gl-error);
+  color: #fff;
+  border: none;
 }
-.btn-danger:hover { background: var(--gl-error); color: #fff; }
+.btn-danger:hover { background: var(--gl-error-muted); color: #fff; }
 
 .btn-sm { padding: 5px 12px; font-size: 0.77rem; border-radius: var(--r-sm); }
 .btn-icon { width: 32px; height: 32px; padding: 0; border-radius: var(--r-sm); }

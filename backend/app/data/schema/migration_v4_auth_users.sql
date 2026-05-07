@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash   TEXT,  -- NULL if using only OAuth
     first_name      TEXT,
     last_name       TEXT,
-    employee_id     UUID REFERENCES employees(id) ON DELETE CASCADE,
+    workspace_id UUID REFERENCES workspaces(id) ON DELETE SET NULL,
     is_active       BOOLEAN DEFAULT TRUE,
     email_verified  BOOLEAN DEFAULT FALSE,
     created_at      TIMESTAMPTZ DEFAULT NOW(),
