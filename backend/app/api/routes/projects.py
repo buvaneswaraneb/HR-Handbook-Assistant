@@ -38,6 +38,14 @@ def assign_employee(project_id: UUID, body: AssignmentCreate):
         _404(e)
 
 
+@router.delete("/{project_id}/assign/{employee_id}")
+def unassign_employee(project_id: UUID, employee_id: UUID):
+    try:
+        return svc.unassign_employee(str(project_id), str(employee_id))
+    except ValueError as e:
+        _404(e)
+
+
 @router.put("/{project_id}")
 def update_project(project_id: UUID, body: ProjectUpdate):
     try:

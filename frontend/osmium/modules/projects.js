@@ -6,15 +6,24 @@ import { State } from '../utils/state.js';
 import { getEmployees, getProjects, createProject, assignToProject } from './api.js';
 import { escHtml, fmtDate, statusBadge, initials, avatarColor, avatarTextColor, emptyState, skeletonRows } from '../utils/helpers.js';
 import { showToast, openModal, closeModal } from './ui.js';
-import { addProjectGroup } from './canvas.js';
+import { addProjectTreeToCanvas } from './canvas.js';
 
 // Tag state
 let projSkillTags = [];
 let projRoleTags  = [];
 let projMemberIds = new Set();
 
+function isManagerEmployee(emp) {
+  return String(emp?.role || '').trim().toLowerCase() === 'manager';
+}
+
+function isAssignableNonManager(emp) {
+  return !isManagerEmployee(emp) && !!emp?.availability && !(emp?.projects || []).length;
+}
+
 export function initProjects() {
   State.on('view:projects', loadProjects);
+  State.on('data:projects:refresh', () => { if (State.currentView === 'projects') loadProjects(); });
   document.getElementById('add-proj-form')?.addEventListener('submit', e => {
     e.preventDefault();
     submitProject();
@@ -73,14 +82,24 @@ async function populateProjDropdowns() {
     const teamLeadSel = document.getElementById('proj-teamlead');
     const memberList  = document.getElementById('proj-member-list');
 
-    const opts = `<option value="">— None —</option>` +
-      emps.map(e => `<option value="${e.id}">${escHtml(e.name)} – ${escHtml(e.role || '—')}</option>`).join('');
+    const managerOpts = `<option value="">— None —</option>` +
+      emps
+        .filter(isManagerEmployee)
+        .map(e => `<option value="${e.id}">${escHtml(e.name)} – ${escHtml(e.role || '—')}</option>`)
+        .join('');
 
-    if (managerSel) managerSel.innerHTML = opts;
-    if (teamLeadSel) teamLeadSel.innerHTML = opts;
+    const contributorOpts = `<option value="">— None —</option>` +
+      emps
+        .filter(isAssignableNonManager)
+        .map(e => `<option value="${e.id}">${escHtml(e.name)} – ${escHtml(e.role || '—')}</option>`)
+        .join('');
+
+    if (managerSel) managerSel.innerHTML = managerOpts;
+    if (teamLeadSel) teamLeadSel.innerHTML = contributorOpts;
 
     if (memberList) {
-      memberList.innerHTML = emps.map(e => {
+      const eligibleMembers = emps.filter(isAssignableNonManager);
+      memberList.innerHTML = eligibleMembers.length ? eligibleMembers.map(e => {
         const bg = avatarColor(e.name);
         const fc = avatarTextColor(e.name);
         return `
@@ -92,7 +111,7 @@ async function populateProjDropdowns() {
               <div style="font-size:0.68rem;color:var(--gl-on-surface-4)">${escHtml(e.role || '—')}</div>
             </div>
           </label>`;
-      }).join('');
+      }).join('') : `<div style="font-size:0.74rem;color:var(--gl-on-surface-4)">No available contributors right now.</div>`;
     }
     renderAssignmentSummary();
   } catch {}
@@ -261,9 +280,12 @@ window._openProjInspector = async function(projId) {
   if (proj) State.emit('inspector:open', { type: 'project', data: proj });
 };
 
-window._addProjToCanvas = function(projId) {
+window._addProjToCanvas = async function(projId) {
   const proj = State.projects.find(p => p.id === projId);
-  if (proj) { addProjectGroup(proj); showToast('Added project group to canvas'); }
+  if (proj) {
+    await addProjectTreeToCanvas(proj);
+    showToast('Added project tree to canvas');
+  }
 };
 
 // Called when project modal opens

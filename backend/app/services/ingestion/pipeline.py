@@ -8,10 +8,11 @@ Flow per document:
   4. Embed in batches.
   5. Add to FAISS store (in-memory).
   6. Persist store to disk.
-  7. Delete source PDF from cache ONLY after successful persistence.
+  7. Leave source cleanup to the upload route, after Cloudinary storage succeeds.
 
-Safe-deletion guarantee: the file is never removed before the store is
-flushed to disk, so a crash mid-pipeline never loses data.
+Cleanup guarantee: upload requests remove the cached source only after the
+vector store is flushed and Cloudinary storage succeeds, so a failed upload can
+still be retried from raw-docs-cache.
 """
 
 from __future__ import annotations
@@ -117,8 +118,7 @@ class IngestionPipeline:
         self._store.add(chunks, embeddings)
         self._store.save()            # persist BEFORE deleting source
 
-        logger.info("[%s] ✓ persisted — deleting from cache", name)
-        # _safe_delete(pdf_path)
+        logger.info("[%s] persisted", name)
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────

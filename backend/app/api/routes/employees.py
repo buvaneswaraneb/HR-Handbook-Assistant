@@ -49,6 +49,14 @@ def bulk_upload(body: list[BulkEmployeeItem]):
     return svc.bulk_upload(body)
 
 
+@router.get("/linkedin-avatar")
+def linkedin_avatar(url: str = Query(..., min_length=1)):
+    try:
+        return svc.resolve_linkedin_avatar(url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/{emp_id}")
 def get_employee(emp_id: UUID):
     try:
@@ -61,6 +69,14 @@ def get_employee(emp_id: UUID):
 def update_employee(emp_id: UUID, body: EmployeeUpdate):
     try:
         return svc.update_employee(str(emp_id), body)
+    except ValueError as e:
+        _404(e)
+
+
+@router.delete("/{emp_id}", status_code=204)
+def delete_employee(emp_id: UUID):
+    try:
+        svc.delete_employee(str(emp_id))
     except ValueError as e:
         _404(e)
 

@@ -84,7 +84,10 @@ function fileRow(f) {
         ${f.description ? `<div style="font-size:0.72rem;color:var(--gl-on-surface-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escHtml(f.description)}</div>` : ''}
       </div>
       <span style="font-size:0.68rem;background:var(--gl-surface-high);color:var(--gl-on-surface-3);padding:2px 7px;border-radius:var(--r-full);flex-shrink:0;border:1px solid var(--gl-outline)">${ext}</span>
-      <button class="btn btn-ghost btn-icon" title="Delete" onclick="window._deleteFile('${f.id}')">
+      ${f.url ? `<button type="button" class="btn btn-ghost btn-icon" title="Download" onclick="window._downloadFile('${escHtml(f.url)}', '${escHtml(f.filename || 'download')}')">
+        <span class="material-symbols-outlined" style="font-size:16px;color:var(--gl-on-surface-4)">download</span>
+      </button>` : ''}
+      <button type="button" class="btn btn-ghost btn-icon" title="Delete" onclick="window._deleteFile('${f.id}')">
         <span class="material-symbols-outlined" style="font-size:16px;color:var(--gl-on-surface-4)">delete</span>
       </button>
     </div>`;
@@ -120,6 +123,18 @@ window._deleteFile = async function(id) {
     showToast('File deleted.');
     loadFiles(null);
   } catch (e) { showToast(e.message, 'error'); }
+};
+
+window._downloadFile = function(url, filename) {
+  if (!url) return;
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename || 'download';
+  anchor.target = '_blank';
+  anchor.rel = 'noopener noreferrer';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
 };
 
 window.loadFilesGlobal = loadFiles;

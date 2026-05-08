@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 def _repo() -> ProjectRepository:
     return ProjectRepository(get_db())
 
-
 def list_projects() -> list[dict]:
     repo = _repo()
     projects = repo.get_all()
@@ -72,13 +71,14 @@ def assign_employee(project_id: str, data: AssignmentCreate) -> dict:
     repo = _repo()
     role = _normalise_role(data.role_in_project)
     employee_id = str(data.employee_id)
-    _validate_assignment(repo, project_id, employee_id, role)
+    employee = _validate_assignment(repo, project_id, employee_id, role)
     payload = {
         "project_id": project_id,
         "employee_id": employee_id,
         "role_in_project": role,
     }
     repo.assign(payload)
+    _sync_project_employee_relations(repo, project_id)
     return get_project(project_id)
 
 
@@ -97,6 +97,28 @@ def get_project_team(project_id: str) -> list[dict]:
         }
         for r in rows
     ]
+
+
+def unassign_employee(project_id: str, employee_id: str) -> dict:
+    repo = _repo()
+    assignments = repo.get_assignments(project_id)
+    current = next((row for row in assignments if row["employee_id"] == employee_id), None)
+    if not current:
+        raise ValueError("Assignment not found.")
+
+    repo.delete_assignment(project_id, employee_id)
+    repo.update_employee(employee_id, {"manager_id": None, "team_lead_id": None})
+
+    remaining = repo.get_assignments_for_employee(employee_id)
+    employee = repo.get_employee(employee_id) or {}
+    if _is_manager_employee(employee):
+        repo.update_employee(employee_id, {"availability": True})
+    else:
+        repo.update_employee(employee_id, {"availability": bool(not remaining)})
+
+    _sync_project_employee_relations(repo, project_id)
+
+    return get_project(project_id)
 
 
 # ── internal ──────────────────────────────────────────────────────────────────
@@ -126,9 +148,20 @@ def _normalise_role(role: str) -> str:
     return value
 
 
-def _validate_assignment(repo: ProjectRepository, project_id: str, employee_id: str, role: str) -> None:
+def _validate_assignment(repo: ProjectRepository, project_id: str, employee_id: str, role: str) -> dict:
+    employee = repo.get_employee(employee_id)
+    if not employee:
+        raise ValueError("Employee not found.")
+
+    is_manager = _is_manager_employee(employee)
     assignments = repo.get_assignments(project_id)
     current_for_employee = next((r for r in assignments if r["employee_id"] == employee_id), None)
+
+    if role == "manager" and not is_manager:
+        raise ValueError("Only employees with the Manager role can be assigned as project managers.")
+
+    if is_manager and role != "manager":
+        raise ValueError("Managers can only be assigned with the manager project role.")
 
     if role in {"manager", "team_lead"}:
         existing = next((r for r in assignments if r["role_in_project"] == role), None)
@@ -136,10 +169,45 @@ def _validate_assignment(repo: ProjectRepository, project_id: str, employee_id: 
             label = "team leader" if role == "team_lead" else "manager"
             raise ValueError(f"This project already has a {label}. Remove or change that assignment first.")
 
-    if role == "team_lead":
+    if not is_manager:
         for row in repo.get_assignments_for_employee(employee_id):
-            if row["role_in_project"] == "team_lead" and row["project_id"] != project_id:
-                raise ValueError("A team leader can only lead one active project.")
+            if row["project_id"] != project_id:
+                raise ValueError("This employee is already assigned to another project.")
 
     if current_for_employee and current_for_employee["role_in_project"] != role:
         repo.delete_assignment(project_id, employee_id)
+
+    return employee
+
+
+def _is_manager_employee(employee: dict) -> bool:
+    return (employee.get("role") or "").strip().lower() == "manager"
+
+
+def _employee_relation_update(
+    manager_id: str | None,
+    team_lead_id: str | None,
+    employee_id: str,
+    role: str,
+) -> dict:
+    if role == "manager":
+        return {"manager_id": None, "team_lead_id": None}
+    if role == "team_lead":
+        return {"manager_id": manager_id if manager_id != employee_id else None, "team_lead_id": None}
+    return {
+        "manager_id": manager_id if manager_id != employee_id else None,
+        "team_lead_id": team_lead_id if team_lead_id != employee_id else None,
+    }
+
+
+def _sync_project_employee_relations(repo: ProjectRepository, project_id: str) -> None:
+    assignments = repo.get_assignments(project_id)
+    manager_id = next((row["employee_id"] for row in assignments if row["role_in_project"] == "manager"), None)
+    team_lead_id = next((row["employee_id"] for row in assignments if row["role_in_project"] == "team_lead"), None)
+
+    for row in assignments:
+        employee = repo.get_employee(row["employee_id"]) or {}
+        payload = _employee_relation_update(manager_id, team_lead_id, row["employee_id"], row["role_in_project"])
+        if not _is_manager_employee(employee):
+            payload["availability"] = False
+        repo.update_employee(row["employee_id"], payload)

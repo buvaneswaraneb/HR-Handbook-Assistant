@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -130,6 +131,7 @@ GROQ_API_URL     = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL       = "llama-3.1-8b-instant"  # adjust as needed; check Groq docs for available models
 MAX_TOKENS       = 1024
 BATCH_SIZE       = 10     # max chunks per API call to avoid 413 payload errors
+GROQ_RETRY_COUNT = 2
 
 # Retrieval settings
 SCORE_THRESHOLD  = 0.30   # min cosine similarity to include a chunk (0–1)
@@ -325,10 +327,7 @@ class RAGQueryEngine:
         }
         
         try:
-            with httpx.Client(timeout=30) as client:
-                resp = client.post(GROQ_API_URL, headers=headers, json=payload)
-                resp.raise_for_status()
-            llm_response = resp.json()["choices"][0]["message"]["content"]
+            llm_response = self._post_groq(payload, headers)
         except Exception as e:
             logger.error("Synthesis call failed: %s. Returning first batch result.", e)
             return batch_results[0]
@@ -361,11 +360,38 @@ class RAGQueryEngine:
             ],
         }
 
-        with httpx.Client(timeout=30) as client:
-            resp = client.post(GROQ_API_URL, headers=headers, json=payload)
-            resp.raise_for_status()
+        try:
+            return self._post_groq(payload, headers)
+        except (httpx.TimeoutException, httpx.NetworkError, httpx.ProtocolError) as exc:
+            logger.warning("Groq network call failed for question %r: %s", question[:80], exc)
+            return json.dumps({
+                "answer": "I couldn't reach the language service just now. Please try again.",
+                "sources": [],
+                "context_preview": [],
+            })
 
-        return resp.json()["choices"][0]["message"]["content"]
+    def _post_groq(self, payload: dict, headers: dict) -> str:
+        timeout = httpx.Timeout(30.0, connect=10.0)
+        last_exc = None
+
+        for attempt in range(1, GROQ_RETRY_COUNT + 2):
+            try:
+                with httpx.Client(timeout=timeout) as client:
+                    resp = client.post(GROQ_API_URL, headers=headers, json=payload)
+                    resp.raise_for_status()
+                return resp.json()["choices"][0]["message"]["content"]
+            except (httpx.TimeoutException, httpx.NetworkError, httpx.ProtocolError) as exc:
+                last_exc = exc
+                logger.warning("Groq request attempt %d failed: %s", attempt, exc)
+                if attempt <= GROQ_RETRY_COUNT:
+                    time.sleep(0.6 * attempt)
+                    continue
+                raise
+            except (KeyError, IndexError, ValueError) as exc:
+                logger.error("Groq response shape invalid: %s", exc)
+                raise ValueError("Invalid response from language service.") from exc
+
+        raise last_exc or RuntimeError("Groq request failed.")
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────

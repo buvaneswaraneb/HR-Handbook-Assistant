@@ -43,6 +43,25 @@ class ProjectRepository:
             .data
         )
 
+    def get_employee(self, employee_id: str) -> dict | None:
+        res = (
+            self.db.table("employees")
+            .select("id, role, availability")
+            .eq("id", employee_id)
+            .single()
+            .execute()
+        )
+        return res.data
+
+    def update_employee(self, employee_id: str, payload: dict) -> dict:
+        return (
+            self.db.table("employees")
+            .update(payload)
+            .eq("id", employee_id)
+            .execute()
+            .data[0]
+        )
+
     def assign(self, payload: dict) -> dict:
         return (
             self.db.table("project_assignments")

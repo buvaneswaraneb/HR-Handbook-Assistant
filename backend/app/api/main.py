@@ -9,9 +9,9 @@ Endpoints
 POST /ingest              Ingest all PDFs in data/raw-docs-cache/
 GET  /ingest/status       Vector store statistics
 POST /query               Ask a question against ingested documents
-POST /upload              Upload a PDF to the cache directory
+POST /upload              Upload, ingest, then store metadata in Cloudinary
 GET  /download/{filename} Download a file from the cache directory
-GET  /files               List files in the cache directory
+GET  /files               List Cloudinary-backed file records
 GET  /health              Health check
 """
 
@@ -19,13 +19,14 @@ from __future__ import annotations
 
 import importlib.util
 import logging
+import os
 import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -49,7 +50,9 @@ if str(_backend_dir) not in sys.path:
 
 # ── internal imports (all via full app.* path) ────────────────────────────────
 from app.services.ingestion import IngestionResult, run_ingestion          # noqa: E402
+from app.services.ingestion.loader import CACHE_DIR                        # noqa: E402
 from app.services.ingestion.vector_store import VectorStore                # noqa: E402
+from app.services.e_r_s import file_service as file_svc                    # noqa: E402
 from app.services.rag import RAGQueryEngine                                # noqa: E402
 
 from app.api.routes import employees, projects, teams, activity, analytics, files, leave, auth, calendar, supabase_auth, google_calendar  # noqa: E402
@@ -101,9 +104,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Register upload / download routes from the upload-downloader service
-app.include_router(file_router)
 
 # Register Supabase authentication routes and email/password auth routes
 app.include_router(supabase_auth.router)
@@ -159,6 +159,99 @@ class QueryResponse(BaseModel):
     context_preview: list[PreviewItem]
 
 
+def _run_ingestion_job() -> IngestionResult:
+    """
+    Run ingestion against the live VectorStore used by the query engine.
+    This keeps newly uploaded documents queryable without restarting the API.
+    """
+    global _running
+
+    if _store is None:
+        raise HTTPException(status_code=503, detail="Store not initialised")
+    if _running:
+        raise HTTPException(status_code=409, detail="Ingestion already in progress")
+
+    _running = True
+    try:
+        return run_ingestion(store=_store)
+    finally:
+        _running = False
+
+
+def _ingestion_response(result: IngestionResult, started_at: float) -> IngestResponse:
+    return IngestResponse(
+        status="ok" if not result.failed else "partial",
+        processed=result.processed,
+        skipped=result.skipped,
+        failed=result.failed,
+        duration_s=round(time.perf_counter() - started_at, 2),
+    )
+
+
+# ── upload → ingest → Cloudinary ──────────────────────────────────────────────
+@app.post("/upload", status_code=201)
+async def upload_file(
+    file: UploadFile = File(...),
+    project_id: str | None = Form(None),
+    department: str | None = Form(None),
+    uploaded_by: str | None = Form(None),
+    description: str | None = Form(None),
+):
+    """
+    Save the uploaded file to the local RAG cache, ingest the cache, then upload
+    the original bytes to Cloudinary and record the metadata.
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    filename = os.path.basename(file.filename)
+    contents = await file.read()
+    if not contents:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    cache_path = CACHE_DIR / filename
+    cache_path.write_bytes(contents)
+
+    t0 = time.perf_counter()
+    ingestion = _run_ingestion_job()
+    if filename in ingestion.failed:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Upload saved, but ingestion failed for {filename}. Cloudinary upload was skipped.",
+        )
+
+    try:
+        cloudinary_file = file_svc.upload_file_bytes(
+            contents=contents,
+            filename=filename,
+            content_type=file.content_type,
+            project_id=project_id,
+            department=department,
+            uploaded_by=uploaded_by,
+            description=description,
+        )
+    except Exception as exc:
+        logger.exception("Cloudinary upload failed for %s: %s", filename, exc)
+        raise HTTPException(status_code=500, detail=f"Cloudinary upload failed: {exc}")
+
+    cache_deleted = False
+    try:
+        cache_path.unlink(missing_ok=True)
+        cache_deleted = True
+    except OSError as exc:
+        logger.warning("Uploaded file reached Cloudinary but cache cleanup failed for %s: %s", cache_path, exc)
+
+    ingestion_payload = _ingestion_response(ingestion, t0).model_dump()
+    return {
+        **cloudinary_file,
+        "message": "Uploaded, ingested, stored in Cloudinary, and removed from raw-docs-cache",
+        "filename": filename,
+        "cache_deleted": cache_deleted,
+        "ingestion": ingestion_payload,
+    }
+
+
 # ── ingestion endpoints ───────────────────────────────────────────────────────
 @app.post("/ingest", response_model=IngestResponse)
 async def trigger_ingestion():
@@ -166,25 +259,9 @@ async def trigger_ingestion():
     Ingest all PDFs currently sitting in data/raw-docs-cache/.
     Runs synchronously in the request (suitable for small batches).
     """
-    global _running
-
-    if _running:
-        raise HTTPException(status_code=409, detail="Ingestion already in progress")
-
-    _running = True
     t0 = time.perf_counter()
-    try:
-        result: IngestionResult = run_ingestion()
-    finally:
-        _running = False
-
-    return IngestResponse(
-        status     = "ok" if not result.failed else "partial",
-        processed  = result.processed,
-        skipped    = result.skipped,
-        failed     = result.failed,
-        duration_s = round(time.perf_counter() - t0, 2),
-    )
+    result = _run_ingestion_job()
+    return _ingestion_response(result, t0)
 
 
 @app.get("/ingest/status", response_model=StoreStatus)
@@ -234,3 +311,8 @@ async def health():
 @app.get("/")
 def greetings():
     return "hello welcome to PRJ006"
+
+
+# Register legacy download/delete helpers after first-class routes so `/upload`
+# and `/files` resolve to the ingestion and Cloudinary-backed handlers above.
+app.include_router(file_router)

@@ -4,9 +4,9 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { escHtml, fmtDate, ratingStars, initials, avatarColor, avatarTextColor, statusBadge } from '../utils/helpers.js';
+import { escHtml, fmtDate, ratingStars, avatarMarkup, statusBadge, initials, avatarColor, avatarTextColor } from '../utils/helpers.js';
 import { showToast } from './ui.js';
-import { patchAvailability, addSkill } from './api.js';
+import { patchAvailability, addSkill, deleteEmployee, unassignFromProject } from './api.js';
 
 let panel, body;
 
@@ -36,17 +36,13 @@ function closeInspector() {
 
 // ─── EMPLOYEE INSPECTOR ───────────────────────────────────────
 function renderEmployee(emp) {
-  const bg   = avatarColor(emp.name);
-  const fc   = avatarTextColor(emp.name);
-  const init = initials(emp.name);
   const avail = emp.availability;
+  const avatarHtml = avatarMarkup(emp.name || '?', emp.avatar_url, { size: 64, shadow: 'var(--shadow-md)' });
 
   body.innerHTML = `
     <!-- Avatar + name -->
     <div style="text-align:center;padding:8px 0 20px">
-      <div style="width:64px;height:64px;border-radius:50%;background:${bg};color:${fc};
-        display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;
-        margin:0 auto 12px;box-shadow:var(--shadow-md)">${init}</div>
+      <div style="display:flex;justify-content:center;margin:0 auto 12px">${avatarHtml}</div>
       <div style="font-size:1rem;font-weight:700;color:var(--gl-on-surface)">${escHtml(emp.name || '—')}</div>
       <div style="font-size:0.82rem;color:var(--gl-on-surface-3);margin-top:2px">${escHtml(emp.role || '—')}</div>
       <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap">
@@ -55,6 +51,14 @@ function renderEmployee(emp) {
         </span>
         <span class="chip">${escHtml(emp.team || 'No team')}</span>
         ${emp.rating ? `<span style="font-size:0.8rem;color:var(--gl-tertiary)">★ ${emp.rating}</span>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px">
+        <button class="btn btn-secondary btn-sm" onclick="window._editEmployee?.('${emp.id}')">
+          <span class="material-symbols-outlined" style="font-size:14px">edit</span> Edit
+        </button>
+        <button class="btn btn-danger btn-sm" onclick="window._deleteEmployeeFromInspector?.('${emp.id}')">
+          <span class="material-symbols-outlined" style="font-size:14px">delete</span> Delete
+        </button>
       </div>
     </div>
 
@@ -191,6 +195,9 @@ function renderProject(proj) {
           <span class="badge ${m.availability ? 'badge-available' : 'badge-unavailable'}" style="font-size:9px">
             ${m.availability ? '●' : '●'}
           </span>
+          <button class="btn btn-ghost btn-sm" title="Unassign" aria-label="Unassign ${escHtml(m.name || 'employee')}" onclick="window._unassignProjectMember?.('${proj.id}', '${m.employee_id}')">
+            <span class="material-symbols-outlined" style="font-size:14px">person_remove</span>
+          </button>
         </div>`;
       }).join('')}
     </div>` : ''}`;
@@ -231,4 +238,39 @@ window._addSkill = async function(empId) {
     document.getElementById('new-skill-level').value = '';
     State.emit('data:employees:refresh');
   } catch (e) { showToast(e.message, 'error'); }
+};
+
+window._deleteEmployeeFromInspector = async function(empId) {
+  const name = State.inspectorTarget?.data?.id === empId ? State.inspectorTarget.data.name : 'this employee';
+  if (!confirm(`Delete ${name} permanently?`)) return;
+  try {
+    await deleteEmployee(empId);
+    showToast('Employee deleted.');
+    closeInspector();
+    State.emit('data:employees:refresh');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+};
+
+window._unassignProjectMember = async function(projId, empId) {
+  const target = State.projects
+    .find(p => p.id === projId)
+    ?.team
+    ?.find(m => m.employee_id === empId);
+  const name = target?.name || target?.employee_name || 'this employee';
+  if (!confirm(`Unassign ${name} from this project?`)) return;
+
+  try {
+    const updatedProject = await unassignFromProject(projId, empId);
+    const projects = State.projects.map(p => p.id === projId ? updatedProject : p);
+    State.set('projects', projects);
+    State.set('inspectorTarget', { type: 'project', data: updatedProject });
+    renderProject(updatedProject);
+    showToast('Employee unassigned.');
+    State.emit('data:employees:refresh');
+    State.emit('data:projects:refresh');
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
 };

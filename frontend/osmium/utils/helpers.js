@@ -136,6 +136,36 @@ export function avatarTextColor(name) {
   return colors[Math.abs(hash) % colors.length];
 }
 
+export function avatarMarkup(name, avatarUrl, options = {}) {
+  const {
+    size = 44,
+    fontSize = size >= 60 ? '1.5rem' : '1rem',
+    border = '1px solid var(--gl-outline-2)',
+    shadow = 'var(--shadow-sm)',
+  } = options;
+
+  const bg = avatarColor(name || '?');
+  const fc = avatarTextColor(name || '?');
+  const init = initials(name || '?');
+
+  if (avatarUrl) {
+    return `
+      <div style="width:${size}px;height:${size}px;border-radius:50%;overflow:hidden;flex-shrink:0;background:${bg};color:${fc};border:${border};box-shadow:${shadow}">
+        <img
+          src="${escHtml(avatarUrl)}"
+          alt=""
+          referrerpolicy="no-referrer"
+          style="width:100%;height:100%;object-fit:cover;display:block"
+          onerror="this.remove();this.parentElement.style.display='flex';this.parentElement.style.alignItems='center';this.parentElement.style.justifyContent='center';this.parentElement.style.fontSize='${fontSize}';this.parentElement.style.fontWeight='700';this.parentElement.textContent='${escHtml(init)}';"
+        >
+      </div>`;
+  }
+
+  return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:${fc};
+    display:flex;align-items:center;justify-content:center;font-size:${fontSize};font-weight:700;
+    flex-shrink:0;border:${border};box-shadow:${shadow}">${init}</div>`;
+}
+
 export function uid() {
   return Math.random().toString(36).slice(2, 11);
 }

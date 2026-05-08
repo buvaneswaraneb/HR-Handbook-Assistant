@@ -364,7 +364,7 @@ body {
 .nav-item .nav-badge {
   margin-left: auto;
   background: var(--gl-primary-muted);
-  color: var(--gl-primary);
+  color: var(--gl-error);
   font-size: 0.65rem;
   font-weight: 700;
   padding: 1px 6px;
@@ -988,6 +988,25 @@ body {
   opacity: 0.92;
 }
 
+.canvas-node-project {
+  border-color: #5abfe8;
+  background: linear-gradient(180deg, var(--gl-surface), var(--gl-surface-high));
+}
+
+.canvas-node-manager {
+  border-color: #3dd68c;
+}
+
+.canvas-node-teamlead {
+  border-color: #f5a623;
+}
+
+.node-avatar-project {
+  border-radius: var(--r-md);
+  background: rgba(90, 191, 232, 0.16);
+  color: #5abfe8;
+}
+
 .node-header {
   padding: 10px 12px 8px;
   display: flex;
@@ -1089,6 +1108,15 @@ body {
 .canvas-edge.manager {
   stroke: var(--gl-primary);
   stroke-width: 2;
+}
+
+.canvas-edge.project {
+  stroke: var(--gl-secondary);
+  stroke-width: 2;
+}
+
+.canvas-edge.teamlead {
+  stroke: var(--gl-warning);
 }
 
 .canvas-edge.selected {
@@ -1784,7 +1812,7 @@ body {
   left: 0;
   bottom: 0;
   width: 220px;
-  background: #0e1a20;
+  background: var(--gl-surface-lowest);
   border-right: 1px solid var(--gl-outline);
   z-index: 22;
   display: flex;
@@ -1799,7 +1827,7 @@ body {
   left: 220px;
   width: 22px;
   height: 44px;
-  background: #0e1a20;
+  background: var(--gl-surface-lowest);
   border: 1px solid var(--gl-outline);
   border-left: none;
   border-radius: 0 var(--r-sm) var(--r-sm) 0;
@@ -1865,7 +1893,7 @@ body {
   height: 12px;
   border-radius: 50%;
   background: #5abfe8;
-  border: 2px solid #0e1a20;
+  border: 2px solid var(--gl-surface-lowest);
   cursor: crosshair;
   opacity: 0;
   pointer-events: none;
@@ -1929,7 +1957,7 @@ body {
   height: 100%;
   flex-direction: row;
   overflow: hidden;
-  background: #0b1318;
+  background: var(--gl-surface-lowest);
 }
 
 #view-ai.active {
@@ -1950,7 +1978,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #0e1a20;
+  background: var(--gl-surface-lowest);
   flex-shrink: 0;
 }
 
@@ -1974,14 +2002,14 @@ body {
 
 .ai-msg-user {
   align-self: flex-end;
-  background: #5abfe8;
-  color: #fff;
+  background: var(--gl-tertiary);
+  color: var(--gl-on-surface);
   border-radius: var(--r-lg) var(--r-lg) 4px var(--r-lg);
 }
 
 .ai-msg-bot {
   align-self: flex-start;
-  background: #1e2d36;
+  background: var(--gl-surface);
   color: var(--gl-on-surface-2);
   border-radius: var(--r-lg) var(--r-lg) var(--r-lg) 4px;
   border: 1px solid var(--gl-outline);
@@ -1991,7 +2019,7 @@ body {
   flex-shrink: 0;
   padding: 14px 16px;
   border-top: 1px solid var(--gl-outline);
-  background: #0e1a20;
+  background: var(--gl-surface-lowest);
 }
 
 #ai-input {
@@ -1999,7 +2027,7 @@ body {
   resize: none;
   min-height: 52px;
   max-height: 180px;
-  background: #1e2d36;
+  background: var(--gl-surface);
   border: 1px solid var(--gl-outline-2);
   border-radius: var(--r-md);
   padding: 12px 14px;
@@ -2012,7 +2040,7 @@ body {
 }
 
 #ai-input:focus {
-  border-color: #5abfe8;
+  border-color: var(--gl-tertiary);
 }
 
 #ai-input-actions {
@@ -2044,12 +2072,12 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  background: #253744;
+  background: var(--gl-surface-high);
   border: 1px solid var(--gl-outline-2);
   border-radius: var(--r-sm);
   padding: 3px 8px;
   font-size: 0.7rem;
-  color: #5abfe8;
+  color: var(--gl-on-surface-2);
   margin: 2px;
   cursor: default;
 }
@@ -2059,7 +2087,7 @@ body {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: #0e1a20;
+  background: var(--gl-surface-lowest);
   overflow: hidden;
 }
 
@@ -2092,7 +2120,7 @@ body {
 .ai-chip {
   padding: 5px 12px;
   border-radius: var(--r-full);
-  background: #1e2d36;
+  background: var(--gl-surface);
   border: 1px solid var(--gl-outline-2);
   color: var(--gl-on-surface-3);
   font-size: 0.73rem;
@@ -2101,9 +2129,9 @@ body {
 }
 
 .ai-chip:hover {
-  background: rgba(90, 191, 232, 0.15);
-  color: #5abfe8;
-  border-color: #5abfe844;
+  background: var(--gl-tertiary-muted);
+  color: var(--gl-on-surface);
+  border-color: rgba(13, 111, 253, 0.28);
 }
 
 /* ── LEAVE MANAGEMENT VIEW ───────────────────────────────── */
@@ -2201,16 +2229,103 @@ body {
 }
 
 /* ── ORG TREE HORIZONTAL ROWS ────────────────────────────── */
-.org-level-row {
-  padding: 0 16px 0;
+.org-tree-header {
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.org-tree-horizontal {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: max-content;
+  padding: 4px 28px 40px 4px;
+}
+
+.org-h-node {
+  display: flex;
+  align-items: center;
+  gap: 34px;
+  position: relative;
+}
+
+.org-h-node>.tree-node-card-h {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+.org-h-node.has-children>.tree-node-card-h::after {
+  content: '';
+  position: absolute;
+  right: -35px;
+  top: 50%;
+  width: 35px;
+  height: 2px;
+  background: var(--gl-outline-2);
+}
+
+.org-h-children {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  padding-left: 28px;
+}
+
+.org-h-children::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 22px;
+  bottom: 22px;
+  width: 2px;
+  background: var(--gl-outline-2);
+  border-radius: 1px;
+}
+
+.org-h-children>.org-h-node::before {
+  content: '';
+  position: absolute;
+  left: -28px;
+  top: 50%;
+  width: 28px;
+  height: 2px;
+  background: var(--gl-outline-2);
 }
 
 .tree-node-card-h {
   box-shadow: var(--shadow-sm);
+  width: 210px;
+  background: var(--gl-surface);
+  border: 1px solid var(--gl-outline);
+  border-left: 3px solid #5abfe8;
+  border-radius: var(--r-md);
+  padding: 28px 14px 12px;
+  transition: all 0.15s;
+  cursor: pointer;
 }
 
 .tree-node-card-h:hover {
   box-shadow: var(--shadow-md) !important;
+  background: var(--gl-surface-high);
+  border-color: var(--gl-outline-2);
+}
+
+.tree-node-assignment {
+  position: absolute;
+  top: 9px;
+  right: 12px;
+  max-width: 138px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #3dd68c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
 }
 
 

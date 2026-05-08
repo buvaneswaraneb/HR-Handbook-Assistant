@@ -1,8 +1,15 @@
 from __future__ import annotations
+import html
 import logging
+import mimetypes
+import re
+from urllib.parse import urlparse
 from uuid import UUID
 
+import requests
+
 from app.services.e_r_s.db import get_db
+from app.services.e_r_s import file_service
 from app.services.e_r_s.repositories.employee_repo import EmployeeRepository
 from app.services.e_r_s.repositories.skill_repo import SkillRepository
 from app.services.e_r_s.schemas import (
@@ -14,6 +21,11 @@ from app.services.e_r_s.utils.serializer import build_employee_out
 from app.services.e_r_s.cache import cached, cache_clear, cache_delete
 
 logger = logging.getLogger(__name__)
+_LINKEDIN_META_PATTERNS = (
+    r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+    r'<meta[^>]+name=["\']twitter:image["\'][^>]+content=["\']([^"\']+)["\']',
+    r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+)
 
 
 def _repos():
@@ -70,6 +82,16 @@ def patch_availability(emp_id: str, data: AvailabilityUpdate) -> dict:
     return _enrich(emp, emp_repo)
 
 
+def delete_employee(emp_id: str) -> None:
+    emp_repo, _ = _repos()
+    emp = emp_repo.get_by_id(emp_id)
+    if not emp:
+        raise ValueError(f"Employee {emp_id} not found")
+    emp_repo.delete(emp_id)
+    cache_clear("list_employees")
+    cache_delete(f"get_employee:{emp_id}")
+
+
 def add_skill(emp_id: str, data: EmployeeSkillCreate) -> dict:
     emp_repo, skill_repo = _repos()
     skill = skill_repo.get_or_create(data.skill_name)
@@ -113,6 +135,87 @@ def search_employees(filters: dict) -> list[dict]:
         employees = [e for e in employees if e["id"] in emp_ids]
 
     return [_enrich(e, emp_repo) for e in employees]
+
+
+def resolve_linkedin_avatar(profile_url: str) -> dict:
+    if not profile_url:
+        raise ValueError("Please provide a LinkedIn profile or image URL.")
+
+    source_url = profile_url.strip()
+    parsed = urlparse(source_url)
+    host = (parsed.hostname or "").lower()
+    if "licdn.com" in host or _looks_like_image_url(source_url):
+        media_url = source_url
+    elif "linkedin.com" in host:
+        try:
+            response = requests.get(
+                source_url,
+                headers=_web_headers(),
+                timeout=12,
+            )
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise ValueError("Could not reach the LinkedIn profile page.") from exc
+
+        page = response.text or ""
+        media_url = None
+        for pattern in _LINKEDIN_META_PATTERNS:
+            match = re.search(pattern, page, re.IGNORECASE)
+            if match:
+                media_url = html.unescape(match.group(1))
+                break
+        if not media_url:
+            raise ValueError("Could not find a public profile image on that LinkedIn page.")
+    else:
+        raise ValueError("Please provide a LinkedIn profile, LinkedIn media URL, or direct image URL.")
+
+    try:
+        image_response = requests.get(
+            media_url,
+            headers=_web_headers(referer=source_url if "linkedin.com" in host else "https://www.linkedin.com/"),
+            timeout=20,
+        )
+        image_response.raise_for_status()
+    except requests.RequestException as exc:
+        raise ValueError("Could not download the LinkedIn profile image.") from exc
+
+    content_type = image_response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+    if not content_type.startswith("image/"):
+        raise ValueError("LinkedIn did not return a usable image.")
+
+    extension = mimetypes.guess_extension(content_type) or ".jpg"
+    uploaded = file_service.upload_cloudinary_bytes(
+        contents=image_response.content,
+        filename=f"linkedin-avatar{extension}",
+        department="avatars",
+        description="LinkedIn profile image",
+    )
+    if not uploaded.get("secure_url"):
+        raise ValueError("Profile image upload failed.")
+
+    return {
+        "avatar_url": uploaded["secure_url"],
+        "source_url": media_url,
+        "storage_provider": "cloudinary",
+    }
+
+
+def _web_headers(referer: str | None = None) -> dict:
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+    }
+    if referer:
+        headers["Referer"] = referer
+    return headers
+
+
+def _looks_like_image_url(url: str) -> bool:
+    path = (urlparse(url).path or "").lower()
+    return path.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".svg"))
 
 
 def bulk_upload(items: list[BulkEmployeeItem]) -> BulkUploadResult:

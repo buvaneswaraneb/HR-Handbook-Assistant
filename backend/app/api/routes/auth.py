@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Header
 from typing import Optional
 
 from app.services.e_r_s import auth_service as svc
+from app.services.e_r_s import supabase_auth_service
 from app.services.e_r_s.auth_schemas import (
     LoginRequest, SignupRequest, GoogleCallbackRequest, UserProfile
 )
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 def signup(body: SignupRequest):
     """Register a new user with email and password."""
     try:
-        return svc.signup(body)
+        return supabase_auth_service.signup_with_password(body)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -25,11 +26,14 @@ def signup(body: SignupRequest):
 def login(body: LoginRequest):
     """Login with email and password."""
     try:
-        return svc.login(body)
+        return supabase_auth_service.login_with_password(body)
     except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Login failed")
+        try:
+            return svc.login(body)
+        except ValueError:
+            raise HTTPException(status_code=401, detail=str(e))
+        except Exception:
+            raise HTTPException(status_code=401, detail=str(e))
 
 
 @router.get("/me")

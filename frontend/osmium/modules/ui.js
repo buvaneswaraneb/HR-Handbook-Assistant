@@ -32,7 +32,12 @@ export function showToast(msg, type = 'success', duration = 3500) {
 // ─── MODAL ───────────────────────────────────────────────────
 export function openModal(id) {
   const el = document.getElementById(id);
-  if (el) { el.classList.add('open'); el.querySelector('[autofocus]')?.focus(); }
+  if (el) {
+    const hookName = `_on${id.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('')}Open`;
+    window[hookName]?.();
+    el.classList.add('open');
+    el.querySelector('[autofocus]')?.focus();
+  }
 }
 
 export function closeModal(id) {

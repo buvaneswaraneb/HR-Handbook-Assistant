@@ -140,8 +140,7 @@
           <div id="auth-title"
             style="font-size:1.25rem;font-weight:800;letter-spacing:-0.025em;color:var(--gl-on-surface)">Sign in to
             Osmium</div>
-          <div style="font-size:0.82rem;color:var(--gl-on-surface-3);margin-top:4px">Use Google or your employee email
-            credentials.</div>
+          <div style="font-size:0.82rem;color:var(--gl-on-surface-3);margin-top:4px">Use Google or your employee email.</div>
         </div>
 
         <button id="auth-google-btn" class="btn btn-secondary"
@@ -160,11 +159,13 @@
           <div class="label">Email</div>
           <input id="auth-email" class="input" type="email" autocomplete="email" placeholder="you@company.com"
             required />
-          <div class="label" style="margin-top:12px">Password</div>
-          <input id="auth-password" class="input" type="password" autocomplete="current-password" placeholder="••••••••"
-            required />
+          <div id="auth-password-wrap" style="display:none;margin-top:12px">
+            <div class="label">Password</div>
+            <input id="auth-password" class="input" type="password" autocomplete="current-password" placeholder="Password" />
+          </div>
+          <div id="auth-email-helper" style="font-size:0.74rem;color:var(--gl-on-surface-4);margin-top:8px">We will email a sign-in link. New users are created after verification.</div>
           <button id="auth-email-btn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px"
-            type="submit">Sign in with email</button>
+            type="submit">Sign in</button>
         </form>
       </div>
     </div>
@@ -224,14 +225,14 @@
       </div>
 
       <div class="nav-section-label" style="margin-top:8px">Tools</div>
-      <div class="nav-item" data-view="leave" onclick="switchViewGlobal('leave')">
-        <span class="material-symbols-outlined nav-icon">event_busy</span>
-        <span>Leave</span>
-      </div>
       <div class="nav-item" data-view="ai" onclick="switchViewGlobal('ai')">
         <span class="material-symbols-outlined nav-icon">smart_toy</span>
         <span>AI Assistant</span>
         <span class="nav-badge">AI</span>
+      </div>
+      <div class="nav-item" data-view="leave" onclick="switchViewGlobal('leave')">
+        <span class="material-symbols-outlined nav-icon">event_busy</span>
+        <span>Leave</span>
       </div>
 
       <div class="sidebar-spacer"></div>
@@ -650,7 +651,7 @@
                 <div class="label">Description</div>
                 <input id="upload-desc" class="input" placeholder="Optional description" />
               </div>
-              <button class="btn btn-primary" id="upload-btn" onclick="window._uploadFileSubmit?.()">
+              <button type="button" class="btn btn-primary" id="upload-btn" onclick="window._uploadFileSubmit?.()">
                 <span class="material-symbols-outlined" style="font-size:16px">upload</span> Upload
               </button>
             </div>
@@ -695,8 +696,10 @@
 
           <div class="card" style="margin-bottom:24px">
             <div
-              style="padding:16px 20px;border-bottom:1px solid var(--gl-outline);font-size:0.95rem;font-weight:700;color:var(--gl-on-surface)">
-              52-Week Absence Heatmap</div>
+              style="padding:16px 20px;border-bottom:1px solid var(--gl-outline);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+              <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface)">52-Week Absence Heatmap</div>
+              <div id="leave-calendar-controls"></div>
+            </div>
             <div id="leave-calendar" style="padding:20px;display:flex;justify-content:center">
               <span class="spinner-sm spinner" style="margin-right:10px"></span> Loading calendar...
             </div>
@@ -717,7 +720,7 @@
       <div id="view-ai" class="view-panel">
         <div id="ai-chat-panel">
           <div id="ai-chat-header">
-            <span class="material-symbols-outlined" style="color:#5abfe8;font-size:24px">smart_toy</span>
+            <span class="material-symbols-outlined" style="color:var(--gl-tertiary);font-size:24px">smart_toy</span>
             <div>
               <div style="font-size:0.9rem;font-weight:700;color:var(--gl-on-surface)">Osmium Intelligence</div>
               <div style="font-size:0.7rem;color:var(--gl-on-surface-4)">Enterprise RAG Assistant</div>
@@ -741,13 +744,13 @@
               <textarea id="ai-input"
                 placeholder="Ask a question or request analysis... (Shift+Enter for new line)"></textarea>
               <div id="ai-input-actions">
-                <button class="btn btn-ghost btn-sm" id="ai-attach-btn" style="color:var(--gl-on-surface-3)">
+                <button type="button" class="btn btn-ghost btn-sm" id="ai-attach-btn" style="color:var(--gl-on-surface-3)">
                   <span class="material-symbols-outlined" style="font-size:18px">attach_file</span> Attach
                 </button>
-                <input type="file" id="ai-file-input" style="display:none">
+                <input type="file" id="ai-file-input" accept="application/pdf,.pdf" style="display:none">
                 <div id="ai-attach-indicator"></div>
                 <div style="flex:1"></div>
-                <button class="btn btn-primary btn-sm" id="ai-send" style="padding:6px 16px;background:#5abfe8">
+                <button type="button" class="btn btn-primary btn-sm" id="ai-send" style="padding:6px 16px">
                   <span class="material-symbols-outlined" style="font-size:16px">send</span> Send
                 </button>
               </div>
@@ -905,7 +908,7 @@
     <div class="modal">
       <div class="modal-header">
         <span class="material-symbols-outlined" style="color:var(--gl-primary)">person_add</span>
-        <span style="font-size:1rem;font-weight:700;color:var(--gl-on-surface);flex:1">Add Employee</span>
+        <span id="emp-modal-title" style="font-size:1rem;font-weight:700;color:var(--gl-on-surface);flex:1">Add Employee</span>
         <button class="btn btn-ghost btn-icon" onclick="closeModal('add-employee-modal')">
           <span class="material-symbols-outlined" style="font-size:18px">close</span>
         </button>
@@ -925,16 +928,6 @@
           </div>
           <div>
             <div class="label">Team</div><input id="new-emp-team" class="input" placeholder="Platform" />
-          </div>
-          <div>
-            <div class="label">Manager</div><select id="new-emp-manager" class="select">
-              <option value="">— None —</option>
-            </select>
-          </div>
-          <div>
-            <div class="label">Team Lead</div><select id="new-emp-teamlead" class="select">
-              <option value="">— None —</option>
-            </select>
           </div>
           <div>
             <div class="label">Rating (0–5)</div><input id="new-emp-rating" class="input" type="number" step="0.1"
@@ -960,8 +953,23 @@
           <div id="emp-skill-rows" style="display:flex;flex-direction:column;gap:8px"></div>
         </div>
         <div style="margin-top:12px">
-          <div class="label">LinkedIn URL</div><input id="new-emp-linkedin" class="input"
-            placeholder="https://linkedin.com/in/…" />
+          <div class="label" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+            <span>Profile Photo URL</span>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window._fillAvatarFromLinkedIn?.()">
+              <span class="material-symbols-outlined" style="font-size:14px">image_search</span> Fetch Profile Photo
+            </button>
+          </div>
+          <input id="new-emp-linkedin" class="input" placeholder="https://linkedin.com/in/... or https://i.imgur.com/..." />
+          <input id="new-emp-avatar" type="hidden" />
+          <div id="new-emp-avatar-preview" style="display:none;align-items:center;gap:10px;margin-top:10px">
+            <div id="new-emp-avatar-preview-shell" style="width:44px;height:44px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--gl-surface-high);border:1px solid var(--gl-outline-2);color:var(--gl-on-surface-2);font-size:0.95rem;font-weight:700;flex-shrink:0">
+              <img id="new-emp-avatar-preview-img" alt="" style="width:100%;height:100%;object-fit:cover;display:none">
+            </div>
+            <div>
+              <div id="new-emp-avatar-preview-text" style="font-size:0.76rem;color:var(--gl-on-surface-3)">Profile photo preview</div>
+              <div id="new-emp-avatar-preview-subtext" style="font-size:0.7rem;color:var(--gl-on-surface-4);margin-top:2px"></div>
+            </div>
+          </div>
         </div>
         <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
           <label class="toggle">
@@ -970,6 +978,31 @@
             <div class="toggle-thumb"></div>
           </label>
           <span style="font-size:0.83rem;color:var(--gl-on-surface-2)">Available for projects</span>
+        </div>
+        <div id="emp-project-assignment-section" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--gl-outline)">
+          <div class="label" style="margin-bottom:10px">Project Assignment</div>
+          <div class="grid-2">
+            <div>
+              <div class="label">Project</div>
+              <select id="emp-assign-project" class="select">
+                <option value="">Select project</option>
+              </select>
+            </div>
+            <div>
+              <div class="label">Role in Project</div>
+              <select id="emp-assign-role" class="select">
+                <option value="manager">Manager</option>
+                <option value="team_lead">Team Lead</option>
+                <option value="member">Member</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:10px">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="window._assignEditingEmployeeToProject?.()">
+              <span class="material-symbols-outlined" style="font-size:14px">assignment_ind</span> Assign to Project
+            </button>
+          </div>
+          <div id="emp-project-list" style="display:flex;flex-direction:column;gap:8px;margin-top:12px"></div>
         </div>
       </form>
       <div class="modal-footer">

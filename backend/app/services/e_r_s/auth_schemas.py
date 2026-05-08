@@ -27,6 +27,7 @@ class AuthResponse(BaseModel):
     access_token: str
     refresh_token: Optional[str] = None
     expires_at: Optional[datetime] = None
+    password_configured: bool = False
 
 
 # ── Google OAuth ──────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ class UserProfile(BaseModel):
     employee_id: Optional[UUID] = None
     google_oauth_connected: bool = False
     google_email: Optional[str] = None
+    password_configured: bool = False
     is_active: bool = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

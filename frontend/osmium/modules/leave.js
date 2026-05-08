@@ -57,6 +57,8 @@ async function loadLeaveCalendar() {
 }
 
 function renderCalendarHeatmap(container, records, totalEmployees, selectedYear) {
+  const controls = document.getElementById('leave-calendar-controls');
+
   // Build a map: date string → count of people on leave
   const leaveByDate = {};
   records.forEach(rec => {
@@ -96,7 +98,8 @@ function renderCalendarHeatmap(container, records, totalEmployees, selectedYear)
   weeks.forEach((week, wi) => {
     const m = week[0].getMonth();
     if (m !== prevMonth) {
-      monthLabels += `<div style="grid-column:${wi + 2};grid-row:1;font-size:10px;color:var(--gl-on-surface-4);padding-bottom:4px">${months[m]}</div>`;
+      const monthOffset = m === 11 ? 'padding-left:8px;' : '';
+      monthLabels += `<div style="grid-column:${wi + 2};grid-row:1;font-size:10px;color:var(--gl-on-surface-4);padding-bottom:4px;${monthOffset}">${months[m]}</div>`;
       prevMonth = m;
     }
   });
@@ -154,28 +157,31 @@ function renderCalendarHeatmap(container, records, totalEmployees, selectedYear)
   }
 
   const yearSelectorHtml = `
-    <div style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
-      <label style="font-size:0.88rem;font-weight:600;color:var(--gl-on-surface)">Calendar Year:</label>
-      <select style="padding:4px 8px;border-radius:4px;border:1px solid var(--gl-on-surface-4);background:var(--gl-surface);color:var(--gl-on-surface);font-size:0.83rem" onchange="window._changeLeaveCalendarYear(this.value)">
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="font-size:0.82rem;font-weight:600;color:var(--gl-on-surface-2);white-space:nowrap">Calendar Year:</label>
+      <select style="width:auto;min-width:142px;padding:6px 30px 6px 10px;border-radius:4px;border:1px solid var(--gl-outline-2);background:var(--gl-surface-high);color:var(--gl-on-surface);font-size:0.83rem" onchange="window._changeLeaveCalendarYear(this.value)">
         ${yearOptions.join('')}
       </select>
     </div>`;
+  if (controls) controls.innerHTML = yearSelectorHtml;
 
   // Legend with past/future indicators
   const legendHtml = `
-    <div style="display:flex;align-items:center;gap:12px;margin-top:12px;font-size:11px;color:var(--gl-on-surface-4);flex-wrap:wrap">
-      <span>Less</span>
-      <div style="width:13px;height:13px;border-radius:2px;background:var(--gl-surface-high);border:1px solid var(--gl-on-surface-4)"></div>
-      <div style="width:13px;height:13px;border-radius:2px;background:#3dd68c;border:1px solid var(--gl-on-surface-4)"></div>
-      <div style="width:13px;height:13px;border-radius:2px;background:#f5a623;border:1px solid var(--gl-on-surface-4)"></div>
-      <div style="width:13px;height:13px;border-radius:2px;background:#f5574a;border:1px solid var(--gl-on-surface-4)"></div>
-      <span>More</span>
-      <span style="margin-left:8px">Green: 1–5% · Yellow: 5–9% · Red: ≥10%</span>
-      <span style="margin-left:16px;border-left:1px solid var(--gl-on-surface-4);padding-left:12px">Past (outlined) · Future (dimmed)</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px 22px;margin-top:12px;font-size:11px;color:var(--gl-on-surface-4);flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:8px;flex:0 0 auto;white-space:nowrap">
+        <span style=padding-left:40px;>Less</span>
+        <div style="display:flex;align-items:center;justify-content:flex-start;gap:10px">
+          <div style="width:13px;height:13px;border-radius:2px;background:var(--gl-surface-high);border:1px solid var(--gl-on-surface-4)"></div>
+          <div style="width:13px;height:13px;border-radius:2px;background:#3dd68c;border:1px solid var(--gl-on-surface-4)"></div>
+          <div style="width:13px;height:13px;border-radius:2px;background:#f5a623;border:1px solid var(--gl-on-surface-4)"></div>
+          <div style="width:13px;height:13px;border-radius:2px;background:#f5574a;border:1px solid var(--gl-on-surface-4)"></div>
+        </div>
+        <span>More</span>
+      </div>
+      <span style="border-left:10px ;solid var(--gl-on-surface-4);padding-left:40px">Past (outlined) · Future (dimmed)</span>
     </div>`;
 
   container.innerHTML = `
-    ${yearSelectorHtml}
     <div style="overflow-x:auto;padding-bottom:4px">
       <div style="display:grid;grid-template-columns:28px repeat(${weeks.length}, 13px);grid-template-rows:16px repeat(7, 13px);gap:2px;min-width:fit-content">
         ${monthLabels}

@@ -6,10 +6,12 @@
 import { State } from '../utils/state.js';
 import { showToast } from './ui.js';
 import { escHtml } from '../utils/helpers.js';
-import { getAuthProfile, loginWithEmail, logoutBackend } from './api.js';
+import { getAuthProfile, getEmailAuthStatus, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js';
 
 let authPopup = null;
 let authReady = false;
+let signInResetTimer = null;
+let authEmailMode = 'email';
 
 /**
  * Decode a JWT payload (base64url) without verifying the signature.
@@ -31,7 +33,7 @@ export async function initAuth() {
   bindAuthForm();
   bindOAuthMessageHandler();
 
-  if (handleOAuthPopupReturn()) return false;
+  if (await handleOAuthReturn()) return Boolean(State.auth?.accessToken);
 
   restoreStoredSession();
   authReady = true;
@@ -44,6 +46,7 @@ function bindAuthForm() {
     e.preventDefault();
     await signInEmail();
   });
+  document.getElementById('auth-email')?.addEventListener('input', resetEmailAuthForm);
   document.getElementById('auth-google-btn')?.addEventListener('click', signInGoogle);
   document.getElementById('logout-btn')?.addEventListener('click', logout);
 }
@@ -67,7 +70,7 @@ function bindOAuthMessageHandler() {
   });
 }
 
-function handleOAuthPopupReturn() {
+async function handleOAuthReturn() {
   const params = new URLSearchParams(window.location.hash.replace(/^#/, '') || window.location.search.replace(/^\?/, ''));
   const accessToken = params.get('access_token');
   const refreshToken = params.get('refresh_token');
@@ -85,11 +88,25 @@ function handleOAuthPopupReturn() {
       error,
     }, window.location.origin);
     window.close();
+    return true;
   }
+
+  if (error) {
+    showToast(error, 'error');
+    window.history.replaceState({}, document.title, window.location.pathname);
+    return false;
+  }
+
+  await applyOAuthSession({
+    accessToken,
+    refreshToken,
+    expiresAt: expiresIn ? Math.floor(Date.now() / 1000) + Number(expiresIn) : null,
+  }, 'email-magic-link');
+  window.history.replaceState({}, document.title, window.location.pathname);
   return true;
 }
 
-async function applyOAuthSession(session) {
+async function applyOAuthSession(session, provider = 'google') {
   // ── 1. Decode the JWT immediately to get Google identity ──────────────────
   const claims = decodeJwt(session.accessToken);
   // Supabase Google tokens carry user_metadata with name/picture/email
@@ -99,7 +116,7 @@ async function applyOAuthSession(session) {
   const jwtPic   = meta.avatar_url || meta.picture || claims.picture || null;
 
   const auth = {
-    provider: 'google',
+    provider,
     accessToken: session.accessToken,
     refreshToken: session.refreshToken || null,
     expiresAt: session.expiresAt || null,
@@ -115,9 +132,10 @@ async function applyOAuthSession(session) {
   persistSession(auth);
   renderAuthShell();          // show name/avatar immediately from JWT
 
-  // ── 2. Enrich with backend profile (non-blocking) ─────────────────────────
+  // ── 2. Enrich with backend profile ────────────────────────────────────────
+  let profile = null;
   try {
-    const profile = await getAuthProfile();
+    profile = await getAuthProfile();
     State.set('authProfile', profile);
     const nextAuth = {
       ...auth,
@@ -133,8 +151,19 @@ async function applyOAuthSession(session) {
     State.set('auth', nextAuth);
     persistSession(nextAuth);
     renderAuthShell();        // update again if backend enriched anything
-  } catch {
-    // Keep the JWT-backed session even if the profile endpoint is unavailable.
+  } catch (e) {
+    if (provider !== 'email-magic-link') {
+      // Keep OAuth sessions usable even if optional profile enrichment fails.
+    } else {
+      showToast('Set a password to finish sign-in.');
+    }
+  }
+
+  if (provider === 'email-magic-link') {
+    const hasPassword = profile?.password_configured === true;
+    if (!hasPassword && !await ensurePasswordConfigured(profile)) {
+      return;
+    }
   }
 
   showToast(`Welcome, ${State.auth.user.name || 'back'}!`);
@@ -156,32 +185,163 @@ async function signInEmail() {
   const email = document.getElementById('auth-email')?.value.trim();
   const password = document.getElementById('auth-password')?.value || '';
   const btn = document.getElementById('auth-email-btn');
-  if (!email || !password) return showToast('Email and password are required.', 'error');
-  if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
+  if (!email) return showToast('Email is required.', 'error');
+  if (btn) { btn.disabled = true; btn.textContent = authEmailMode === 'password' ? 'Signing in...' : 'Checking...'; }
 
   try {
-    const data = await loginWithEmail({ email, password });
-    const auth = {
-      provider: 'email',
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token || null,
-      expiresAt: data.expires_at || null,
-      user: {
-        id: data.user_id,
-        email: data.email,
-        name: [data.first_name, data.last_name].filter(Boolean).join(' ') || data.email,
-      },
-    };
-    State.set('auth', auth);
-    persistSession(auth);
-    showToast('Signed in successfully.');
-    renderAuthShell();
-    window.loadDashboardGlobal?.();
+    if (authEmailMode === 'password') {
+      if (!password) {
+        showToast('Password is required.', 'error');
+        return;
+      }
+      const data = await loginWithEmail({ email, password });
+      applyPasswordSession(data);
+      return;
+    }
+
+    const status = await getEmailAuthStatus(email);
+    if (status.password_configured) {
+      showPasswordLoginStep();
+      return;
+    }
+
+    const redirectTo = window.location.origin + window.location.pathname;
+    await startEmailOtp(email, redirectTo);
+    showToast('Check your inbox for the sign-in link.');
+    if (btn) {
+      btn.textContent = 'Check your inbox';
+      clearTimeout(signInResetTimer);
+      signInResetTimer = setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+      }, 60000);
+    }
   } catch (e) {
-    showToast(e.message || 'Sign in failed.', 'error');
+    showToast(e.message || 'Could not send sign-in link.', 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+    }
+    return;
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Sign in with email'; }
+    if (btn?.textContent !== 'Check your inbox') {
+      btn.disabled = false;
+      btn.textContent = authEmailMode === 'password' ? 'Sign in with password' : 'Sign in';
+    }
   }
+}
+
+function applyPasswordSession(data) {
+  const auth = {
+    provider: 'password',
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token || null,
+    expiresAt: data.expires_at || null,
+    user: {
+      id: data.user_id,
+      email: data.email,
+      name: [data.first_name, data.last_name].filter(Boolean).join(' ') || data.email,
+    },
+  };
+  State.set('auth', auth);
+  persistSession(auth);
+  showToast('Signed in successfully.');
+  renderAuthShell();
+  window.loadDashboardGlobal?.();
+}
+
+function showPasswordLoginStep() {
+  authEmailMode = 'password';
+  const wrap = document.getElementById('auth-password-wrap');
+  const input = document.getElementById('auth-password');
+  const btn = document.getElementById('auth-email-btn');
+  const helper = document.getElementById('auth-email-helper');
+  if (wrap) wrap.style.display = 'block';
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+  if (helper) helper.textContent = 'This account has a password. Enter it to continue.';
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'Sign in with password';
+  }
+}
+
+function resetEmailAuthForm() {
+  authEmailMode = 'email';
+  clearTimeout(signInResetTimer);
+  const wrap = document.getElementById('auth-password-wrap');
+  const input = document.getElementById('auth-password');
+  const btn = document.getElementById('auth-email-btn');
+  const helper = document.getElementById('auth-email-helper');
+  if (wrap) wrap.style.display = 'none';
+  if (input) input.value = '';
+  if (helper) helper.textContent = 'We will email a sign-in link. New users are created after verification.';
+  if (btn) {
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+  }
+}
+
+async function ensurePasswordConfigured(profile) {
+  if (profile?.password_configured) return true;
+  return showPasswordSetupDialog();
+}
+
+function showPasswordSetupDialog() {
+  return new Promise(resolve => {
+    let overlay = document.getElementById('auth-password-setup');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'auth-password-setup';
+      overlay.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.62);display:flex;align-items:center;justify-content:center;padding:20px';
+      overlay.innerHTML = `
+        <form id="auth-password-setup-form" class="auth-card" style="width:min(420px,100%);padding:22px" autocomplete="off">
+          <div style="font-size:1rem;font-weight:800;color:var(--gl-on-surface);margin-bottom:6px">Create your password</div>
+          <div style="font-size:0.8rem;color:var(--gl-on-surface-3);line-height:1.45;margin-bottom:16px">Use this password for future sign-ins. Magic links will still be available for accounts without a password.</div>
+          <div class="label">Password</div>
+          <input id="setup-password" class="input" type="password" autocomplete="new-password" minlength="8" required>
+          <div class="label" style="margin-top:12px">Confirm Password</div>
+          <input id="setup-password-confirm" class="input" type="password" autocomplete="new-password" minlength="8" required>
+          <button id="setup-password-btn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" type="submit">Save password</button>
+        </form>`;
+      document.body.appendChild(overlay);
+    }
+    overlay.style.display = 'flex';
+
+    const form = document.getElementById('auth-password-setup-form');
+    const btn = document.getElementById('setup-password-btn');
+    const passwordInput = document.getElementById('setup-password');
+    const confirmInput = document.getElementById('setup-password-confirm');
+    passwordInput?.focus();
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const password = passwordInput?.value || '';
+      const confirm = confirmInput?.value || '';
+      if (password.length < 8) return showToast('Password must be at least 8 characters.', 'error');
+      if (password !== confirm) return showToast('Passwords do not match.', 'error');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+      }
+      try {
+        await setAccountPassword(password);
+        const profile = await getAuthProfile().catch(() => null);
+        if (profile) State.set('authProfile', profile);
+        overlay.style.display = 'none';
+        showToast('Password saved.');
+        resolve(true);
+      } catch (err) {
+        showToast(err.message || 'Could not save password.', 'error');
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = 'Save password';
+        }
+      }
+    };
+  });
 }
 
 function signInGoogle() {

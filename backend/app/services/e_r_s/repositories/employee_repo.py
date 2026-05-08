@@ -1,6 +1,7 @@
 from __future__ import annotations
 from uuid import UUID
 from typing import Any
+from postgrest.exceptions import APIError
 from supabase import Client
 
 
@@ -17,10 +18,25 @@ class EmployeeRepository:
         return res.data
 
     def create(self, payload: dict) -> dict:
-        return self.db.table("employees").insert(payload).execute().data[0]
+        try:
+            return self.db.table("employees").insert(payload).execute().data[0]
+        except APIError as exc:
+            sanitized = _without_unknown_avatar_column(payload, exc)
+            if sanitized is None:
+                raise
+            return self.db.table("employees").insert(sanitized).execute().data[0]
 
     def update(self, emp_id: str, payload: dict) -> dict:
-        return self.db.table("employees").update(payload).eq("id", emp_id).execute().data[0]
+        try:
+            return self.db.table("employees").update(payload).eq("id", emp_id).execute().data[0]
+        except APIError as exc:
+            sanitized = _without_unknown_avatar_column(payload, exc)
+            if sanitized is None:
+                raise
+            return self.db.table("employees").update(sanitized).eq("id", emp_id).execute().data[0]
+
+    def delete(self, emp_id: str) -> None:
+        self.db.table("employees").delete().eq("id", emp_id).execute()
 
     def search(self, filters: dict) -> list[dict]:
         q = self.db.table("employees").select("*")
@@ -94,3 +110,33 @@ class EmployeeRepository:
             .execute()
             .data
         )
+
+    def clear_manager_relations(self, manager_id: str) -> None:
+        (
+            self.db.table("employees")
+            .update({"manager_id": None})
+            .eq("manager_id", manager_id)
+            .execute()
+        )
+
+    def clear_team_lead_relations(self, team_lead_id: str) -> None:
+        (
+            self.db.table("employees")
+            .update({"team_lead_id": None})
+            .eq("team_lead_id", team_lead_id)
+            .execute()
+        )
+
+
+def _without_unknown_avatar_column(payload: dict, exc: APIError) -> dict | None:
+    details = getattr(exc, "details", None)
+    message = getattr(exc, "message", "") or ""
+    code = getattr(exc, "code", "") or ""
+    blob = f"{code} {message} {details}"
+    if "avatar_url" not in payload:
+        return None
+    if "PGRST204" not in blob and "avatar_url" not in blob:
+        return None
+    sanitized = dict(payload)
+    sanitized.pop("avatar_url", None)
+    return sanitized

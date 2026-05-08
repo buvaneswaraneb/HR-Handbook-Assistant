@@ -1,6 +1,7 @@
 from __future__ import annotations
 from datetime import datetime, timedelta
 from uuid import UUID
+from postgrest.exceptions import APIError
 from supabase import Client
 import hashlib
 import secrets
@@ -12,12 +13,22 @@ class AuthRepository:
 
     # ── User CRUD ─────────────────────────────────────────────────────────────
     def get_user_by_email(self, email: str) -> dict | None:
-        res = self.db.table("users").select("*").eq("email", email).single().execute()
-        return res.data
+        try:
+            res = self.db.table("users").select("*").eq("email", email).single().execute()
+            return res.data
+        except APIError as exc:
+            if _is_no_rows_error(exc):
+                return None
+            raise
 
     def get_user_by_id(self, user_id: str) -> dict | None:
-        res = self.db.table("users").select("*").eq("id", user_id).single().execute()
-        return res.data
+        try:
+            res = self.db.table("users").select("*").eq("id", user_id).single().execute()
+            return res.data
+        except APIError as exc:
+            if _is_no_rows_error(exc):
+                return None
+            raise
 
     def create_user(self, email: str, first_name: str, last_name: str, password: str) -> dict:
         password_hash = self._hash_password(password)
@@ -53,6 +64,9 @@ class AuthRepository:
 
     def link_user_to_employee(self, user_id: str, employee_id: str) -> dict:
         return self.update_user(user_id, {"employee_id": employee_id})
+
+    def set_password(self, user_id: str, password: str) -> dict:
+        return self.update_user(user_id, {"password_hash": self._hash_password(password)})
 
     # ── Sessions ──────────────────────────────────────────────────────────────
     def create_session(
@@ -175,3 +189,8 @@ class AuthRepository:
             return hash_obj.hex() == hash_hex
         except Exception:
             return False
+
+
+def _is_no_rows_error(exc: APIError) -> bool:
+    blob = f"{getattr(exc, 'code', '')} {getattr(exc, 'message', '')} {getattr(exc, 'details', '')}"
+    return "PGRST116" in blob or "0 rows" in blob or "JSON object requested" in blob

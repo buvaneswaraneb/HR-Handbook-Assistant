@@ -9,13 +9,27 @@ from pydantic import BaseModel
 from app.services.e_r_s.auth_middleware import get_auth_middleware
 from app.services.e_r_s import supabase_auth_service as svc
 from app.services.e_r_s import auth_service
-from app.services.e_r_s.auth_schemas import UserProfile, LoginRequest
+from app.services.e_r_s.auth_schemas import UserProfile, LoginRequest, SignupRequest
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 class LinkEmployeeRequest(BaseModel):
     employee_id: str
+
+
+class EmailOtpStartRequest(BaseModel):
+    email: str
+    redirect_to: Optional[str] = None
+
+
+class EmailOtpVerifyRequest(BaseModel):
+    email: str
+    token: str
+
+
+class SetPasswordRequest(BaseModel):
+    password: str
 
 
 def _extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
@@ -151,18 +165,79 @@ def oauth_callback():
     }
 
 
+@router.post("/email/start")
+def start_email_otp(body: EmailOtpStartRequest):
+    """
+    Send a Supabase email OTP. First-time users are created by Supabase when
+    they successfully verify the emailed code.
+    """
+    try:
+        return svc.start_email_otp(body.email, body.redirect_to)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/email/status")
+def email_auth_status(email: str = Query(...)):
+    """
+    Check whether a local app password exists for this email before choosing
+    password login or magic-link login.
+    """
+    try:
+        return svc.get_email_auth_status(email)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/email/verify")
+def verify_email_otp(body: EmailOtpVerifyRequest):
+    """
+    Verify a Supabase email OTP and return a Supabase JWT session.
+    """
+    try:
+        return svc.verify_email_otp(body.email, body.token)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+
+@router.post("/password")
+def set_password(body: SetPasswordRequest, authorization: Optional[str] = Header(None)):
+    """
+    Set the local app password after a verified Supabase magic-link login.
+    """
+    user = _get_current_user(authorization)
+    try:
+        return svc.set_password_for_user(user["user_id"], user["email"], body.password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/login")
 def login(body: LoginRequest):
     """
-    Login with email and password (fallback if Supabase not configured).
-    Returns access token that can be used with /auth/me.
+    Login with Supabase email/password auth.
+    Returns a Supabase access token that can be used with /auth/me.
     """
     try:
-        return auth_service.login(body)
+        return svc.login_with_password(body)
     except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Login failed")
+        try:
+            return auth_service.login(body)
+        except ValueError:
+            raise HTTPException(status_code=401, detail=str(e))
+        except Exception:
+            raise HTTPException(status_code=401, detail=str(e))
+
+
+@router.post("/signup")
+def signup(body: SignupRequest):
+    """
+    Register with Supabase email/password auth.
+    """
+    try:
+        return svc.signup_with_password(body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/me")

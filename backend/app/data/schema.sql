@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS employees (
     team                    TEXT,
     manager_id              UUID        REFERENCES employees(id) ON DELETE SET NULL,
     linkedin_url            TEXT,
+    avatar_url              TEXT,
     rating                  NUMERIC(3,2) CHECK (rating >= 0 AND rating <= 5),
     total_experience_years  NUMERIC(5,2),
     availability            BOOLEAN     DEFAULT TRUE,

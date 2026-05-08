@@ -27,8 +27,8 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 file_router = APIRouter(tags=["files"])
 
 
-# ── Upload ────────────────────────────────────────────────────────────────────
-@file_router.post("/upload")
+# ── Legacy cache upload ───────────────────────────────────────────────────────
+@file_router.post("/cache/upload")
 async def upload_file(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
@@ -57,15 +57,15 @@ def download_file(filename: str):
     )
 
 
-# ── List files ────────────────────────────────────────────────────────────────
-@file_router.get("/files")
+# ── List cached files ─────────────────────────────────────────────────────────
+@file_router.get("/cache/files")
 def list_files():
     files = [f.name for f in UPLOAD_DIR.iterdir() if f.is_file()]
     return {"files": files}
 
 
 # ── Delete ────────────────────────────────────────────────────────────────────
-@file_router.delete("/files/delete/{filename}")
+@file_router.delete("/cache/files/{filename}")
 def delete_file(filename: str):
     # os.path.basename guards against path-traversal (e.g. ../../etc/passwd)
     safe_name = os.path.basename(filename)

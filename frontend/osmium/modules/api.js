@@ -28,6 +28,22 @@ export async function loginWithEmail(body) {
   return request('/auth/login', { method: 'POST', body: JSON.stringify(body) });
 }
 
+export async function getEmailAuthStatus(email) {
+  return request(`/auth/email/status?email=${encodeURIComponent(email)}`);
+}
+
+export async function startEmailOtp(email, redirectTo = null) {
+  return request('/auth/email/start', { method: 'POST', body: JSON.stringify({ email, redirect_to: redirectTo }) });
+}
+
+export async function verifyEmailOtp(email, token) {
+  return request('/auth/email/verify', { method: 'POST', body: JSON.stringify({ email, token }) });
+}
+
+export async function setAccountPassword(password) {
+  return request('/auth/password', { method: 'POST', body: JSON.stringify({ password }) });
+}
+
 export async function getAuthProfile() {
   return request('/auth/me');
 }
@@ -74,6 +90,14 @@ export async function updateEmployee(id, body) {
   return request(`/employees/${id}`, { method: 'PUT', body: JSON.stringify(body) });
 }
 
+export async function deleteEmployee(id) {
+  return request(`/employees/${id}`, { method: 'DELETE' });
+}
+
+export async function resolveLinkedInAvatar(url) {
+  return request(`/employees/linkedin-avatar?url=${encodeURIComponent(url)}`);
+}
+
 export async function patchAvailability(id, available) {
   return request(`/employees/${id}/availability`, {
     method: 'PATCH',
@@ -82,8 +106,11 @@ export async function patchAvailability(id, available) {
 }
 
 export async function searchEmployees(params) {
+  const normalized = { ...params };
+  if (normalized.availability === 'true') normalized.availability = true;
+  if (normalized.availability === 'false') normalized.availability = false;
   const qs = new URLSearchParams(
-    Object.fromEntries(Object.entries(params).filter(([, v]) => v !== '' && v !== null && v !== undefined))
+    Object.fromEntries(Object.entries(normalized).filter(([, v]) => v !== '' && v !== null && v !== undefined))
   ).toString();
   const data = await request(`/employees/search?${qs}`);
   return data.employees || data || [];
@@ -120,6 +147,10 @@ export async function createProject(body) {
 
 export async function assignToProject(projId, body) {
   return request(`/projects/${projId}/assign`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+export async function unassignFromProject(projId, empId) {
+  return request(`/projects/${projId}/assign/${empId}`, { method: 'DELETE' });
 }
 
 export async function getProjectTeam(projId) {

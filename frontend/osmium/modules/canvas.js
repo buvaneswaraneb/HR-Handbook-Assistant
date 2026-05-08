@@ -22,6 +22,8 @@ let isConnecting = false, connectFromId = null;
 
 const MIN_ZOOM = 0.15, MAX_ZOOM = 3.0;
 const ZOOM_STEP = 0.1;
+const NODE_W = 200;
+const NODE_H = 100;
 
 // ─── INIT ─────────────────────────────────────────────────────
 export function initCanvas() {
@@ -421,9 +423,11 @@ export function renderNodes() {
 }
 
 function createNodeElement(node) {
-  const emp = State.employees.find(e => e.id === node.empId) || {};
+  if (node.type === 'project') return createProjectNodeElement(node);
+
+  const emp = getEmployeeForNode(node);
   const el = document.createElement('div');
-  el.className = 'canvas-node';
+  el.className = `canvas-node${node.projectRole ? ` canvas-node-${node.projectRole}` : ''}`;
   el.dataset.id = node.id;
 
   const avail = emp.availability;
@@ -487,6 +491,79 @@ function createNodeElement(node) {
   return el;
 }
 
+function createProjectNodeElement(node) {
+  const proj = State.projects.find(p => p.id === node.projectId) || {};
+  const el = document.createElement('div');
+  el.className = 'canvas-node canvas-node-project';
+  el.dataset.id = node.id;
+
+  const statusColors = {
+    active: 'var(--gl-success)',
+    planning: 'var(--gl-primary)',
+    on_hold: 'var(--gl-warning)',
+    completed: 'var(--gl-secondary)',
+  };
+  const sc = statusColors[proj.status] || 'var(--gl-primary)';
+  const pct = proj.percent_complete ?? 0;
+  const teamCount = Array.isArray(proj.team) ? proj.team.length : 0;
+
+  el.innerHTML = `
+    <div class="node-header">
+      <div class="node-avatar node-avatar-project">
+        <span class="material-symbols-outlined" style="font-size:18px">folder_managed</span>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="node-name truncate">${escHtml(proj.project_name || 'Project')}</div>
+        <div class="node-role truncate">${escHtml(proj.client_name || 'Project root')}</div>
+      </div>
+    </div>
+    <div class="node-body">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+        <span class="badge badge-neutral" style="font-size:10px;padding:1px 6px;color:${sc}">${escHtml(proj.status || 'active')}</span>
+        <span style="font-size:11px;color:var(--gl-on-surface-3)">${teamCount} people</span>
+      </div>
+      <div style="height:5px;background:var(--gl-surface-high);border-radius:var(--r-full);overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${sc};border-radius:var(--r-full)"></div>
+      </div>
+    </div>
+    <div class="node-footer">
+      <span class="chip" style="font-size:10px">Project Root</span>
+      <button class="btn btn-ghost btn-icon" title="Inspect" onclick="window._inspectNode('${node.id}')">
+        <span class="material-symbols-outlined" style="font-size:14px">open_in_new</span>
+      </button>
+    </div>
+    <div class="node-port node-port-t" data-node="${node.id}" title="Connect from top"></div>
+    <div class="node-port node-port-r" data-node="${node.id}" title="Connect from right"></div>
+    <div class="node-port node-port-b" data-node="${node.id}" title="Connect from bottom"></div>
+    <div class="node-port node-port-l" data-node="${node.id}" title="Connect from left"></div>`;
+
+  el.addEventListener('click', e => {
+    if (e.target.closest('button')) return;
+    State.selectNode(node.id, e.shiftKey);
+    State.emit('inspector:open', { type: 'project', data: proj });
+  });
+
+  el.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    showNodeCtxMenu(e, node.id);
+  });
+
+  return el;
+}
+
+function getEmployeeForNode(node) {
+  const emp = State.employees.find(e => e.id === node.empId);
+  if (emp) return emp;
+  return {
+    id: node.empId,
+    name: node.name || 'Unknown',
+    role: node.role || node.projectRole || '',
+    availability: node.availability ?? true,
+    team: node.team || '',
+    skills: [],
+  };
+}
+
 function syncNodeEl(id) {
   const node = State.canvas.nodes.find(n => n.id === id);
   if (!node) return;
@@ -510,11 +587,10 @@ export function renderEdges() {
     const toNode = State.canvas.nodes.find(n => n.id === edge.toId);
     if (!fromNode || !toNode) return;
 
-    const nodeW = 200, nodeH = 100;
-    const x1 = fromNode.x + nodeW / 2;
-    const y1 = fromNode.y + nodeH / 2;
-    const x2 = toNode.x + nodeW / 2;
-    const y2 = toNode.y + nodeH / 2;
+    const x1 = fromNode.x + NODE_W;
+    const y1 = fromNode.y + NODE_H / 2;
+    const x2 = toNode.x;
+    const y2 = toNode.y + NODE_H / 2;
 
     // Bezier control points
     const dx = x2 - x1, dy = y2 - y1;
@@ -523,9 +599,10 @@ export function renderEdges() {
 
     const d = `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`;
     const isManager = edge.type === 'manager';
-    const marker = isManager ? 'url(#arrowhead-primary)' : 'url(#arrowhead)';
-    const stroke = isManager ? 'var(--gl-primary)' : 'var(--gl-outline-3)';
-    const width = isManager ? '2' : '1.5';
+    const isProject = edge.type === 'project';
+    const marker = (isManager || isProject) ? 'url(#arrowhead-primary)' : 'url(#arrowhead)';
+    const stroke = isProject ? 'var(--gl-secondary)' : isManager ? 'var(--gl-primary)' : 'var(--gl-outline-3)';
+    const width = (isManager || isProject) ? '2' : '1.5';
 
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.classList.add('canvas-edge-group');
@@ -552,6 +629,7 @@ export function renderEdges() {
     path.setAttribute('fill', 'none');
     path.setAttribute('marker-end', marker);
     path.classList.add('canvas-edge');
+    if (edge.type) path.classList.add(edge.type);
 
     // Optional label
     if (State.settings.showEdgeLabels && edge.label) {
@@ -685,8 +763,108 @@ export function addEmployeeToCanvas(emp) {
   State.addCanvasNode({ id: uid(), empId: emp.id, x, y });
 }
 
+export async function addProjectTreeToCanvas(proj) {
+  if (!proj?.id) return;
+
+  if (!State.employees.length) {
+    try { await getEmployees(); } catch {}
+  }
+
+  const existingRoot = State.canvas.nodes.find(n => n.type === 'project' && n.projectId === proj.id);
+  if (existingRoot) {
+    State.selectNode(existingRoot.id);
+    fitToScreenIfVisible();
+    return;
+  }
+
+  const treeIndex = State.canvas.nodes.filter(n => n.type === 'project').length;
+  const rootX = 80 + treeIndex * 90;
+  const rootY = 80 + treeIndex * 70;
+  const managerX = rootX + 300;
+  const childX = managerX + 300;
+  const rowGap = 142;
+
+  const projectNode = {
+    id: uid(),
+    type: 'project',
+    projectId: proj.id,
+    x: rootX,
+    y: rootY + rowGap,
+  };
+  State.addCanvasNode(projectNode);
+
+  const team = Array.isArray(proj.team) ? proj.team : [];
+  const managers = team.filter(m => m.role_in_project === 'manager');
+  const teamLeads = team.filter(m => m.role_in_project === 'team_lead');
+  const members = team.filter(m => !['manager', 'team_lead'].includes(m.role_in_project));
+  const managerRow = managers[0] || teamLeads[0] || null;
+
+  if (!managerRow) {
+    showToast('Project node added. Assign a manager to build the tree.');
+    renderNodes();
+    renderEdges();
+    return;
+  }
+
+  const managerNode = nodeFromTeamMember(managerRow, managerX, rootY + rowGap, 'manager');
+  State.addCanvasNode(managerNode);
+  State.addCanvasEdge({
+    id: uid(),
+    fromId: projectNode.id,
+    toId: managerNode.id,
+    type: 'project',
+    label: 'Project Manager',
+  });
+
+  const childRows = [
+    ...teamLeads.filter(m => m.employee_id !== managerRow.employee_id),
+    ...members,
+  ];
+  const startY = rootY + rowGap - ((Math.max(childRows.length, 1) - 1) * rowGap) / 2;
+
+  childRows.forEach((member, idx) => {
+    const projectRole = member.role_in_project === 'team_lead' ? 'teamlead' : 'member';
+    const childNode = nodeFromTeamMember(member, childX, startY + idx * rowGap, projectRole);
+    State.addCanvasNode(childNode);
+    State.addCanvasEdge({
+      id: uid(),
+      fromId: managerNode.id,
+      toId: childNode.id,
+      type: projectRole === 'teamlead' ? 'teamlead' : 'member',
+      label: projectRole === 'teamlead' ? 'Team Lead' : 'Member',
+    });
+  });
+
+  renderNodes();
+  renderEdges();
+  fitToScreenIfVisible();
+}
+
+function fitToScreenIfVisible() {
+  const container = document.getElementById('canvas-view');
+  const rect = container?.getBoundingClientRect();
+  if (!rect?.width || !rect?.height) return;
+  fitToScreen();
+}
+
+function nodeFromTeamMember(member, x, y, projectRole) {
+  return {
+    id: uid(),
+    empId: member.employee_id,
+    x,
+    y,
+    projectRole,
+    name: member.name || member.employee_name,
+    role: member.role,
+    availability: member.availability,
+  };
+}
+
 // ─── GROUPS ───────────────────────────────────────────────────
 export function addProjectGroup(proj) {
+  addProjectTreeToCanvas(proj);
+  return;
+
   const existing = world.querySelector(`.canvas-group[data-proj="${proj.id}"]`);
   if (existing) return;
 
@@ -734,6 +912,10 @@ function duplicateNode(id) {
 window._inspectNode = function (nodeId) {
   const node = State.canvas.nodes.find(n => n.id === nodeId);
   if (!node) return;
-  const emp = State.employees.find(e => e.id === node.empId);
-  if (emp) State.emit('inspector:open', { type: 'employee', data: emp });
+  if (node.type === 'project') {
+    const proj = State.projects.find(p => p.id === node.projectId);
+    if (proj) State.emit('inspector:open', { type: 'project', data: proj });
+    return;
+  }
+  State.emit('inspector:open', { type: 'employee', data: getEmployeeForNode(node) });
 };

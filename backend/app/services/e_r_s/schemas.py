@@ -65,6 +65,7 @@ class EmployeeCreate(BaseModel):
     manager_id: Optional[UUID] = None
     team_lead_id: Optional[UUID] = None
     linkedin_url: Optional[str] = None
+    avatar_url: Optional[str] = None
     rating: Optional[float] = Field(None, ge=0, le=5)
     total_experience_years: Optional[float] = None
     availability: bool = True
@@ -97,6 +98,7 @@ class EmployeeOut(BaseModel):
     manager_id: Optional[UUID] = None
     team_lead_id: Optional[UUID] = None
     linkedin_url: Optional[str] = None
+    avatar_url: Optional[str] = None
     rating: Optional[float] = None
     total_experience_years: Optional[float] = None
     availability: bool

@@ -20,7 +20,10 @@ export function initAI() {
   if (!messagesEl) return;
 
   // Send button
-  document.getElementById('ai-send')?.addEventListener('click', sendMessage);
+  document.getElementById('ai-send')?.addEventListener('click', e => {
+    e.preventDefault();
+    sendMessage();
+  });
 
   // Textarea: Enter sends (Shift+Enter = newline)
   inputEl?.addEventListener('keydown', e => {
@@ -28,7 +31,8 @@ export function initAI() {
   });
 
   // Attach file button inside chat input
-  document.getElementById('ai-attach-btn')?.addEventListener('click', () => {
+  document.getElementById('ai-attach-btn')?.addEventListener('click', e => {
+    e.preventDefault();
     document.getElementById('ai-file-input')?.click();
   });
 
@@ -76,21 +80,24 @@ export async function loadAIFiles() {
 
 function renderAIFilePanel(files) {
   if (!filesPanelEl) return;
+  const pdfFiles = (files || []).filter(isPdfFile);
+  injectedFiles = injectedFiles.filter(id => pdfFiles.some(file => file.id === id));
+  updateContextBadge();
 
-  if (!files.length) {
+  if (!pdfFiles.length) {
     filesPanelEl.innerHTML = `
       <div style="padding:24px;text-align:center;color:var(--gl-on-surface-4)">
         <span class="material-symbols-outlined" style="font-size:36px;display:block;margin-bottom:8px;opacity:0.4">folder_open</span>
-        <div style="font-size:0.82rem">No files uploaded yet.</div>
-        <div style="font-size:0.72rem;margin-top:4px">Upload files to inject into AI context.</div>
+        <div style="font-size:0.82rem">No PDFs uploaded yet.</div>
+        <div style="font-size:0.72rem;margin-top:4px">Upload PDFs to inject into AI context.</div>
       </div>`;
     return;
   }
 
-  const extIcon = { PDF:'picture_as_pdf', PNG:'image', JPG:'image', JPEG:'image', ZIP:'folder_zip', DOC:'description', DOCX:'description', XLS:'table_chart', XLSX:'table_chart' };
-  const extColor = { PDF:'#f5574a', PNG:'#f5a623', JPG:'#f5a623', DOCX:'#5abfe8', DOC:'#5abfe8', XLS:'#3dd68c', XLSX:'#3dd68c' };
+  const extIcon = { PDF:'picture_as_pdf' };
+  const extColor = { PDF:'#f5574a' };
 
-  filesPanelEl.innerHTML = files.map(f => {
+  filesPanelEl.innerHTML = pdfFiles.map(f => {
     const ext = (f.filename || '').split('.').pop().toUpperCase();
     const icon = extIcon[ext] || 'insert_drive_file';
     const color = extColor[ext] || 'var(--gl-on-surface-4)';
@@ -106,12 +113,19 @@ function renderAIFilePanel(files) {
           <div style="font-size:0.68rem;color:var(--gl-on-surface-4)">${fmtBytes(f.size_bytes)} · ${fmtDate(f.created_at)}</div>
         </div>
         <div style="display:flex;gap:4px;flex-shrink:0">
-          <button class="ai-inject-btn" title="${isInjected ? 'Remove from context' : 'Inject into context'}"
+          <button type="button" class="ai-inject-btn" title="${isInjected ? 'Remove from context' : 'Inject into context'}"
             style="width:28px;height:28px;border-radius:4px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:${isInjected ? '#3dd68c22' : 'transparent'};color:${isInjected ? '#3dd68c' : 'var(--gl-on-surface-4)'};transition:all 0.15s"
             onclick="window._toggleInjectFile('${f.id}', '${escHtml(f.filename)}')">
             <span class="material-symbols-outlined" style="font-size:15px">${isInjected ? 'check_circle' : 'add_circle_outline'}</span>
           </button>
-          <button title="Delete file"
+          ${f.url ? `<button type="button" title="Download file"
+            style="width:28px;height:28px;border-radius:4px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:transparent;color:var(--gl-on-surface-4);transition:all 0.15s"
+            onmouseenter="this.style.color='var(--gl-on-surface)'"
+            onmouseleave="this.style.color='var(--gl-on-surface-4)'"
+            onclick="window._downloadAIFile('${escHtml(f.url)}', '${escHtml(f.filename || 'download')}')">
+            <span class="material-symbols-outlined" style="font-size:15px">download</span>
+          </button>` : ''}
+          <button type="button" title="Delete file"
             style="width:28px;height:28px;border-radius:4px;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;background:transparent;color:var(--gl-on-surface-4);transition:all 0.15s"
             onmouseenter="this.style.color='#f5574a'"
             onmouseleave="this.style.color='var(--gl-on-surface-4)'"
@@ -121,6 +135,12 @@ function renderAIFilePanel(files) {
         </div>
       </div>`;
   }).join('');
+}
+
+function isPdfFile(file) {
+  const name = file?.filename || file?.name || '';
+  const mime = file?.mime_type || file?.content_type || file?.type || '';
+  return /\.pdf$/i.test(name) || mime === 'application/pdf';
 }
 
 window._toggleInjectFile = function(fileId, filename) {
@@ -146,6 +166,10 @@ window._deleteAIFile = async function(fileId) {
   } catch (e) { showToast(e.message, 'error'); }
 };
 
+window._downloadAIFile = function(url, filename) {
+  triggerCloudDownload(url, filename);
+};
+
 function updateContextBadge() {
   const badge = document.getElementById('ai-context-badge');
   if (!badge) return;
@@ -155,6 +179,11 @@ function updateContextBadge() {
 
 // ─── ATTACHMENT STAGING ───────────────────────────────────────
 function stageAttachment(file) {
+  if (!isPdfFile(file)) {
+    pendingAttach = null;
+    showToast('Only PDF files can be attached to AI.', 'error');
+    return;
+  }
   pendingAttach = file;
   const indicator = document.getElementById('ai-attach-indicator');
   if (indicator) {
@@ -235,6 +264,18 @@ async function sendMessage() {
   }
 
   scrollToBottom();
+}
+
+function triggerCloudDownload(url, filename) {
+  if (!url) return;
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename || 'download';
+  anchor.target = '_blank';
+  anchor.rel = 'noopener noreferrer';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
 }
 
 function appendMsg(role, html) {

@@ -4,7 +4,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
 from app.services.e_r_s import file_service as svc
 from app.services.e_r_s.schemas import FileLinkRequest
 
-router = APIRouter(prefix="/sb/files", tags=["Files & Assets"])
+router = APIRouter(prefix="/files", tags=["Files & Assets"])
 
 
 @router.get("")
@@ -28,7 +28,7 @@ def upload_file(
     description: Optional[str] = Form(None),
 ):
     """
-    Upload a file to Supabase Storage and record metadata in the files table.
+    Upload a file to Cloudinary and record metadata in the files table.
     The file is automatically linked to the activity feed via a DB trigger.
 
     Form fields:
@@ -60,5 +60,5 @@ def link_file(file_id: UUID, body: FileLinkRequest):
 
 @router.delete("/{file_id}", status_code=204)
 def delete_file(file_id: UUID):
-    """Delete file record and remove from Supabase Storage."""
+    """Delete file record and remove the Cloudinary asset."""
     svc.delete_file(str(file_id))
