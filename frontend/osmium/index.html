@@ -401,12 +401,12 @@
                 </div>
                 <div style="display:flex;align-items:center;gap:10px">
                   <span id="calendar-date-header" style="font-size:0.75rem;color:var(--gl-on-surface-4)"></span>
-                  <button class="btn btn-secondary btn-sm" onclick="window._syncCalendar?.()">
+                  <button class="btn btn-secondary btn-sm" onclick="window._syncGoogleCalendar?.()">
                     <span class="material-symbols-outlined" style="font-size:14px">sync</span> Sync
                   </button>
                 </div>
               </div>
-              <div id="calendar-widget" style="padding:12px 20px;min-height:160px">
+              <div id="calendar-widget" style="padding:0;min-height:160px">
                 <div style="display:flex;align-items:center;gap:10px;color:var(--gl-on-surface-4);padding:20px 0">
                   <span class="spinner-sm spinner"></span> Loading calendar…
                 </div>
@@ -441,7 +441,7 @@
                   <span style="font-size:0.82rem">Add Employee</span>
                 </button>
                 <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px"
-                  onclick="openModal('add-project-modal');window._onAddProjectModalOpen?.()">
+                  onclick="openModal('add-project-modal')">
                   <span class="material-symbols-outlined" style="color:#3dd68c">create_new_folder</span>
                   <span style="font-size:0.82rem">New Project</span>
                 </button>
@@ -930,17 +930,17 @@
           </div>
           <div>
             <div class="label">Role</div>
-            <input id="new-emp-role" class="input" list="employee-role-options" placeholder="Backend Developer" />
-            <datalist id="employee-role-options">
-              <option value="Manager"></option>
-              <option value="Team Lead"></option>
-              <option value="Backend Developer"></option>
-              <option value="Frontend Developer"></option>
-              <option value="Full Stack Developer"></option>
-              <option value="Designer"></option>
-              <option value="QA Engineer"></option>
-              <option value="HR Specialist"></option>
-            </datalist>
+            <select id="new-emp-role" class="select">
+              <option value="">Select role</option>
+              <option value="Manager">Manager</option>
+              <option value="Team Lead">Team Lead</option>
+              <option value="Backend Developer">Backend Developer</option>
+              <option value="Frontend Developer">Frontend Developer</option>
+              <option value="Full Stack Developer">Full Stack Developer</option>
+              <option value="Designer">Designer</option>
+              <option value="QA Engineer">QA Engineer</option>
+              <option value="HR Specialist">HR Specialist</option>
+            </select>
           </div>
           <div>
             <div class="label">Team</div><input id="new-emp-team" class="input" placeholder="Platform" />

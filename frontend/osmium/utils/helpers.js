@@ -83,14 +83,9 @@ export function urgencyBorderClass(days) {
 }
 
 export function statusBadge(s) {
-  const map = {
-    active:    'badge-primary',
-    planning:  'badge-neutral',
-    on_hold:   'badge-warning',
-    completed: 'badge-available',
-    cancelled: 'badge-error',
-  };
-  return map[s] || 'badge-neutral';
+  return String(s || 'active').toLowerCase() === 'active'
+    ? 'badge-available'
+    : 'badge-unavailable';
 }
 
 export function eventIcon(type) {

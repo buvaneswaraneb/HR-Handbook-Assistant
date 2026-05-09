@@ -189,20 +189,35 @@ function stageAttachment(file) {
   if (!isPdfFile(file)) {
     pendingAttach = null;
     showToast('Only PDF files can be attached to AI.', 'error');
+    renderPendingAttachment();
     return;
   }
   pendingAttach = file;
+  renderPendingAttachment();
+}
+
+function renderPendingAttachment() {
   const indicator = document.getElementById('ai-attach-indicator');
-  if (indicator) {
-    indicator.textContent = file.name;
-    indicator.style.display = 'flex';
+  if (!indicator) return;
+
+  if (!pendingAttach) {
+    indicator.innerHTML = '';
+    indicator.style.display = 'none';
+    return;
   }
+
+  indicator.style.display = 'flex';
+  indicator.innerHTML = `
+    <span class="material-symbols-outlined" style="font-size:14px">picture_as_pdf</span>
+    <span style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(pendingAttach.name)}">${escHtml(pendingAttach.name)}</span>
+    <button type="button" class="ai-attach-clear" title="Remove attachment" onclick="window._clearAttach()">
+      <span class="material-symbols-outlined" style="font-size:13px">close</span>
+    </button>`;
 }
 
 window._clearAttach = function() {
   pendingAttach = null;
-  const indicator = document.getElementById('ai-attach-indicator');
-  if (indicator) indicator.style.display = 'none';
+  renderPendingAttachment();
 };
 
 // ─── SEND MESSAGE ─────────────────────────────────────────────
@@ -216,36 +231,54 @@ async function sendMessage() {
   if (sendBtn) sendBtn.disabled = true;
 
   try {
+    const attachment = pendingAttach;
+    const attachedName = attachment?.name || '';
+    const activeFileIds = [...injectedFiles];
+
+    if (inputEl) {
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+    }
+    window._clearAttach();
+
+    const userHtml = userMessageHtml(q, attachment);
+    appendMsg('user', userHtml);
+
+    const thinkingEl = appendMsg('bot', attachment
+      ? processingFileHtml(attachedName)
+      : `<span style="color:var(--gl-on-surface-4);font-style:italic">Thinking…</span>`);
+    scrollToBottom();
+
     // Upload attachment first if present
-    if (pendingAttach) {
-      const attachedName = pendingAttach.name;
+    if (attachment) {
       const formData = new FormData();
-      formData.append('file', pendingAttach);
+      formData.append('file', attachment);
       try {
         const result = await uploadFile(formData);
         if (result?.id) {
           injectedFiles.push(result.id);
+          activeFileIds.push(result.id);
           updateContextBadge();
           State.emit('data:files:refresh');
           showToast(`"${attachedName}" uploaded & injected`);
         }
       } catch (e) {
         showToast(`Upload failed: ${e.message}`, 'error');
+        thinkingEl.innerHTML = `<span style="color:#f5574a">Could not process "${escHtml(attachedName)}": ${escHtml(e.message)}</span>`;
+        scrollToBottom();
+        return;
       }
-      window._clearAttach();
     }
 
-    if (!q) return;
-    if (inputEl) inputEl.value = '';
-    inputEl.style.height = 'auto';
-
-    appendMsg('user', escHtml(q));
-
-    const thinkingEl = appendMsg('bot', `<span style="color:var(--gl-on-surface-4);font-style:italic">Thinking…</span>`);
-    scrollToBottom();
+    if (!q) {
+      thinkingEl.innerHTML = `File processed and added to context: <strong>${escHtml(attachedName)}</strong>`;
+      scrollToBottom();
+      return;
+    }
 
     try {
-      const data = await queryRAG(q, injectedFiles);
+      thinkingEl.innerHTML = `<span style="color:var(--gl-on-surface-4);font-style:italic">Thinking…</span>`;
+      const data = await queryRAG(q, activeFileIds);
       const answer = data.answer || '';
 
       // Format answer with line breaks preserved
@@ -285,6 +318,25 @@ async function sendMessage() {
     isSending = false;
     if (sendBtn) sendBtn.disabled = false;
   }
+}
+
+function userMessageHtml(text, attachment) {
+  const body = text ? `<div style="white-space:pre-wrap">${escHtml(text)}</div>` : '';
+  const fileChip = attachment ? `
+    <div class="ai-sent-attachment">
+      <span class="material-symbols-outlined" style="font-size:14px">picture_as_pdf</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(attachment.name)}</span>
+    </div>` : '';
+  return `${body}${fileChip}`;
+}
+
+function processingFileHtml(filename) {
+  return `
+    <div style="display:flex;align-items:center;gap:8px;color:var(--gl-on-surface-3)">
+      <span class="spinner-sm spinner"></span>
+      <span>Processing ${escHtml(filename)}…</span>
+    </div>
+    <div style="font-size:0.72rem;color:var(--gl-on-surface-4);margin-top:6px">Uploading and indexing the file before answering.</div>`;
 }
 
 function triggerCloudDownload(url, filename) {

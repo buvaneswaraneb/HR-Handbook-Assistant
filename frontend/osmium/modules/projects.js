@@ -155,6 +155,25 @@ function filterMemberSearch() {
   });
 }
 
+function resetProjectForm() {
+  document.getElementById('add-proj-form')?.reset();
+  projSkillTags = [];
+  projRoleTags = [];
+  projMemberIds = new Set();
+  window['_tagRef_proj-skill-input']?.renderTags();
+  window['_tagRef_proj-role-input']?.renderTags();
+  const status = document.getElementById('proj-status');
+  const pct = document.getElementById('proj-pct');
+  const search = document.getElementById('proj-member-search');
+  if (status) status.value = 'active';
+  if (pct) pct.value = '';
+  if (search) search.value = '';
+  document.querySelectorAll('#proj-member-list input[type="checkbox"]').forEach(input => {
+    input.checked = false;
+  });
+  renderAssignmentSummary();
+}
+
 export async function loadProjects() {
   const list = document.getElementById('projects-list');
   if (!list) return;
@@ -275,10 +294,7 @@ async function submitProject() {
     }
     showToast('Project created!');
     closeModal('add-project-modal');
-    projSkillTags = [];
-    projRoleTags = [];
-    projMemberIds = new Set();
-    renderAssignmentSummary();
+    resetProjectForm();
     State.emit('data:projects:refresh');
     State.emit('data:employees:refresh');
   } catch (e) { showToast(e.message, 'error'); }
@@ -299,4 +315,7 @@ window._addProjToCanvas = async function(projId) {
 };
 
 // Called when project modal opens
-window._onAddProjectModalOpen = populateProjDropdowns;
+window._onAddProjectModalOpen = async function() {
+  resetProjectForm();
+  await populateProjDropdowns();
+};

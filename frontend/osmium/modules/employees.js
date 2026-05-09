@@ -33,7 +33,7 @@ export function initEmployees() {
   document.getElementById('emp-search-avail')?.addEventListener('change', doSearch);
   document.getElementById('add-emp-form')?.addEventListener('submit', e => { e.preventDefault(); submitEmployee(); });
   document.getElementById('new-emp-avatar')?.addEventListener('input', e => updateAvatarPreview(e.target.value));
-  document.getElementById('new-emp-role')?.addEventListener('input', () => renderProjectAssignmentSection());
+  document.getElementById('new-emp-role')?.addEventListener('change', () => renderProjectAssignmentSection());
   document.getElementById('new-emp-linkedin')?.addEventListener('input', e => {
     if (_looksLikeDirectImageUrl(e.target.value)) {
       const avatarInput = document.getElementById('new-emp-avatar');
@@ -345,6 +345,7 @@ async function submitEmployee() {
 function resetEmployeeForm() {
   editingEmployeeId = null;
   editingEmployeeProjects = [];
+  clearCustomRoleOption();
   document.getElementById('add-emp-form')?.reset();
   document.getElementById('new-emp-start').value = '09:00';
   document.getElementById('new-emp-end').value = '18:00';
@@ -364,7 +365,7 @@ async function openEditEmployeeModal(empId) {
   document.getElementById('add-emp-btn').textContent = 'Save Changes';
   document.getElementById('new-emp-name').value = emp.name || '';
   document.getElementById('new-emp-email').value = emp.email || '';
-  document.getElementById('new-emp-role').value = emp.role || '';
+  setRoleSelectValue(emp.role || '');
   document.getElementById('new-emp-team').value = emp.team || '';
   document.getElementById('new-emp-rating').value = emp.rating ?? '';
   document.getElementById('new-emp-exp').value = emp.total_experience_years ?? '';
@@ -386,6 +387,20 @@ async function openEditEmployeeModal(empId) {
   await populateProjectOptions();
   suppressEmployeeModalReset = true;
   openModal('add-employee-modal');
+}
+
+function clearCustomRoleOption() {
+  document.querySelectorAll('#new-emp-role option[data-custom="true"]').forEach(option => option.remove());
+}
+
+function setRoleSelectValue(role) {
+  const select = document.getElementById('new-emp-role');
+  if (!select) return;
+  clearCustomRoleOption();
+  if (role && ![...select.options].some(option => option.value === role)) {
+    select.insertAdjacentHTML('beforeend', `<option value="${escHtml(role)}" data-custom="true">${escHtml(role)}</option>`);
+  }
+  select.value = role;
 }
 
 async function removeEmployee(empId) {

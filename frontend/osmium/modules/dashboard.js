@@ -95,13 +95,17 @@ function renderDashboardLeaveHeatmap(el, records, totalEmployees) {
     }
   });
 
+  const pastWeeks = 18;
+  const futureWeeks = 8;
+  const totalWeeks = pastWeeks + futureWeeks;
+
   const startDate = new Date(today);
-  startDate.setDate(startDate.getDate() - 7 * 17);
+  startDate.setDate(startDate.getDate() - 7 * (pastWeeks - 1));
   startDate.setDate(startDate.getDate() - startDate.getDay());
 
   const weeks = [];
   const cursor = new Date(startDate);
-  for (let wi = 0; wi < 18; wi++) {
+  for (let wi = 0; wi < totalWeeks; wi++) {
     const week = [];
     for (let di = 0; di < 7; di++) {
       week.push(new Date(cursor));
@@ -144,7 +148,7 @@ function renderDashboardLeaveHeatmap(el, records, totalEmployees) {
       <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
         <div>
           <div style="font-size:0.82rem;font-weight:700;color:var(--gl-on-surface)">${activeToday} on leave today</div>
-          <div style="font-size:0.72rem;color:var(--gl-on-surface-4)">Last 18 weeks · today outlined</div>
+          <div style="font-size:0.72rem;color:var(--gl-on-surface-4)">Last ${pastWeeks} weeks + next ${futureWeeks} · today outlined</div>
         </div>
         <div style="display:flex;align-items:center;gap:5px;font-size:0.68rem;color:var(--gl-on-surface-4)">
           <span>Less</span>
@@ -227,7 +231,13 @@ async function loadCalendarWidget() {
   }
 
   if (!State.auth?.accessToken || !State.authProfile) {
-    renderCalendarSignedOut(el);
+    renderSevenDayCalendar(el, [], {
+      title: 'Google Calendar Sync',
+      message: 'Sign in again to connect your calendar.',
+      actionLabel: 'Sign in',
+      actionIcon: 'login',
+      action: "document.getElementById('auth-email')?.focus()",
+    });
     return;
   }
 
@@ -235,87 +245,39 @@ async function loadCalendarWidget() {
     const status = await getGoogleCalendarStatus();
     
     if (!status.connected) {
-      // Show connect button
-      el.innerHTML = `
-        <div style="padding:18px;text-align:center;color:var(--gl-on-surface-4)">
-          <span class="material-symbols-outlined" style="font-size:30px;display:block;margin-bottom:8px;color:#4285f4">calendar_month</span>
-          <div style="font-size:0.86rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:4px">Google Calendar Sync</div>
-          <div style="font-size:0.76rem;margin-bottom:12px">Connect to view your calendar events</div>
-          <button class="btn btn-secondary btn-sm" onclick="window._connectGoogleCalendar()">
-            <span class="material-symbols-outlined" style="font-size:14px">link</span>
-            Connect Calendar
-          </button>
-        </div>`;
+      renderSevenDayCalendar(el, [], {
+        title: 'Connect Calendar',
+        message: 'Connect to view your calendar events.',
+        actionLabel: 'Connect',
+        actionIcon: 'link',
+        action: 'window._connectGoogleCalendar()',
+      });
       return;
     }
 
     // Calendar is connected, load events
-    const response = await getGoogleCalendarEvents(30);
+    const response = await getGoogleCalendarEvents(7);
     const events = response.events || [];
-
-    if (events.length === 0) {
-      el.innerHTML = `
-        <div style="padding:18px;text-align:center;color:var(--gl-on-surface-4)">
-          <span class="material-symbols-outlined" style="font-size:30px;display:block;margin-bottom:8px;color:#4285f4">calendar_month</span>
-          <div style="font-size:0.86rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:4px">No upcoming events</div>
-          <button class="btn btn-secondary btn-sm" onclick="window._syncGoogleCalendar()">
-            <span class="material-symbols-outlined" style="font-size:14px">sync</span>
-            Refresh
-          </button>
-        </div>`;
-      return;
-    }
-
-    // Display events
-    const eventList = events.slice(0, 5).map(evt => {
-      const start = new Date(evt.start_time);
-      const end = new Date(evt.end_time);
-      const dateStr = start.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
-      const timeStr = start.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-      
-      return `
-        <div style="padding:12px 14px;border-radius:var(--r-md);background:var(--gl-surface-high);
-          border-left:3px solid #4285f4;cursor:pointer;margin-bottom:6px;transition:all 0.15s"
-          onmouseenter="this.style.background='var(--gl-surface-highest)'"
-          onmouseleave="this.style.background='var(--gl-surface-high)'"
-          onclick="${evt.event_url ? `window.open('${evt.event_url}', '_blank')` : ''} ">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
-            <div style="font-size:0.82rem;font-weight:600;color:var(--gl-on-surface);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%">${escHtml(evt.title)}</div>
-            <span style="font-size:0.7rem;color:var(--gl-on-surface-3);flex-shrink:0">${dateStr}</span>
-          </div>
-          <div style="font-size:0.75rem;color:var(--gl-on-surface-4)">${timeStr}</div>
-          ${evt.description ? `<div style="font-size:0.72rem;color:var(--gl-on-surface-4);margin-top:4px;line-height:1.3;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${escHtml(evt.description)}</div>` : ''}
-        </div>`;
-    }).join('');
-
-    el.innerHTML = `
-      <div style="padding:0">
-        <div style="padding:12px 14px;border-bottom:1px solid var(--gl-outline);display:flex;justify-content:space-between;align-items:center">
-          <div style="font-size:0.8rem;font-weight:600;color:var(--gl-on-surface-3)">UPCOMING EVENTS</div>
-          <button class="btn btn-icon btn-sm" onclick="window._syncGoogleCalendar()" style="padding:4px;min-width:32px">
-            <span class="material-symbols-outlined" style="font-size:16px">sync</span>
-          </button>
-        </div>
-        <div style="padding:12px 14px;max-height:280px;overflow-y:auto">
-          ${eventList}
-        </div>
-      </div>`;
+    renderSevenDayCalendar(el, events);
   } catch (err) {
     if (isAuthError(err)) {
-      renderCalendarSignedOut(el);
+      renderSevenDayCalendar(el, [], {
+        title: 'Google Calendar Sync',
+        message: 'Sign in again to connect your calendar.',
+        actionLabel: 'Sign in',
+        actionIcon: 'login',
+        action: "document.getElementById('auth-email')?.focus()",
+      });
       return;
     }
     console.error('Failed to load calendar widget:', err);
-    el.innerHTML = `
-      <div style="padding:18px;text-align:center;color:var(--gl-on-surface-4)">
-        <span class="material-symbols-outlined" style="font-size:30px;display:block;margin-bottom:8px;color:#4285f4">calendar_month</span>
-        <div style="font-size:0.86rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:4px">Calendar Error</div>
-        <div style="font-size:0.76rem;margin-bottom:12px">Could not load calendar</div>
-        <button class="btn btn-secondary btn-sm" onclick="window._connectGoogleCalendar()">
-          <span class="material-symbols-outlined" style="font-size:14px">link</span>
-          Try Again
-        </button>
-      </div>`;
+    renderSevenDayCalendar(el, [], {
+      title: 'Calendar Error',
+      message: 'Could not load calendar.',
+      actionLabel: 'Try Again',
+      actionIcon: 'sync',
+      action: 'window._syncGoogleCalendar()',
+    });
   }
 }
 
@@ -324,16 +286,96 @@ function isAuthError(err) {
   return msg.includes('unauthorized') || msg.includes('invalid or expired token') || msg.includes('401');
 }
 
-function renderCalendarSignedOut(el) {
+function renderSevenDayCalendar(el, events = [], notice = null) {
+  const today = todayLocalDate();
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(today);
+    day.setDate(today.getDate() + i);
+    return day;
+  });
+  const eventsByDay = groupEventsByDay(events, days);
+
+  const dayColumns = days.map(day => {
+    const key = dateKey(day);
+    const dayEvents = eventsByDay[key] || [];
+    const isToday = key === dateKey(today);
+    const dayName = day.toLocaleDateString('en-GB', { weekday: 'short' });
+    const monthName = day.toLocaleDateString('en-GB', { month: 'short' });
+    const eventPills = dayEvents.length
+      ? dayEvents.slice(0, 3).map(calendarEventPill).join('')
+      : `<div style="font-size:0.68rem;color:var(--gl-on-surface-4);margin-top:10px">No events</div>`;
+    const moreCount = dayEvents.length - 3;
+
+    return `
+      <div style="min-width:126px;min-height:154px;background:#211c2b;border-right:1px solid var(--gl-outline);border-top:${isToday ? '2px solid #4285f4' : '1px solid var(--gl-outline)'};padding:10px 8px 9px;display:flex;flex-direction:column">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+          <div style="font-size:0.68rem;font-weight:700;color:${isToday ? '#4285f4' : 'var(--gl-on-surface-4)'};text-transform:uppercase">${dayName}</div>
+          <div style="text-align:right">
+            <div style="font-size:1.22rem;line-height:1;font-weight:800;color:${isToday ? '#4285f4' : 'var(--gl-on-surface)'}">${day.getDate()}</div>
+            <div style="font-size:0.62rem;color:var(--gl-on-surface-4);margin-top:2px">${monthName}</div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;min-width:0">
+          ${eventPills}
+          ${moreCount > 0 ? `<div style="font-size:0.66rem;color:var(--gl-on-surface-4);padding:0 4px">+${moreCount} more</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
   el.innerHTML = `
-    <div style="padding:18px;text-align:center;color:var(--gl-on-surface-4)">
-      <span class="material-symbols-outlined" style="font-size:30px;display:block;margin-bottom:8px;color:#4285f4">calendar_month</span>
-      <div style="font-size:0.86rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:4px">Google Calendar Sync</div>
-      <div style="font-size:0.76rem;margin-bottom:12px">Sign in again to connect your calendar.</div>
-      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('auth-email')?.focus()">
-        <span class="material-symbols-outlined" style="font-size:14px">login</span>
-        Sign in
-      </button>
+    <div style="position:relative;overflow-x:auto;border-radius:0 0 var(--r-lg) var(--r-lg);padding-bottom:2px">
+      <div style="display:grid;grid-template-columns:repeat(7, minmax(126px, 1fr));min-width:882px;background:#211c2b">
+        ${dayColumns}
+      </div>
+      ${notice ? `
+        <div style="position:absolute;inset:1px 0 2px 0;display:flex;align-items:center;justify-content:center;background:rgba(31,31,34,0.72);backdrop-filter:blur(3px)">
+          <div style="text-align:center;color:var(--gl-on-surface-4);padding:14px 18px;border-radius:var(--r-md);background:rgba(44,44,48,0.88);border:1px solid var(--gl-outline)">
+            <span class="material-symbols-outlined" style="font-size:26px;display:block;margin-bottom:6px;color:#4285f4">calendar_month</span>
+            <div style="font-size:0.86rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:3px">${escHtml(notice.title)}</div>
+            <div style="font-size:0.74rem;margin-bottom:10px">${escHtml(notice.message)}</div>
+            <button class="btn btn-secondary btn-sm" onclick="${notice.action}">
+              <span class="material-symbols-outlined" style="font-size:14px">${escHtml(notice.actionIcon)}</span>
+              ${escHtml(notice.actionLabel)}
+            </button>
+          </div>
+        </div>` : ''}
+    </div>`;
+}
+
+function groupEventsByDay(events, days) {
+  const dayKeys = new Set(days.map(dateKey));
+  return events.reduce((acc, evt) => {
+    if (!evt.start_time) return acc;
+    const start = parseCalendarDateTime(evt.start_time);
+    if (!start) return acc;
+    const key = dateKey(start);
+    if (!dayKeys.has(key)) return acc;
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(evt);
+    return acc;
+  }, {});
+}
+
+function parseCalendarDateTime(value) {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return parseLocalDate(value);
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function calendarEventPill(evt) {
+  const start = parseCalendarDateTime(evt.start_time);
+  const isAllDay = /^\d{4}-\d{2}-\d{2}$/.test(evt.start_time || '');
+  const time = start && !isAllDay
+    ? start.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+    : 'All day';
+  return `
+    <div data-url="${escHtml(evt.event_url || '')}"
+      onclick="if(this.dataset.url) window.open(this.dataset.url, '_blank')"
+      title="${escHtml(`${time} · ${evt.title || 'Untitled'}`)}"
+      style="height:24px;border-radius:12px;background:#1f6f48;color:#35d07f;display:flex;align-items:center;gap:4px;padding:0 8px;font-size:0.72rem;font-weight:700;line-height:1;min-width:0;cursor:${evt.event_url ? 'pointer' : 'default'};overflow:hidden">
+      <span class="material-symbols-outlined" style="font-size:12px;flex:0 0 auto">calendar_month</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(evt.title || 'Untitled')}</span>
     </div>`;
 }
 
