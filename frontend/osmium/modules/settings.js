@@ -5,7 +5,7 @@
 
 import { State } from '../utils/state.js';
 import { applyTheme } from './ui.js';
-import { checkHealth, invalidateApiCache } from './api.js?v=20260509-4';
+import { checkHealth, invalidateApiCache } from './api.js?v=20260509-5';
 import { showToast } from './ui.js';
 
 export function initSettings() {

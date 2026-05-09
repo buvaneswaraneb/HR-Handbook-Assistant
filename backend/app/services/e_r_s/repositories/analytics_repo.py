@@ -1,5 +1,8 @@
 from __future__ import annotations
+from datetime import date
 from supabase import Client
+
+from app.services.e_r_s.repositories.leave_repo import app_today
 
 
 class AnalyticsRepository:
@@ -7,14 +10,27 @@ class AnalyticsRepository:
         self.db = db
 
     def employee_counts(self, workplace_id: str | None = None) -> dict:
-        q = self.db.table("employees").select("availability")
+        q = self.db.table("employees").select("id, availability")
         if workplace_id:
             q = q.eq("workplace_id", workplace_id)
         rows = q.execute().data
+        active_leave_ids = self.active_leave_employee_ids(app_today(), workplace_id)
         total = len(rows)
-        available = sum(1 for r in rows if r["availability"])
-        on_leave = total - available
+        available = sum(1 for r in rows if r["availability"] and r.get("id") not in active_leave_ids)
+        on_leave = len(active_leave_ids)
         return {"total": total, "available": available, "on_leave": on_leave}
+
+    def active_leave_employee_ids(self, day: date, workplace_id: str | None = None) -> set[str]:
+        q = (
+            self.db.table("leave_records")
+            .select("employee_id")
+            .lte("start_date", day.isoformat())
+            .gte("end_date", day.isoformat())
+        )
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
+        rows = q.execute().data
+        return {row["employee_id"] for row in rows if row.get("employee_id")}
 
     def active_project_count(self, workplace_id: str | None = None) -> int:
         q = self.db.table("projects").select("id").eq("status", "active")

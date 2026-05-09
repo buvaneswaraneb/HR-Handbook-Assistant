@@ -18,6 +18,7 @@ GET  /health              Health check
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import logging
 import os
 import sys
@@ -229,6 +230,27 @@ def _ingestion_response(result: IngestionResult, started_at: float) -> IngestRes
     )
 
 
+def _ensure_upload_was_ingested(filename: str, ingestion: IngestionResult) -> None:
+    if filename in ingestion.failed:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Upload saved to cache, but ingestion failed for {filename}. Cloudinary upload was skipped.",
+        )
+
+    if filename not in ingestion.processed and filename not in ingestion.skipped:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Upload saved to cache, but {filename} was not digested. "
+                "Only readable PDF files are uploaded to Cloudinary after ingestion succeeds."
+            ),
+        )
+
+
+def _file_hash(contents: bytes) -> str:
+    return hashlib.sha256(contents).hexdigest()
+
+
 # ── upload → ingest → Cloudinary ──────────────────────────────────────────────
 @app.post("/upload", status_code=201)
 async def upload_file(
@@ -257,13 +279,12 @@ async def upload_file(
     cache_path = upload_cache_dir / filename
     cache_path.write_bytes(contents)
 
+    if _store is not None:
+        _store.delete_by_doc_hash(_file_hash(contents), workplace_id=workplace_id)
+
     t0 = time.perf_counter()
     ingestion = _run_ingestion_job(cache_dir=upload_cache_dir, workplace_id=workplace_id)
-    if filename in ingestion.failed:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Upload saved, but ingestion failed for {filename}. Cloudinary upload was skipped.",
-        )
+    _ensure_upload_was_ingested(filename, ingestion)
 
     try:
         cloudinary_file = file_svc.upload_file_bytes(

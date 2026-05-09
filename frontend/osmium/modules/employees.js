@@ -6,8 +6,8 @@ import { State } from '../utils/state.js';
 import {
   getEmployees, getEmployee, searchEmployees, createEmployee, updateEmployee, deleteEmployee,
   getProjects, assignToProject, unassignFromProject, resolveLinkedInAvatar
-} from './api.js?v=20260509-4';
-import { escHtml, ratingStars, avatarMarkup, initials, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js';
+} from './api.js?v=20260509-5';
+import { escHtml, ratingStars, avatarMarkup, initials, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js?v=20260509-3';
 import { showToast, openModal, closeModal } from './ui.js';
 import { addEmployeeToCanvas } from './canvas.js';
 
@@ -17,6 +17,10 @@ let editingEmployeeId = null;
 let suppressEmployeeModalReset = false;
 let availableProjects = [];
 let editingEmployeeProjects = [];
+
+function isManagerRole(role) {
+  return /\bmanager\b/i.test(String(role || '').trim());
+}
 
 export function initEmployees() {
   State.on('view:employees', loadEmployees);
@@ -147,7 +151,7 @@ function renderProjectAssignmentSection() {
     ? (State.employees.find(emp => emp.id === editingEmployeeId) || null)
     : null;
   const employeeRole = (document.getElementById('new-emp-role')?.value || currentEmployee?.role || '').trim().toLowerCase();
-  const isManager = employeeRole === 'manager';
+  const isManager = isManagerRole(employeeRole);
   const hasExistingAssignments = editingEmployeeProjects.length > 0;
 
   section.style.display = editingEmployeeId ? 'block' : 'none';
@@ -329,6 +333,7 @@ async function submitEmployee() {
       await createEmployee(body);
       showToast('Employee created!');
     }
+    await getEmployees({ cache: false }).catch(() => null);
     closeModal('add-employee-modal');
     resetEmployeeForm();
     State.emit('data:employees:refresh');
@@ -459,7 +464,7 @@ window._assignEditingEmployeeToProject = async function() {
     };
     if (existingIndex >= 0) editingEmployeeProjects.splice(existingIndex, 1, assignment);
     else editingEmployeeProjects.push(assignment);
-    if ((document.getElementById('new-emp-role')?.value || '').trim().toLowerCase() !== 'manager') {
+    if (!isManagerRole(document.getElementById('new-emp-role')?.value)) {
       document.getElementById('new-emp-avail').checked = false;
     }
     renderProjectAssignmentSection();

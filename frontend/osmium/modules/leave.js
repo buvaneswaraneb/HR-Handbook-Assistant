@@ -4,8 +4,8 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getAnalytics, getLeaveRecords, createLeaveRecord, deleteLeaveRecord, getEmployees } from './api.js?v=20260509-4';
-import { escHtml, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js';
+import { getAnalytics, getLeaveRecords, createLeaveRecord, deleteLeaveRecord, getEmployees } from './api.js?v=20260509-5';
+import { dateKey, escHtml, fmtDate, emptyState, parseLocalDate, skeletonRows, todayLocalDate } from '../utils/helpers.js?v=20260509-3';
 import { showToast, openModal, closeModal } from './ui.js';
 
 export function initLeave() {
@@ -22,7 +22,7 @@ export function initLeave() {
 
 async function populateLeaveEmployeeDropdown() {
   try {
-    const emps = State.employees.length ? State.employees : await getEmployees();
+    const emps = await getEmployees({ cache: false });
     const select = document.getElementById('leave-emp-select');
     if (!select) return;
     
@@ -39,13 +39,13 @@ export async function loadLeave() {
 }
 
 // ─── CALENDAR HEATMAP ─────────────────────────────────────────
-async function loadLeaveCalendar() {
+async function loadLeaveCalendar(options = {}) {
   const container = document.getElementById('leave-calendar');
   if (!container) return;
 
   try {
     const [records, analytics] = await Promise.all([
-      getLeaveRecords(),
+      getLeaveRecords(options),
       getAnalytics().catch(() => ({}))
     ]);
 
@@ -64,10 +64,10 @@ function renderCalendarHeatmap(container, records, totalEmployees, selectedYear)
   const leaveByDate = {};
   records.forEach(rec => {
     if (!rec.start_date || !rec.end_date) return;
-    const start = new Date(rec.start_date);
-    const end = new Date(rec.end_date);
+    const start = parseLocalDate(rec.start_date);
+    const end = parseLocalDate(rec.end_date);
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-      const key = d.toISOString().slice(0, 10);
+      const key = dateKey(d);
       leaveByDate[key] = (leaveByDate[key] || 0) + 1;
     }
   });
@@ -79,8 +79,8 @@ function renderCalendarHeatmap(container, records, totalEmployees, selectedYear)
   // Align start to Sunday
   startDate.setDate(startDate.getDate() - startDate.getDay());
   
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = todayLocalDate();
+  const todayKey = dateKey(today);
 
   const weeks = [];
   let current = new Date(startDate);
@@ -114,7 +114,7 @@ function renderCalendarHeatmap(container, records, totalEmployees, selectedYear)
   let cellsHtml = '';
   weeks.forEach((week, wi) => {
     week.forEach((day, di) => {
-      const key = day.toISOString().slice(0, 10);
+      const key = dateKey(day);
       const count = leaveByDate[key] || 0;
       const pct = (count / totalEmployees) * 100;
       const isPast = day < today;
@@ -141,7 +141,9 @@ function renderCalendarHeatmap(container, records, totalEmployees, selectedYear)
       }
 
       cellsHtml += `<div
-        style="grid-column:${wi + 2};grid-row:${di + 2};width:13px;height:13px;border-radius:2px;background:${bg};opacity:${opacity};cursor:${count > 0 ? 'pointer' : 'default'};transition:opacity 0.15s;border:${isPast ? '1px solid var(--gl-on-surface-4)' : '1px solid transparent'}"
+        data-date="${key}"
+        ${key === todayKey ? 'data-today="true"' : ''}
+        style="grid-column:${wi + 2};grid-row:${di + 2};width:13px;height:13px;border-radius:2px;background:${bg};opacity:${opacity};cursor:${count > 0 ? 'pointer' : 'default'};transition:opacity 0.15s;border:${key === todayKey ? '2px solid var(--gl-primary)' : isPast ? '1px solid var(--gl-on-surface-4)' : '1px solid transparent'}"
         title="${escHtml(title)}"
         onmouseenter="this.style.opacity='${isFuture ? '0.8' : '0.7'}'"
         onmouseleave="this.style.opacity='${opacity}'">
@@ -191,6 +193,11 @@ function renderCalendarHeatmap(container, records, totalEmployees, selectedYear)
       </div>
     </div>
     ${legendHtml}`;
+
+  requestAnimationFrame(() => {
+    const todayCell = container.querySelector('[data-today="true"]');
+    todayCell?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  });
 }
 
 window._changeLeaveCalendarYear = async function(year) {
@@ -205,13 +212,13 @@ window._changeLeaveCalendarYear = async function(year) {
 
 
 // ─── LEAVE LIST ───────────────────────────────────────────────
-async function loadLeaveList() {
+async function loadLeaveList(options = {}) {
   const list = document.getElementById('leave-list');
   if (!list) return;
   list.innerHTML = skeletonRows(5, '56px');
 
   try {
-    const records = await getLeaveRecords();
+    const records = await getLeaveRecords(options);
     if (!records.length) {
       list.innerHTML = emptyState('event_busy', 'No leave records', 'Add leave records to track absences.');
       return;
@@ -223,9 +230,9 @@ async function loadLeaveList() {
 }
 
 function leaveRow(r) {
-  const today = new Date();
-  const start = new Date(r.start_date);
-  const end = new Date(r.end_date);
+  const today = todayLocalDate();
+  const start = parseLocalDate(r.start_date);
+  const end = parseLocalDate(r.end_date);
   const isActive = start <= today && end >= today;
   const isUpcoming = start > today;
 
@@ -260,7 +267,7 @@ async function submitLeave() {
   };
 
   if (!body.start_date || !body.end_date) { showToast('Dates required.', 'error'); return; }
-  if (new Date(body.start_date) > new Date(body.end_date)) { showToast('End date must be on or after the start date.', 'error'); return; }
+  if (parseLocalDate(body.start_date) > parseLocalDate(body.end_date)) { showToast('End date must be on or after the start date.', 'error'); return; }
   if (!body.employee_name && !body.employee_id) { showToast('Employee required.', 'error'); return; }
 
   const btn = document.getElementById('leave-submit-btn');
@@ -270,8 +277,9 @@ async function submitLeave() {
     await createLeaveRecord(body);
     showToast('Leave record added!');
     closeModal('add-leave-modal');
-    State.emit('data:leave:refresh');
+    await Promise.all([loadLeaveCalendar({ cache: false }), loadLeaveList({ cache: false })]);
     State.emit('data:employees:refresh');
+    State.emit('data:projects:refresh');
   } catch (e) { showToast(e.message, 'error'); }
   finally { if (btn) { btn.textContent = 'Add Leave'; btn.disabled = false; } }
 }
@@ -281,7 +289,8 @@ window._deleteLeave = async function(id) {
   try {
     await deleteLeaveRecord(id);
     showToast('Leave record deleted.');
-    State.emit('data:leave:refresh');
+    await Promise.all([loadLeaveCalendar({ cache: false }), loadLeaveList({ cache: false })]);
     State.emit('data:employees:refresh');
+    State.emit('data:projects:refresh');
   } catch (e) { showToast(e.message, 'error'); }
 };

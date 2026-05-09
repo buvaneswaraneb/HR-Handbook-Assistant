@@ -3,8 +3,8 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getFiles, uploadFile, deleteFile } from './api.js?v=20260509-4';
-import { escHtml, fmtBytes, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js';
+import { getFiles, uploadFile, deleteFile } from './api.js?v=20260509-5';
+import { escHtml, fmtBytes, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js?v=20260509-3';
 import { showToast } from './ui.js';
 
 let pendingFile = null;

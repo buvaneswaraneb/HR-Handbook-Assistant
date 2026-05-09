@@ -4,9 +4,9 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getAnalytics, getProjects, getGoogleCalendarStatus, getGoogleCalendarEvents, syncCalendarEvents, getGoogleCalendarAuthUrl, handleGoogleCalendarCallback } from './api.js?v=20260509-4';
+import { getAnalytics, getProjects, getGoogleCalendarStatus, getGoogleCalendarEvents, syncCalendarEvents, getGoogleCalendarAuthUrl, handleGoogleCalendarCallback } from './api.js?v=20260509-5';
 import { showToast } from './ui.js';
-import { escHtml, fmtDate } from '../utils/helpers.js';
+import { escHtml, fmtDate } from '../utils/helpers.js?v=20260509-3';
 
 const FRONTEND_AUTH_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
 

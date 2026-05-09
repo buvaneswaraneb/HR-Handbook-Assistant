@@ -193,7 +193,7 @@ def _validate_assignment(
 
 
 def _is_manager_employee(employee: dict) -> bool:
-    return (employee.get("role") or "").strip().lower() == "manager"
+    return "manager" in (employee.get("role") or "").strip().lower().split()
 
 
 def _employee_relation_update(

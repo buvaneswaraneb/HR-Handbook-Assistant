@@ -11,6 +11,7 @@ import requests
 from app.services.e_r_s.db import get_db
 from app.services.e_r_s import file_service
 from app.services.e_r_s.repositories.employee_repo import EmployeeRepository
+from app.services.e_r_s.repositories.leave_repo import LeaveRepository, app_today
 from app.services.e_r_s.repositories.skill_repo import SkillRepository
 from app.services.e_r_s.schemas import (
     EmployeeCreate, EmployeeUpdate, AvailabilityUpdate,
@@ -33,11 +34,22 @@ def _repos():
     return EmployeeRepository(db), SkillRepository(db)
 
 
+def _active_leave_employee_ids(workplace_id: str | None = None) -> set[str]:
+    return LeaveRepository(get_db()).active_employee_ids(app_today(), workplace_id)
+
+
+def _apply_leave_availability(emp: dict, active_leave_ids: set[str]) -> dict:
+    if emp.get("id") not in active_leave_ids:
+        return emp
+    return {**emp, "availability": False, "on_leave_today": True}
+
+
 @cached(ttl_seconds=30, key_prefix="list_employees")
 def list_employees(workplace_id: str | None = None) -> list[dict]:
     emp_repo, _ = _repos()
+    active_leave_ids = _active_leave_employee_ids(workplace_id)
     employees = emp_repo.get_all(workplace_id)
-    return [_enrich(e, emp_repo) for e in employees]
+    return [_enrich(_apply_leave_availability(e, active_leave_ids), emp_repo) for e in employees]
 
 
 @cached(ttl_seconds=30, key_prefix="get_employee")
@@ -46,7 +58,7 @@ def get_employee(emp_id: str, workplace_id: str | None = None) -> dict:
     emp = emp_repo.get_by_id(emp_id, workplace_id)
     if not emp:
         raise ValueError(f"Employee {emp_id} not found")
-    return _enrich(emp, emp_repo)
+    return _enrich(_apply_leave_availability(emp, _active_leave_employee_ids(workplace_id)), emp_repo)
 
 
 def create_employee(data: EmployeeCreate, workplace_id: str | None = None) -> dict:
@@ -134,9 +146,16 @@ def search_employees(filters: dict, workplace_id: str | None = None) -> list[dic
 
     # skill filter requires join — handled separately
     skill_name = filters.pop("skill", None)
+    availability_filter = filters.pop("availability", None)
     if workplace_id:
         filters["workplace_id"] = workplace_id
     employees = emp_repo.search(filters)
+    active_leave_ids = _active_leave_employee_ids(workplace_id)
+    employees = [_apply_leave_availability(e, active_leave_ids) for e in employees]
+    if availability_filter is True:
+        employees = [e for e in employees if e.get("availability")]
+    elif availability_filter is False:
+        employees = [e for e in employees if not e.get("availability")]
 
     if skill_name:
         emp_ids = skill_repo.get_employee_ids_by_skill(skill_name)

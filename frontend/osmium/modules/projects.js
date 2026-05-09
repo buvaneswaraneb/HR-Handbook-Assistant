@@ -3,8 +3,8 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getEmployees, getProjects, createProject, assignToProject } from './api.js?v=20260509-4';
-import { escHtml, fmtDate, statusBadge, initials, avatarColor, avatarTextColor, emptyState, skeletonRows } from '../utils/helpers.js';
+import { getEmployees, getProjects, createProject, assignToProject } from './api.js?v=20260509-5';
+import { escHtml, fmtDate, statusBadge, initials, avatarColor, avatarTextColor, emptyState, skeletonRows } from '../utils/helpers.js?v=20260509-3';
 import { showToast, openModal, closeModal } from './ui.js';
 import { addProjectTreeToCanvas } from './canvas.js';
 
@@ -14,7 +14,7 @@ let projRoleTags  = [];
 let projMemberIds = new Set();
 
 function isManagerEmployee(emp) {
-  return String(emp?.role || '').trim().toLowerCase() === 'manager';
+  return /\bmanager\b/i.test(String(emp?.role || '').trim());
 }
 
 function isAssignableNonManager(emp) {
@@ -77,7 +77,7 @@ window._removeTag = function(inputId, idx) {
 
 async function populateProjDropdowns() {
   try {
-    const emps = State.employees.length ? State.employees : await getEmployees();
+    const emps = await getEmployees({ cache: false });
     const managerSel = document.getElementById('proj-manager');
     const teamLeadSel = document.getElementById('proj-teamlead');
     const memberList  = document.getElementById('proj-member-list');
@@ -94,7 +94,10 @@ async function populateProjDropdowns() {
         .map(e => `<option value="${e.id}">${escHtml(e.name)} – ${escHtml(e.role || '—')}</option>`)
         .join('');
 
-    if (managerSel) managerSel.innerHTML = managerOpts;
+    if (managerSel) {
+      managerSel.innerHTML = managerOpts;
+      managerSel.title = emps.some(isManagerEmployee) ? '' : 'Create an employee with role Manager first';
+    }
     if (teamLeadSel) teamLeadSel.innerHTML = contributorOpts;
 
     if (memberList) {
@@ -112,6 +115,12 @@ async function populateProjDropdowns() {
             </div>
           </label>`;
       }).join('') : `<div style="font-size:0.74rem;color:var(--gl-on-surface-4)">No available contributors right now.</div>`;
+    }
+    if (!emps.some(isManagerEmployee) && memberList) {
+      memberList.insertAdjacentHTML('afterbegin', `
+        <div style="font-size:0.74rem;color:var(--gl-warning);margin-bottom:8px">
+          No managers available. Add an employee with role Manager to fill the manager field.
+        </div>`);
     }
     renderAssignmentSummary();
   } catch {}

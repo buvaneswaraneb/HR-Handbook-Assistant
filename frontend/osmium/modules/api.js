@@ -221,8 +221,8 @@ export async function getAnalytics() {
 }
 
 // ─── EMPLOYEES ───────────────────────────────────────────────
-export async function getEmployees() {
-  const data = await request('/employees');
+export async function getEmployees(options = {}) {
+  const data = await request('/employees', options);
   const list = data.employees || data || [];
   State.set('employees', list);
   return list;
@@ -359,8 +359,8 @@ export async function queryRAG(question, fileIds = []) {
 }
 
 // ─── LEAVE MANAGEMENT ─────────────────────────────────────────
-export async function getLeaveRecords() {
-  const data = await request('/leave');
+export async function getLeaveRecords(options = {}) {
+  const data = await request('/leave', options);
   return Array.isArray(data) ? data : (data.records || []);
 }
 

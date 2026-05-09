@@ -46,6 +46,8 @@ def create_leave(data: LeaveRecordCreate, workplace_id: str | None = None) -> di
         payload["workplace_id"] = workplace_id
     result = repo.create(payload)
     cache_clear("list_leave")
+    cache_clear("list_employees")
+    cache_clear("get_employee")
     return result
 
 
@@ -53,6 +55,8 @@ def delete_leave(leave_id: str, workplace_id: str | None = None) -> dict:
     repo = _repo()
     result = repo.delete(leave_id, workplace_id)
     cache_clear("list_leave")
+    cache_clear("list_employees")
+    cache_clear("get_employee")
     return result
 
 

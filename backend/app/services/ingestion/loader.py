@@ -8,7 +8,6 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator
@@ -17,8 +16,8 @@ import pypdf
 
 logger = logging.getLogger(__name__)
 
-RUNTIME_DIR = Path(os.getenv("HR_ASSISTANT_RUNTIME_DIR", Path(tempfile.gettempdir()) / "hr-assistant-runtime"))
-CACHE_DIR = Path(os.getenv("RAW_DOCS_CACHE_DIR", RUNTIME_DIR / "raw-docs-cache"))
+APP_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+CACHE_DIR = Path(os.getenv("RAW_DOCS_CACHE_DIR", APP_DATA_DIR / "raw-docs-cache"))
 
 
 @dataclass

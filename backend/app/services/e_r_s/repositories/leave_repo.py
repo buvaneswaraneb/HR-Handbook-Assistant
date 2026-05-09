@@ -1,6 +1,13 @@
 from __future__ import annotations
-from datetime import date
+import os
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 from supabase import Client
+
+
+def app_today() -> date:
+    timezone = os.getenv("APP_TIMEZONE", "Asia/Kolkata")
+    return datetime.now(ZoneInfo(timezone)).date()
 
 
 class LeaveRepository:
@@ -34,6 +41,18 @@ class LeaveRepository:
         if workplace_id:
             q = q.eq("workplace_id", workplace_id)
         return q.execute().data
+
+    def active_employee_ids(self, day: date, workplace_id: str | None = None) -> set[str]:
+        q = (
+            self.db.table("leave_records")
+            .select("employee_id")
+            .lte("start_date", day.isoformat())
+            .gte("end_date", day.isoformat())
+        )
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
+        rows = q.execute().data
+        return {row["employee_id"] for row in rows if row.get("employee_id")}
 
     def total_members(self, workplace_id: str | None = None) -> int:
         q = self.db.table("employees").select("id")

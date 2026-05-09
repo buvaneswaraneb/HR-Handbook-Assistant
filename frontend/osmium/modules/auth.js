@@ -5,8 +5,8 @@
 
 import { State } from '../utils/state.js';
 import { showToast } from './ui.js';
-import { escHtml } from '../utils/helpers.js';
-import { getAuthProfile, getEmailAuthStatus, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260509-4';
+import { escHtml } from '../utils/helpers.js?v=20260509-3';
+import { getAuthProfile, getEmailAuthStatus, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260509-5';
 
 let authPopup = null;
 let authReady = false;

@@ -926,7 +926,18 @@
               type="email" />
           </div>
           <div>
-            <div class="label">Role</div><input id="new-emp-role" class="input" placeholder="Backend Developer" />
+            <div class="label">Role</div>
+            <input id="new-emp-role" class="input" list="employee-role-options" placeholder="Backend Developer" />
+            <datalist id="employee-role-options">
+              <option value="Manager"></option>
+              <option value="Team Lead"></option>
+              <option value="Backend Developer"></option>
+              <option value="Frontend Developer"></option>
+              <option value="Full Stack Developer"></option>
+              <option value="Designer"></option>
+              <option value="QA Engineer"></option>
+              <option value="HR Specialist"></option>
+            </datalist>
           </div>
           <div>
             <div class="label">Team</div><input id="new-emp-team" class="input" placeholder="Platform" />
@@ -1168,8 +1179,8 @@
     import { initTree } from './modules/tree.js';
     import { initAI } from './modules/ai.js';
     import { initSettings } from './modules/settings.js';
-    import { initLeave } from './modules/leave.js';
-    import { debounce } from './utils/helpers.js';
+    import { initLeave } from './modules/leave.js?v=20260509-3';
+    import { debounce } from './utils/helpers.js?v=20260509-3';
     import { initAuth } from './modules/auth.js';
 
     // ── Load settings first ─────────────────────────
@@ -1208,7 +1219,7 @@
     // ── Global search ───────────────────────────────
     const searchDebounced = debounce(async q => {
       if (!q.trim() || q.length < 2) return;
-      const { searchEmployees } = await import('./modules/api.js?v=20260509-4');
+      const { searchEmployees } = await import('./modules/api.js?v=20260509-5');
       try {
         const results = await searchEmployees({ skill: q });
         if (results.length) { switchView('employees'); State.set('employees', results); State.emit('view:employees'); }
@@ -1220,7 +1231,7 @@
 
     // ── Populate canvas helper ───────────────────────
     window._populateCanvas = async function () {
-      const emps = State.employees.length ? State.employees : await (await import('./modules/api.js?v=20260509-4')).getEmployees();
+      const emps = State.employees.length ? State.employees : await (await import('./modules/api.js?v=20260509-5')).getEmployees();
       emps.slice(0, 16).forEach(e => addEmployeeToCanvas(e));
       renderNodes();
       showToast(`${Math.min(emps.length, 16)} employees added to canvas`);

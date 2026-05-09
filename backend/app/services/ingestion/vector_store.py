@@ -250,6 +250,81 @@ class VectorStore:
         logger.info("Deleted %d vectors for source %s", removed_count, source)
         return removed_count
 
+    def delete_by_doc_hash(self, doc_hash: str, workplace_id: str | None = None) -> int:
+        """
+        Remove every vector chunk and processed marker for a document hash.
+
+        Use this before replacing an uploaded document so the pipeline can
+        digest the same file contents again in the currently running process.
+        """
+        if not doc_hash:
+            return 0
+
+        processed_keys = {doc_hash, self._processed_key(doc_hash, workplace_id)}
+        removed_count = self._delete_matching(
+            lambda metadata: (
+                metadata.get("doc_hash") == doc_hash
+                and (workplace_id is None or metadata.get("workplace_id") == workplace_id)
+            ),
+            processed_keys=processed_keys,
+            description=f"hash {doc_hash[:8]}",
+        )
+
+        if removed_count == 0 and self._processed.intersection(processed_keys):
+            self._processed.difference_update(processed_keys)
+            self.save()
+            logger.info("Cleared processed marker for hash %s", doc_hash[:8])
+
+        return removed_count
+
+    def _delete_matching(self, predicate, processed_keys: set[str], description: str) -> int:
+        if self._index.ntotal == 0:
+            self._processed.difference_update(processed_keys)
+            return 0
+
+        if self._index.ntotal != len(self._metadata):
+            logger.warning(
+                "Vector metadata mismatch before deleting %s: index=%d metadata=%d",
+                description,
+                self._index.ntotal,
+                len(self._metadata),
+            )
+
+        limit = min(self._index.ntotal, len(self._metadata))
+        kept_vectors: list[np.ndarray] = []
+        kept_metadata: list[dict[str, Any]] = []
+        removed_count = 0
+
+        for idx, metadata in enumerate(self._metadata[:limit]):
+            if predicate(metadata):
+                removed_count += 1
+                continue
+
+            kept_vectors.append(np.asarray(self._index.reconstruct(idx), dtype=np.float32))
+            kept_metadata.append(metadata)
+
+        for metadata in self._metadata[limit:]:
+            if predicate(metadata):
+                removed_count += 1
+            else:
+                kept_metadata.append(metadata)
+
+        if removed_count == 0:
+            self._processed.difference_update(processed_keys)
+            return 0
+
+        new_index = faiss.IndexFlatIP(self._dim)
+        if kept_vectors:
+            new_index.add(np.vstack(kept_vectors).astype(np.float32))
+
+        self._index = new_index
+        self._metadata = kept_metadata
+        self._processed.difference_update(processed_keys)
+        self.save()
+
+        logger.info("Deleted %d vectors for %s", removed_count, description)
+        return removed_count
+
 
     # ── private ───────────────────────────────────────────────────────────────
     @staticmethod

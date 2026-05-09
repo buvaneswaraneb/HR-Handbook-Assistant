@@ -76,8 +76,8 @@ class IngestionPipeline:
             name = pdf_path.name
             try:
                 if not pages:
-                    logger.warning("%s yielded no extractable text — skipping", name)
-                    result.skipped.append(name)
+                    logger.warning("%s yielded no extractable text — failing ingestion", name)
+                    result.failed.append(name)
                     continue
 
                 doc_hash = pages[0].doc_hash
@@ -109,8 +109,7 @@ class IngestionPipeline:
         chunks = chunk_pages(pages, source=name, workplace_id=self._workplace_id)
 
         if not chunks:
-            logger.warning("[%s] produced 0 chunks after splitting", name)
-            return
+            raise ValueError(f"{name} produced 0 chunks after splitting")
 
         logger.info("[%s] %d chunks → embedding …", name, len(chunks))
         texts = [c.content for c in chunks]
