@@ -3,7 +3,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getFiles, uploadFile, deleteFile } from './api.js?v=20260509-2';
+import { getFiles, uploadFile, deleteFile } from './api.js?v=20260509-3';
 import { escHtml, fmtBytes, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js';
 import { showToast } from './ui.js';
 
@@ -51,6 +51,11 @@ export async function loadFiles(department) {
     btn.style.background = active ? 'var(--gl-primary-muted)' : 'var(--gl-surface-high)';
     btn.style.color = active ? 'var(--gl-primary-light)' : 'var(--gl-on-surface-3)';
   });
+
+  if (!State.authProfile) {
+    list.innerHTML = emptyState('lock', 'Sign in required', 'Sign in again to view uploaded files.');
+    return;
+  }
 
   list.innerHTML = skeletonRows(4, '56px');
 

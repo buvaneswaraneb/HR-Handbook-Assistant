@@ -68,6 +68,55 @@ function authHeaders() {
   return State.auth?.accessToken ? { Authorization: `Bearer ${State.auth.accessToken}` } : {};
 }
 
+function decodeJwtPayload(token) {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(atob(base64).split('').map(c => {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join('')));
+  } catch {
+    return {};
+  }
+}
+
+function authExpiresAt() {
+  if (State.auth?.expiresAt) {
+    const value = typeof State.auth.expiresAt === 'number'
+      ? State.auth.expiresAt
+      : Math.floor(new Date(State.auth.expiresAt).getTime() / 1000);
+    if (Number.isFinite(value)) return value;
+  }
+  const exp = decodeJwtPayload(State.auth?.accessToken || '').exp;
+  return Number.isFinite(exp) ? exp : null;
+}
+
+function clearAuthSession() {
+  localStorage.removeItem('osmium_auth_session');
+  State.set('auth', null);
+  State.set('authProfile', null);
+  State.resetWorkspaceData?.();
+  State.emit('auth:unauthorized');
+}
+
+function isPublicPath(path) {
+  return path === '/health' ||
+    path.startsWith('/auth/login') ||
+    path.startsWith('/auth/email/status') ||
+    path.startsWith('/auth/email/start') ||
+    path.startsWith('/auth/email/verify') ||
+    path.startsWith('/auth/google/calendar/callback');
+}
+
+function ensureValidAuthFor(path) {
+  if (isPublicPath(path)) return;
+  if (!State.auth?.accessToken) throw new Error('Sign in required');
+  const expiresAt = authExpiresAt();
+  if (expiresAt && expiresAt <= Math.floor(Date.now() / 1000) + 30) {
+    clearAuthSession();
+    throw new Error('Session expired. Sign in again.');
+  }
+}
+
 async function request(path, opts = {}) {
   const {
     cache: useCache = true,
@@ -79,6 +128,8 @@ async function request(path, opts = {}) {
   const method = (fetchOpts.method || 'GET').toUpperCase();
   const url = apiUrl(path);
   const key = cacheKey(path);
+
+  ensureValidAuthFor(path);
 
   if (method === 'GET' && useCache !== false) {
     const cached = cache.get(key);
@@ -107,11 +158,7 @@ async function request(path, opts = {}) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     if (res.status === 401) {
-      localStorage.removeItem('osmium_auth_session');
-      State.set('auth', null);
-      State.set('authProfile', null);
-      State.resetWorkspaceData?.();
-      State.emit('auth:unauthorized');
+      clearAuthSession();
     }
     throw new Error(err.detail || `HTTP ${res.status}`);
   }

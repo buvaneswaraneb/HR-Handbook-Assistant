@@ -6,7 +6,7 @@
 import { State } from '../utils/state.js';
 import { showToast } from './ui.js';
 import { escHtml } from '../utils/helpers.js';
-import { getAuthProfile, getEmailAuthStatus, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260509-2';
+import { getAuthProfile, getEmailAuthStatus, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260509-3';
 
 let authPopup = null;
 let authReady = false;
@@ -283,6 +283,7 @@ function applyPasswordSession(data) {
       name: [data.first_name, data.last_name].filter(Boolean).join(' ') || data.email,
     },
   };
+  State.set('authProfile', data);
   setAuthenticatedSession(auth);
   persistSession(auth);
   showToast('Signed in successfully.');

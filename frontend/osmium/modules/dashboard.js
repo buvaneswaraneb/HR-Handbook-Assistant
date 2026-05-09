@@ -4,7 +4,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getAnalytics, getProjects, getGoogleCalendarStatus, getGoogleCalendarEvents, syncCalendarEvents, getGoogleCalendarAuthUrl, handleGoogleCalendarCallback } from './api.js?v=20260509-2';
+import { getAnalytics, getProjects, getGoogleCalendarStatus, getGoogleCalendarEvents, syncCalendarEvents, getGoogleCalendarAuthUrl, handleGoogleCalendarCallback } from './api.js?v=20260509-3';
 import { showToast } from './ui.js';
 import { escHtml, fmtDate } from '../utils/helpers.js';
 
@@ -123,7 +123,7 @@ async function loadCalendarWidget() {
     dateHeader.textContent = today.toLocaleDateString('en-GB', { weekday: 'long', month: 'long', day: 'numeric' });
   }
 
-  if (!State.auth?.accessToken) {
+  if (!State.auth?.accessToken || !State.authProfile) {
     renderCalendarSignedOut(el);
     return;
   }
@@ -235,7 +235,7 @@ function renderCalendarSignedOut(el) {
 }
 
 window._connectGoogleCalendar = async function () {
-  if (!State.auth?.accessToken) {
+  if (!State.auth?.accessToken || !State.authProfile) {
     showToast('Sign in again before connecting Calendar.', 'error');
     return;
   }
@@ -264,7 +264,7 @@ window._connectGoogleCalendar = async function () {
 };
 
 window._syncGoogleCalendar = async function () {
-  if (!State.auth?.accessToken) {
+  if (!State.auth?.accessToken || !State.authProfile) {
     showToast('Sign in again before syncing Calendar.', 'error');
     return;
   }

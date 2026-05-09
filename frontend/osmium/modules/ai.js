@@ -4,7 +4,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { queryRAG, getFiles, deleteFile, uploadFile } from './api.js?v=20260509-2';
+import { queryRAG, getFiles, deleteFile, uploadFile } from './api.js?v=20260509-3';
 import { escHtml, fmtBytes, fmtDate } from '../utils/helpers.js';
 import { showToast } from './ui.js';
 
@@ -67,13 +67,16 @@ export function initAI() {
     if (State.currentView === 'ai') loadAIFiles();
   });
 
-  // Load right panel when view initialises
-  loadAIFiles();
+  if (State.currentView === 'ai') loadAIFiles();
 }
 
 // ─── FILE RIGHT PANEL ─────────────────────────────────────────
 export async function loadAIFiles() {
   if (!filesPanelEl) return;
+  if (!State.authProfile) {
+    filesPanelEl.innerHTML = `<div style="padding:16px;color:var(--gl-on-surface-4);font-size:0.8rem">Sign in to load files.</div>`;
+    return;
+  }
   try {
     const files = await getFiles();
     renderAIFilePanel(files);
