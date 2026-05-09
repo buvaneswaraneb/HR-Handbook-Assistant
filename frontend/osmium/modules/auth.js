@@ -12,6 +12,7 @@ let authPopup = null;
 let authReady = false;
 let signInResetTimer = null;
 let authEmailMode = 'email';
+const FRONTEND_AUTH_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
 
 /**
  * Decode a JWT payload (base64url) without verifying the signature.
@@ -243,7 +244,7 @@ async function signInEmail() {
       return;
     }
 
-    const redirectTo = window.location.origin + window.location.pathname;
+    const redirectTo = FRONTEND_AUTH_URL;
     await startEmailOtp(email, redirectTo);
     showToast('Check your inbox for the sign-in link.');
     if (btn) {
@@ -384,8 +385,8 @@ function showPasswordSetupDialog() {
 }
 
 function signInGoogle() {
-  const redirectTo = window.location.origin + window.location.pathname;
-  const url = `${State.apiBase}/auth/google/login?redirect_to=${encodeURIComponent(redirectTo)}`;
+  const redirectTo = FRONTEND_AUTH_URL;
+  const url = `${(State.apiBase || '').replace(/\/+$/, '')}/auth/google/login?redirect_to=${encodeURIComponent(redirectTo)}`;
   const width = 520;
   const height = 680;
   const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);

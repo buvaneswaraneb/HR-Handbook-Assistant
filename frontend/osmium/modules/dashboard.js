@@ -8,6 +8,8 @@ import { getAnalytics, getProjects, getGoogleCalendarStatus, getGoogleCalendarEv
 import { showToast } from './ui.js';
 import { escHtml, fmtDate } from '../utils/helpers.js';
 
+const FRONTEND_AUTH_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
+
 // ─── INIT ─────────────────────────────────────────────────────
 export function initDashboard() {
   State.on('view:dashboard', loadDashboard);
@@ -121,6 +123,11 @@ async function loadCalendarWidget() {
     dateHeader.textContent = today.toLocaleDateString('en-GB', { weekday: 'long', month: 'long', day: 'numeric' });
   }
 
+  if (!State.auth?.accessToken) {
+    renderCalendarSignedOut(el);
+    return;
+  }
+
   try {
     const status = await getGoogleCalendarStatus();
     
@@ -191,6 +198,10 @@ async function loadCalendarWidget() {
         </div>
       </div>`;
   } catch (err) {
+    if (isAuthError(err)) {
+      renderCalendarSignedOut(el);
+      return;
+    }
     console.error('Failed to load calendar widget:', err);
     el.innerHTML = `
       <div style="padding:18px;text-align:center;color:var(--gl-on-surface-4)">
@@ -205,9 +216,31 @@ async function loadCalendarWidget() {
   }
 }
 
+function isAuthError(err) {
+  const msg = String(err?.message || '').toLowerCase();
+  return msg.includes('unauthorized') || msg.includes('invalid or expired token') || msg.includes('401');
+}
+
+function renderCalendarSignedOut(el) {
+  el.innerHTML = `
+    <div style="padding:18px;text-align:center;color:var(--gl-on-surface-4)">
+      <span class="material-symbols-outlined" style="font-size:30px;display:block;margin-bottom:8px;color:#4285f4">calendar_month</span>
+      <div style="font-size:0.86rem;font-weight:700;color:var(--gl-on-surface);margin-bottom:4px">Google Calendar Sync</div>
+      <div style="font-size:0.76rem;margin-bottom:12px">Sign in again to connect your calendar.</div>
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('auth-email')?.focus()">
+        <span class="material-symbols-outlined" style="font-size:14px">login</span>
+        Sign in
+      </button>
+    </div>`;
+}
+
 window._connectGoogleCalendar = async function () {
+  if (!State.auth?.accessToken) {
+    showToast('Sign in again before connecting Calendar.', 'error');
+    return;
+  }
   try {
-    const callbackUrl = window.location.origin + window.location.pathname;
+    const callbackUrl = FRONTEND_AUTH_URL;
     const response = await getGoogleCalendarAuthUrl(callbackUrl);
     const popup = window.open(response.authorization_url, 'google-calendar-auth', 'width=600,height=600');
     
@@ -231,8 +264,13 @@ window._connectGoogleCalendar = async function () {
 };
 
 window._syncGoogleCalendar = async function () {
+  if (!State.auth?.accessToken) {
+    showToast('Sign in again before syncing Calendar.', 'error');
+    return;
+  }
+  let btn = null;
   try {
-    const btn = event?.target.closest('button');
+    btn = window.event?.target?.closest('button') || null;
     if (btn) btn.disabled = true;
     
     await syncCalendarEvents();

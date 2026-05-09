@@ -9,11 +9,24 @@ function authHeaders() {
   return State.auth?.accessToken ? { Authorization: `Bearer ${State.auth.accessToken}` } : {};
 }
 
+function apiBase() {
+  return (State.apiBase || '').trim().replace(/\/+$/, '');
+}
+
+function apiUrl(path) {
+  return `${apiBase()}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+function tunnelHeaders() {
+  return apiBase().includes('.ngrok-free.dev') ? { 'ngrok-skip-browser-warning': 'true' } : {};
+}
+
 async function request(path, opts = {}) {
-  const url = State.apiBase + path;
+  const { headers = {}, ...fetchOpts } = opts;
+  const url = apiUrl(path);
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(opts.headers || {}) },
-    ...opts,
+    ...fetchOpts,
+    headers: { 'Content-Type': 'application/json', ...tunnelHeaders(), ...authHeaders(), ...headers },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -183,9 +196,9 @@ export async function getFiles(department = null) {
 }
 
 export async function uploadFile(formData) {
-  const res = await fetch(State.apiBase + '/upload', {
+  const res = await fetch(apiUrl('/upload'), {
     method: 'POST',
-    headers: authHeaders(),
+    headers: { ...tunnelHeaders(), ...authHeaders() },
     body: formData,
   });
   if (!res.ok) {
