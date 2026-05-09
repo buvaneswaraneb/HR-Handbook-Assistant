@@ -1014,8 +1014,16 @@ body {
   filter: drop-shadow(0 0 0 var(--gl-primary)) drop-shadow(0 0 14px var(--gl-primary-glow));
 }
 
+.canvas-node.connect-target {
+  filter: drop-shadow(0 0 0 var(--gl-primary)) drop-shadow(0 0 18px rgba(90, 191, 232, 0.42));
+}
+
 .canvas-node-employee:hover,
 .canvas-node-employee.selected {
+  filter: none;
+}
+
+.canvas-node-employee.connect-target {
   filter: none;
 }
 
@@ -1026,6 +1034,11 @@ body {
 .canvas-node-employee.selected .employee-node-orb {
   border-color: #5abfe8;
   box-shadow: 0 0 0 3px rgba(90, 191, 232, 0.18), var(--shadow-lg);
+}
+
+.canvas-node-employee.connect-target .employee-node-orb {
+  border-color: #5abfe8;
+  box-shadow: 0 0 0 4px rgba(90, 191, 232, 0.22), 0 0 28px rgba(90, 191, 232, 0.34), var(--shadow-lg);
 }
 
 .canvas-node.dragging {
@@ -1357,6 +1370,9 @@ body {
   stroke-width: 1.5;
   fill: none;
   marker-end: url(#arrowhead);
+  stroke-dasharray: 7 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .canvas-edge.manager {
@@ -1379,7 +1395,6 @@ body {
 
 .canvas-edge.pending {
   stroke: var(--canvas-edge-strong);
-  stroke-dasharray: 6 5;
 }
 
 .canvas-edge.selected {
@@ -1403,6 +1418,10 @@ body {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
   opacity: 0.92;
   transition: transform 0.15s var(--ease-out), background 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.canvas-edge-delete[hidden] {
+  display: none !important;
 }
 
 .canvas-edge-delete:hover {

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID, uuid4
 from postgrest.exceptions import APIError
 from supabase import Client
@@ -78,7 +78,7 @@ class AuthRepository:
     def create_session(
         self, user_id: str, access_token: str, refresh_token: str | None = None, expires_in_hours: int = 24
     ) -> dict:
-        expires_at = (datetime.utcnow() + timedelta(hours=expires_in_hours)).isoformat()
+        expires_at = (datetime.now(timezone.utc) + timedelta(hours=expires_in_hours)).isoformat()
         payload = {
             "user_id": user_id,
             "access_token": access_token,
@@ -88,19 +88,24 @@ class AuthRepository:
         return self.db.table("sessions").insert(payload).execute().data[0]
 
     def get_session_by_token(self, access_token: str) -> dict | None:
-        res = (
-            self.db.table("sessions")
-            .select("*")
-            .eq("access_token", access_token)
-            .single()
-            .execute()
-        )
-        return res.data
+        try:
+            res = (
+                self.db.table("sessions")
+                .select("*")
+                .eq("access_token", access_token)
+                .single()
+                .execute()
+            )
+            return res.data
+        except APIError as exc:
+            if _is_no_rows_error(exc):
+                return None
+            raise
 
     def update_session_last_used(self, session_id: str) -> dict:
         return (
             self.db.table("sessions")
-            .update({"last_used_at": datetime.utcnow().isoformat()})
+            .update({"last_used_at": datetime.now(timezone.utc).isoformat()})
             .eq("id", session_id)
             .execute()
             .data[0]

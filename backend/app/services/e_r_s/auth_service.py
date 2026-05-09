@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from app.services.e_r_s.db import get_db
@@ -12,6 +12,27 @@ from app.services.e_r_s.auth_schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _session_expires_at(hours: int = 24) -> datetime:
+    return _utcnow() + timedelta(hours=hours)
+
+
+def _parse_utc_datetime(value) -> datetime | None:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        raw = str(value).replace("Z", "+00:00")
+        dt = datetime.fromisoformat(raw)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _auth_repo() -> AuthRepository:
@@ -59,7 +80,7 @@ def signup(data: SignupRequest) -> AuthResponse:
         employee_id=user.get("employee_id"),
         access_token=access_token,
         refresh_token=refresh_token,
-        expires_at=(datetime.utcnow() + timedelta(hours=24)).isoformat(),
+        expires_at=_session_expires_at(),
     )
 
 
@@ -93,7 +114,7 @@ def login(data: LoginRequest) -> AuthResponse:
         employee_id=user.get("employee_id"),
         access_token=access_token,
         refresh_token=refresh_token,
-        expires_at=(datetime.utcnow() + timedelta(hours=24)).isoformat(),
+        expires_at=_session_expires_at(),
     )
 
 
@@ -155,7 +176,7 @@ def handle_google_oauth(google_token: GoogleOAuthToken) -> AuthResponse:
         employee_id=user.get("employee_id"),
         access_token=access_token,
         refresh_token=refresh_token,
-        expires_at=(datetime.utcnow() + timedelta(hours=24)).isoformat(),
+        expires_at=_session_expires_at(),
     )
 
 
@@ -216,8 +237,8 @@ def get_current_user_from_token(access_token: str) -> dict | None:
 
     # Check if token expired
     if session.get("expires_at"):
-        expires_at = datetime.fromisoformat(session["expires_at"])
-        if datetime.utcnow() > expires_at:
+        expires_at = _parse_utc_datetime(session["expires_at"])
+        if expires_at and _utcnow() > expires_at:
             auth_repo.invalidate_session(access_token)
             return None
 
