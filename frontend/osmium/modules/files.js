@@ -3,7 +3,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getFiles, uploadFile, deleteFile } from './api.js';
+import { getFiles, uploadFile, deleteFile } from './api.js?v=20260509-2';
 import { escHtml, fmtBytes, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js';
 import { showToast } from './ui.js';
 

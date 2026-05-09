@@ -4,7 +4,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getEmployees } from './api.js';
+import { getEmployees } from './api.js?v=20260509-2';
 import { escHtml, initials, avatarColor, avatarTextColor, emptyState } from '../utils/helpers.js';
 
 export function initTree() {

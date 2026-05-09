@@ -4,7 +4,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getAnalytics, getLeaveRecords, createLeaveRecord, deleteLeaveRecord, getEmployees } from './api.js';
+import { getAnalytics, getLeaveRecords, createLeaveRecord, deleteLeaveRecord, getEmployees } from './api.js?v=20260509-2';
 import { escHtml, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js';
 import { showToast, openModal, closeModal } from './ui.js';
 

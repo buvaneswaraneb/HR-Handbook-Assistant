@@ -8,7 +8,7 @@ import { State } from '../utils/state.js';
 import { uid, clamp, snap, throttle } from '../utils/helpers.js';
 import { showContextMenu, showToast } from './ui.js';
 import { escHtml, initials, avatarColor, avatarTextColor } from '../utils/helpers.js';
-import { getEmployees, getProjects, assignToProject } from './api.js';
+import { getEmployees, getProjects, assignToProject } from './api.js?v=20260509-2';
 
 // Hierarchy maps per project: { projId: { managerId, teamLeadId, memberIds[] } }
 const projectAssignments = {};
