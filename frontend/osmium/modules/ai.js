@@ -11,6 +11,7 @@ import { showToast } from './ui.js';
 let messagesEl, inputEl, filesPanelEl;
 let injectedFiles = [];   // files currently "active" in context
 let pendingAttach = null; // file staged for upload
+let isSending = false;
 
 export function initAI() {
   messagesEl   = document.getElementById('ai-messages');
@@ -200,70 +201,84 @@ window._clearAttach = function() {
 
 // ─── SEND MESSAGE ─────────────────────────────────────────────
 async function sendMessage() {
+  if (isSending) return;
   const q = inputEl?.value.trim();
   if (!q && !pendingAttach) return;
 
-  // Upload attachment first if present
-  if (pendingAttach) {
-    const formData = new FormData();
-    formData.append('file', pendingAttach);
-    try {
-      const result = await uploadFile(formData);
-      if (result?.id) {
-        injectedFiles.push(result.id);
-        updateContextBadge();
-        loadAIFiles();
-        showToast(`"${pendingAttach.name}" uploaded & injected`);
-      }
-    } catch (e) {
-      showToast(`Upload failed: ${e.message}`, 'error');
-    }
-    window._clearAttach();
-  }
-
-  if (!q) return;
-  if (inputEl) inputEl.value = '';
-  inputEl.style.height = 'auto';
-
-  appendMsg('user', escHtml(q));
-
-  const thinkingEl = appendMsg('bot', `<span style="color:var(--gl-on-surface-4);font-style:italic">Thinking…</span>`);
-  scrollToBottom();
+  const sendBtn = document.getElementById('ai-send');
+  isSending = true;
+  if (sendBtn) sendBtn.disabled = true;
 
   try {
-    const data = await queryRAG(q, injectedFiles);
-    const answer = data.answer || '';
-
-    // Format answer with line breaks preserved
-    let html = `<div style="line-height:1.7;white-space:pre-wrap">${escHtml(answer)}</div>`;
-
-    const validSources = (data.sources || []).filter(s => (s.file || s.filename || s.source) && (s.page || s.page_number));
-    if (validSources.length) {
-      html += `<div class="ai-sources">
-        <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gl-on-surface-4);margin-bottom:8px">Sources</div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          ${validSources.map(s => {
-            const fileName = s.file || s.filename || s.source;
-            const page = s.page || s.page_number;
-            const snippet = s.preview || s.snippet || s.text || '';
-            return `<div class="ai-source-chip" style="display:block;line-height:1.45">
-              <div style="display:flex;align-items:center;gap:5px;font-weight:700">
-                <span class="material-symbols-outlined" style="font-size:12px">description</span>
-                ${escHtml(fileName)} · Page ${escHtml(String(page))}
-              </div>
-              ${snippet ? `<div style="margin-top:3px;color:var(--gl-on-surface-3);font-weight:400">${escHtml(String(snippet).slice(0, 180))}</div>` : ''}
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`;
+    // Upload attachment first if present
+    if (pendingAttach) {
+      const attachedName = pendingAttach.name;
+      const formData = new FormData();
+      formData.append('file', pendingAttach);
+      try {
+        const result = await uploadFile(formData);
+        if (result?.id) {
+          injectedFiles.push(result.id);
+          updateContextBadge();
+          loadAIFiles();
+          showToast(`"${attachedName}" uploaded & injected`);
+        }
+      } catch (e) {
+        showToast(`Upload failed: ${e.message}`, 'error');
+      }
+      window._clearAttach();
     }
 
-    thinkingEl.innerHTML = html;
-  } catch (e) {
-    thinkingEl.innerHTML = `<span style="color:#f5574a">Error: ${escHtml(e.message)}</span>`;
-  }
+    if (!q) return;
+    if (inputEl) inputEl.value = '';
+    inputEl.style.height = 'auto';
 
-  scrollToBottom();
+    appendMsg('user', escHtml(q));
+
+    const thinkingEl = appendMsg('bot', `<span style="color:var(--gl-on-surface-4);font-style:italic">Thinking…</span>`);
+    scrollToBottom();
+
+    try {
+      const data = await queryRAG(q, injectedFiles);
+      const answer = data.answer || '';
+
+      // Format answer with line breaks preserved
+      let html = `<div style="line-height:1.7;white-space:pre-wrap">${escHtml(answer)}</div>`;
+
+      const validSources = (data.sources || []).filter(s => {
+        const page = s.page ?? s.page_number;
+        return (s.file || s.filename || s.source) && page !== undefined && page !== null && page !== '';
+      });
+      if (validSources.length) {
+        html += `<div class="ai-sources">
+          <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gl-on-surface-4);margin-bottom:8px">Sources</div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            ${validSources.map(s => {
+              const fileName = s.file || s.filename || s.source;
+              const page = s.page ?? s.page_number;
+              const snippet = s.preview || s.snippet || s.text || '';
+              return `<div class="ai-source-chip" style="display:block;line-height:1.45">
+                <div style="display:flex;align-items:center;gap:5px;font-weight:700">
+                  <span class="material-symbols-outlined" style="font-size:12px">description</span>
+                  ${escHtml(fileName)} · Page ${escHtml(String(page))}
+                </div>
+                ${snippet ? `<div style="margin-top:3px;color:var(--gl-on-surface-3);font-weight:400">${escHtml(String(snippet).slice(0, 180))}</div>` : ''}
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }
+
+      thinkingEl.innerHTML = html;
+    } catch (e) {
+      thinkingEl.innerHTML = `<span style="color:#f5574a">Error: ${escHtml(e.message)}</span>`;
+    }
+
+    scrollToBottom();
+  } finally {
+    isSending = false;
+    if (sendBtn) sendBtn.disabled = false;
+  }
 }
 
 function triggerCloudDownload(url, filename) {

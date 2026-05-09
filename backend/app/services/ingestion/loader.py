@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator
@@ -15,11 +17,8 @@ import pypdf
 
 logger = logging.getLogger(__name__)
 
-# Anchor to backend/app/data/raw-docs-cache regardless of the working directory.
-# __file__ is  backend/app/services/ingestion/loader.py
-# → .parent.parent.parent  == backend/app
-# → / "data" / "raw-docs-cache" == backend/app/data/raw-docs-cache
-CACHE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "raw-docs-cache"
+RUNTIME_DIR = Path(os.getenv("HR_ASSISTANT_RUNTIME_DIR", Path(tempfile.gettempdir()) / "hr-assistant-runtime"))
+CACHE_DIR = Path(os.getenv("RAW_DOCS_CACHE_DIR", RUNTIME_DIR / "raw-docs-cache"))
 
 
 @dataclass

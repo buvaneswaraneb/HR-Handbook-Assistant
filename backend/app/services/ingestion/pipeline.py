@@ -56,10 +56,12 @@ class IngestionPipeline:
         cache_dir: Path = CACHE_DIR,
         embedder: Embedder | None = None,
         store: VectorStore | None = None,
+        workplace_id: str | None = None,
     ) -> None:
         self._cache_dir = cache_dir
         self._embedder = embedder or get_default_embedder()
         self._store = store or VectorStore(dim=self._embedder.dimension)
+        self._workplace_id = workplace_id
 
     # ── public ────────────────────────────────────────────────────────────────
     def run(self) -> IngestionResult:
@@ -80,7 +82,7 @@ class IngestionPipeline:
 
                 doc_hash = pages[0].doc_hash
 
-                if store.is_processed(doc_hash):
+                if store.is_processed(doc_hash, self._workplace_id):
                     logger.info("%s already ingested (hash %s) — skipping", name, doc_hash[:8])
                     result.skipped.append(name)
                     _safe_delete(pdf_path)   # clean up duplicate cache entry
@@ -104,7 +106,7 @@ class IngestionPipeline:
     def _ingest_document(self, pdf_path: Path, pages) -> None:
         name = pdf_path.name
         logger.info("[%s] chunking …", name)
-        chunks = chunk_pages(pages, source=name)
+        chunks = chunk_pages(pages, source=name, workplace_id=self._workplace_id)
 
         if not chunks:
             logger.warning("[%s] produced 0 chunks after splitting", name)
@@ -135,6 +137,7 @@ def run_ingestion(
     cache_dir: Path = CACHE_DIR,
     embedder: "Embedder | None" = None,
     store: "VectorStore | None" = None,
+    workplace_id: str | None = None,
 ) -> IngestionResult:
     """
     Module-level shortcut — create a pipeline and run it.
@@ -144,5 +147,5 @@ def run_ingestion(
     """
     from .embedder import Embedder       # avoid circular at module level  # noqa: F401
     from .vector_store import VectorStore  # noqa: F401
-    pipeline = IngestionPipeline(cache_dir=cache_dir, embedder=embedder, store=store)
+    pipeline = IngestionPipeline(cache_dir=cache_dir, embedder=embedder, store=store, workplace_id=workplace_id)
     return pipeline.run()

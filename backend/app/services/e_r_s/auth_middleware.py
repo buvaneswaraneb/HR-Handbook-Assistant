@@ -3,7 +3,8 @@ import os
 import logging
 import jwt
 from typing import Optional
-from datetime import datetime
+
+from app.services.e_r_s.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -12,9 +13,13 @@ class SupabaseAuthMiddleware:
     """Validate Supabase JWT tokens in Authorization header."""
 
     def __init__(self):
-        self.supabase_url = os.getenv("SUPABASE_URL", "")
-        self.supabase_key = os.getenv("SUPABASE_ANON_KEY", "")
-        self.jwt_secret = os.getenv("SUPABASE_JWT_SECRET", "")
+        settings = get_settings()
+        self.supabase_url = (os.getenv("SUPABASE_URL") or settings.supabase_url or "").rstrip("/")
+        self.supabase_key = os.getenv("SUPABASE_ANON_KEY") or settings.supabase_anon_key
+        self.jwt_secret = os.getenv("SUPABASE_JWT_SECRET") or settings.supabase_jwt_secret or ""
+        self.issuer = f"{self.supabase_url}/auth/v1" if self.supabase_url else None
+        self.jwks_url = f"{self.issuer}/.well-known/jwks.json" if self.issuer else None
+        self._jwks_client = jwt.PyJWKClient(self.jwks_url) if self.jwks_url else None
 
     def extract_token(self, authorization: Optional[str]) -> Optional[str]:
         """Extract Bearer token from Authorization header."""
@@ -30,30 +35,64 @@ class SupabaseAuthMiddleware:
         Verify Supabase JWT token.
         Returns decoded token if valid, None otherwise.
         """
-        if not token or not self.jwt_secret:
+        if not token:
             return None
 
         try:
-            # Decode JWT without verification first to get algorithm
-            unverified = jwt.decode(token, options={"verify_signature": False})
-            
-            # Verify with secret
-            decoded = jwt.decode(
-                token,
-                self.jwt_secret,
-                algorithms=["HS256"],
-                options={"verify_exp": True}
-            )
-            return decoded
+            header = jwt.get_unverified_header(token)
+            algorithm = header.get("alg")
+            if algorithm == "HS256":
+                return self._verify_hs256_token(token)
+            if algorithm in {"ES256", "RS256"}:
+                return self._verify_jwks_token(token, algorithm)
+
+            logger.warning("Unsupported Supabase token algorithm: %s", algorithm)
+            return None
         except jwt.ExpiredSignatureError:
             logger.warning("Token expired")
             return None
         except jwt.InvalidTokenError as e:
-            logger.warning(f"Invalid token: {e}")
+            logger.warning("Invalid token: %s", e)
             return None
         except Exception as e:
-            logger.warning(f"Token verification error: {e}")
+            logger.warning("Token verification error: %s", e)
             return None
+
+    def _verify_hs256_token(self, token: str) -> dict | None:
+        if not self.jwt_secret:
+            return None
+        return jwt.decode(
+            token,
+            self.jwt_secret,
+            algorithms=["HS256"],
+            audience="authenticated",
+            issuer=self.issuer,
+            options={"verify_exp": True, "verify_iss": bool(self.issuer)},
+        )
+
+    def _verify_jwks_token(self, token: str, algorithm: str) -> dict | None:
+        if not self._jwks_client:
+            return None
+        try:
+            signing_key = self._jwks_client.get_signing_key_from_jwt(token)
+            return jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=[algorithm],
+                audience="authenticated",
+                issuer=self.issuer,
+                options={"verify_exp": True, "verify_iss": bool(self.issuer)},
+            )
+        except jwt.InvalidAudienceError:
+            signing_key = self._jwks_client.get_signing_key_from_jwt(token)
+            decoded = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=[algorithm],
+                issuer=self.issuer,
+                options={"verify_exp": True, "verify_aud": False, "verify_iss": bool(self.issuer)},
+            )
+            return decoded
 
     def get_user_from_token(self, token: str) -> dict | None:
         """

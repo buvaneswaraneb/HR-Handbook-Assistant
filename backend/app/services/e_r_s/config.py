@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_key: str          # service-role key (bypasses RLS)xx
     supabase_anon_key: str = ""
+    supabase_jwt_secret: str = ""
     log_level: str = "INFO"
     groq_api_key: str = ""
     cloudinary_url: str = ""

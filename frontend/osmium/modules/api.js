@@ -17,6 +17,13 @@ async function request(path, opts = {}) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
+    if (res.status === 401) {
+      localStorage.removeItem('osmium_auth_session');
+      State.set('auth', null);
+      State.set('authProfile', null);
+      State.resetWorkspaceData?.();
+      State.emit('auth:unauthorized');
+    }
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
   if (res.status === 204) return null;

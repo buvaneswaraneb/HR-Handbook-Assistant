@@ -55,6 +55,7 @@ def _auth_response_from_supabase(auth_result) -> AuthResponse:
 
     return AuthResponse(
         user_id=user_id,
+        workplace_id=user_id,
         email=email,
         first_name=first_name,
         last_name=last_name,
@@ -179,6 +180,7 @@ def get_or_create_user_from_supabase(supabase_user_id: str, email: str) -> dict:
     from datetime import datetime
     user_data = {
         "id": supabase_user_id,
+        "workplace_id": supabase_user_id,
         "email": email,
         "first_name": email.split("@")[0].capitalize(),
         "last_name": "",
@@ -206,6 +208,9 @@ def link_user_to_employee(user_id: str, employee_id: str) -> dict:
     """Link authenticated user to an employee record."""
     auth_repo = _auth_repo()
     try:
+        employee = _emp_repo().get_by_id(employee_id, user_id)
+        if not employee:
+            raise ValueError("Employee not found in this workplace")
         return auth_repo.link_user_to_employee(user_id, employee_id)
     except Exception as e:
         raise ValueError(f"Could not link user to employee: {e}")
@@ -226,9 +231,10 @@ def get_user_workspace(user_id: str) -> dict:
     """Get the user's workspace/workplace info based on their employee record."""
     employee = get_user_employee(user_id)
     if not employee:
-        return {"workplace": None, "department": None, "team": None}
+        return {"workplace_id": user_id, "workplace": None, "department": None, "team": None}
 
     return {
+        "workplace_id": user_id,
         "employee_id": employee.get("id"),
         "name": employee.get("name"),
         "role": employee.get("role"),
@@ -248,6 +254,7 @@ def get_user_profile_from_supabase(supabase_user_id: str, email: str) -> UserPro
     
     return UserProfile(
         user_id=user["id"],
+        workplace_id=user["id"],
         email=user["email"],
         first_name=user.get("first_name"),
         last_name=user.get("last_name"),
@@ -269,4 +276,4 @@ def get_user_workspace_team(user_id: str) -> list[dict]:
 
     emp_repo = _emp_repo()
     # Get all employees in same team
-    return emp_repo.search({"team": employee["team"]})
+    return emp_repo.search({"team": employee["team"], "workplace_id": user_id})

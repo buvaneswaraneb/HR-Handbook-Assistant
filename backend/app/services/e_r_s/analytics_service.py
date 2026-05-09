@@ -4,13 +4,13 @@ from app.services.e_r_s.db import get_db
 from app.services.e_r_s.repositories.analytics_repo import AnalyticsRepository
 
 
-def get_summary() -> dict:
+def get_summary(workplace_id: str | None = None) -> dict:
     repo = AnalyticsRepository(get_db())
 
-    counts      = repo.employee_counts()
-    active_proj = repo.active_project_count()
-    required    = repo.required_skills()
-    actual_rows = repo.actual_skill_counts()
+    counts      = repo.employee_counts(workplace_id)
+    active_proj = repo.active_project_count(workplace_id)
+    required    = repo.required_skills(workplace_id)
+    actual_rows = repo.actual_skill_counts(workplace_id)
 
     # Build actual count map: skill_name → count of employees with that skill
     actual_map: dict[str, int] = defaultdict(int)
@@ -43,5 +43,5 @@ def get_summary() -> dict:
         "on_leave":         counts["on_leave"],
         "available":        counts["available"],
         "skill_coverage":   skill_coverage,
-        "google_calendar":  repo.google_calendar_status(),
+        "google_calendar":  repo.google_calendar_status(workplace_id),
     }

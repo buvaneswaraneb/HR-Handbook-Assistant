@@ -88,6 +88,26 @@ export const State = {
     this._persistSettings();
   },
 
+  resetWorkspaceData() {
+    this.employees = [];
+    this.projects = [];
+    this.files = [];
+    this.orgTree = null;
+    this.inspectorOpen = false;
+    this.inspectorTarget = null;
+    this.canvas.nodes = [];
+    this.canvas.groups = [];
+    this.canvas.edges = [];
+    this.canvas.selectedIds.clear();
+    this.canvas.selectedEdgeId = null;
+    this.emit('workspace:reset');
+    this.emit('change:employees', this.employees);
+    this.emit('change:projects', this.projects);
+    this.emit('change:files', this.files);
+    this.emit('canvas:nodes:change', this.canvas.nodes);
+    this.emit('canvas:edges:change', this.canvas.edges);
+  },
+
   _persistSettings() {
     try { localStorage.setItem('osmium_settings', JSON.stringify(this.settings)); } catch {}
   },

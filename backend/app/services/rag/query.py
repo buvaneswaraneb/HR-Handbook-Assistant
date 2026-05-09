@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -84,7 +85,12 @@ class HourlyRotatingHandler(logging.FileHandler):
 
 
 # ── configure logging ─────────────────────────────────────────────────────────
-LOGS_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
+LOGS_DIR = Path(
+    os.getenv(
+        "RAG_LOGS_DIR",
+        Path(tempfile.gettempdir()) / "hr-assistant-runtime" / "logs",
+    )
+)
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Configure root logger
@@ -226,7 +232,7 @@ class RAGQueryEngine:
                 "Export it: export GROQ_API_KEY=gsk_..."
             )
 
-    def query(self, question: str) -> QueryResult:
+    def query(self, question: str, workplace_id: str | None = None) -> QueryResult:
         if not question.strip():
             raise ValueError("Question cannot be empty.")
 
@@ -238,6 +244,7 @@ class RAGQueryEngine:
             vec,
             score_threshold=self._score_threshold,
             candidate_k=self._candidate_k,
+            workplace_id=workplace_id,
         )
         logger.info(
             "Retrieved %d relevant chunks (threshold=%.2f) for: %s",
@@ -451,10 +458,106 @@ def _parse_response(raw: str, chunks: list[dict]) -> QueryResult:
 
     return QueryResult(
         answer          = data.get("answer", ""),
-        sources         = data.get("sources", []),
-        context_preview = data.get("context_preview", []),
+        sources         = _normalize_sources(data.get("sources", []), chunks),
+        context_preview = _normalize_previews(data.get("context_preview", []), chunks),
         raw_chunks      = chunks,
     )
+
+
+def _normalize_sources(sources: object, chunks: list[dict]) -> list[dict]:
+    if not isinstance(sources, list):
+        return []
+
+    normalized = []
+    for source in sources:
+        if not isinstance(source, dict):
+            continue
+
+        matched_chunk = _find_chunk_for_citation(source, chunks)
+        file = source.get("file") or source.get("source") or (matched_chunk or {}).get("source")
+        page = _coerce_page(source.get("page"), matched_chunk)
+        chunk_id = source.get("chunk_id") or (matched_chunk or {}).get("chunk_id")
+
+        if not file or page is None or not chunk_id:
+            logger.warning("Dropping malformed source citation: %s", source)
+            continue
+
+        normalized.append({
+            "file": str(file),
+            "page": page,
+            "chunk_id": str(chunk_id),
+        })
+
+    return _dedupe_dicts(normalized, ("file", "page", "chunk_id"))
+
+
+def _normalize_previews(previews: object, chunks: list[dict]) -> list[dict]:
+    if not isinstance(previews, list):
+        return []
+
+    normalized = []
+    for preview in previews:
+        if not isinstance(preview, dict):
+            continue
+
+        matched_chunk = _find_chunk_for_citation(preview, chunks)
+        file = preview.get("file") or preview.get("source") or (matched_chunk or {}).get("source")
+        page = _coerce_page(preview.get("page"), matched_chunk)
+        text = preview.get("text") or (matched_chunk or {}).get("content", "")
+
+        if not file or page is None:
+            logger.warning("Dropping malformed context preview: %s", preview)
+            continue
+
+        normalized.append({
+            "text": str(text)[:200],
+            "file": str(file),
+            "page": page,
+        })
+
+    return _dedupe_dicts(normalized, ("text", "file", "page"))
+
+
+def _find_chunk_for_citation(citation: dict, chunks: list[dict]) -> dict | None:
+    chunk_id = citation.get("chunk_id")
+    file = citation.get("file") or citation.get("source")
+
+    if chunk_id:
+        for chunk in chunks:
+            if str(chunk.get("chunk_id", "")) == str(chunk_id):
+                return chunk
+
+    if file:
+        for chunk in chunks:
+            if str(chunk.get("source", "")) == str(file):
+                return chunk
+
+    if not chunk_id and not file and len(chunks) == 1:
+        return chunks[0]
+
+    return None
+
+
+def _coerce_page(value: object, matched_chunk: dict | None = None) -> int | None:
+    if value is None or value == "":
+        value = (matched_chunk or {}).get("page")
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _dedupe_dicts(items: list[dict], keys: tuple[str, ...]) -> list[dict]:
+    seen = set()
+    deduped = []
+    for item in items:
+        marker = tuple(item.get(key) for key in keys)
+        if marker in seen:
+            continue
+        seen.add(marker)
+        deduped.append(item)
+    return deduped
 
 
 def _estimate_token_count(system_prompt: str, question: str, context: str) -> int:

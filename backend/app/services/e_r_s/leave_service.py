@@ -12,9 +12,13 @@ def _repo() -> LeaveRepository:
 
 
 @cached(ttl_seconds=30, key_prefix="list_leave")
-def list_leave(start_date: date | None = None, end_date: date | None = None) -> list[dict]:
+def list_leave(
+    start_date: date | None = None,
+    end_date: date | None = None,
+    workplace_id: str | None = None,
+) -> list[dict]:
     repo = _repo()
-    rows = repo.get_records(start_date, end_date)
+    rows = repo.get_records(start_date, end_date, workplace_id)
     
     result = []
     for row in rows:
@@ -35,17 +39,19 @@ def list_leave(start_date: date | None = None, end_date: date | None = None) -> 
     return result
 
 
-def create_leave(data: LeaveRecordCreate) -> dict:
+def create_leave(data: LeaveRecordCreate, workplace_id: str | None = None) -> dict:
     repo = _repo()
     payload = data.model_dump(exclude_none=True, mode="json")
+    if workplace_id:
+        payload["workplace_id"] = workplace_id
     result = repo.create(payload)
     cache_clear("list_leave")
     return result
 
 
-def delete_leave(leave_id: str) -> dict:
+def delete_leave(leave_id: str, workplace_id: str | None = None) -> dict:
     repo = _repo()
-    result = repo.delete(leave_id)
+    result = repo.delete(leave_id, workplace_id)
     cache_clear("list_leave")
     return result
 

@@ -6,48 +6,48 @@ class AnalyticsRepository:
     def __init__(self, db: Client):
         self.db = db
 
-    def employee_counts(self) -> dict:
-        rows = self.db.table("employees").select("availability").execute().data
+    def employee_counts(self, workplace_id: str | None = None) -> dict:
+        q = self.db.table("employees").select("availability")
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
+        rows = q.execute().data
         total = len(rows)
         available = sum(1 for r in rows if r["availability"])
         on_leave = total - available
         return {"total": total, "available": available, "on_leave": on_leave}
 
-    def active_project_count(self) -> int:
-        rows = (
-            self.db.table("projects")
-            .select("id")
-            .eq("status", "active")
-            .execute()
-            .data
-        )
+    def active_project_count(self, workplace_id: str | None = None) -> int:
+        q = self.db.table("projects").select("id").eq("status", "active")
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
+        rows = q.execute().data
         return len(rows)
 
-    def required_skills(self) -> list[dict]:
-        return (
-            self.db.table("required_skills")
-            .select("department, head_count, skills(name)")
-            .execute()
-            .data
-        )
+    def required_skills(self, workplace_id: str | None = None) -> list[dict]:
+        q = self.db.table("required_skills").select("department, head_count, skills(name)")
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
+        return q.execute().data
 
-    def actual_skill_counts(self) -> list[dict]:
+    def actual_skill_counts(self, workplace_id: str | None = None) -> list[dict]:
         """Count distinct employees per skill."""
-        return (
-            self.db.table("employee_skills")
-            .select("skill_id, skills(name)")
-            .execute()
-            .data
-        )
+        q = self.db.table("employee_skills").select("employee_id, skill_id, skills(name)")
+        rows = q.execute().data
+        if not workplace_id:
+            return rows
 
-    def google_calendar_status(self) -> dict:
+        employee_ids = {
+            row["id"]
+            for row in self.db.table("employees").select("id").eq("workplace_id", workplace_id).execute().data
+        }
+        return [row for row in rows if row.get("employee_id") in employee_ids]
+
+    def google_calendar_status(self, workplace_id: str | None = None) -> dict:
         try:
-            rows = (
-                self.db.table("employees")
-                .select("google_calendar_sync_enabled, google_calendar_synced_at")
-                .execute()
-                .data
-            )
+            q = self.db.table("employees").select("google_calendar_sync_enabled, google_calendar_synced_at")
+            if workplace_id:
+                q = q.eq("workplace_id", workplace_id)
+            rows = q.execute().data
         except Exception:
             return {"synced": 0, "pending": 0, "last_synced_at": None}
 

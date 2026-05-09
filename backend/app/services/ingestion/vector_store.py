@@ -20,6 +20,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -30,11 +33,12 @@ from .chunker import Chunk
 
 logger = logging.getLogger(__name__)
 
-# Anchor to backend/app/data/faiss-store regardless of the working directory.
-# __file__ is  backend/app/services/ingestion/vector_store.py
-# → .parent.parent.parent  == backend/app
-# → / "data" / "faiss-store" == backend/app/data/faiss-store
-STORE_DIR      = Path(__file__).resolve().parent.parent.parent / "data" / "faiss-store"
+# Keep runtime writes outside backend/app so uvicorn --reload does not restart
+# whenever ingestion saves FAISS files.
+REPO_ROOT = Path(__file__).resolve().parents[4]
+LEGACY_STORE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "faiss-store"
+RUNTIME_DIR = Path(os.getenv("HR_ASSISTANT_RUNTIME_DIR", Path(tempfile.gettempdir()) / "hr-assistant-runtime"))
+STORE_DIR = Path(os.getenv("VECTOR_STORE_DIR", RUNTIME_DIR / "faiss-store"))
 INDEX_FILE     = STORE_DIR / "index.faiss"
 META_FILE      = STORE_DIR / "metadata.json"
 PROCESSED_FILE = STORE_DIR / "processed.json"
@@ -56,15 +60,17 @@ class VectorStore:
         self._dir = store_dir
         self._dim = dim
         self._dir.mkdir(parents=True, exist_ok=True)
+        self._migrate_legacy_store()
 
         self._index: faiss.Index = self._load_index()
+        self._dim = self._index.d
         self._metadata: list[dict[str, Any]] = self._load_metadata()
         self._processed: set[str] = self._load_processed()
 
     # ── public ────────────────────────────────────────────────────────────────
-    def is_processed(self, doc_hash: str) -> bool:
+    def is_processed(self, doc_hash: str, workplace_id: str | None = None) -> bool:
         """Return True if this document was already ingested (dedup guard)."""
-        return doc_hash in self._processed
+        return self._processed_key(doc_hash, workplace_id) in self._processed
 
     def add(self, chunks: list[Chunk], embeddings: np.ndarray) -> None:
         """
@@ -84,7 +90,7 @@ class VectorStore:
 
         # Mark doc hashes as processed
         for chunk in chunks:
-            self._processed.add(chunk.metadata["doc_hash"])
+            self._processed.add(self._processed_key(chunk.metadata["doc_hash"], chunk.metadata.get("workplace_id")))
 
         logger.info(
             "Added %d vectors — index total: %d", len(chunks), self._index.ntotal
@@ -101,9 +107,9 @@ class VectorStore:
         tmp_proc.write_text(json.dumps(sorted(self._processed), ensure_ascii=False))
         faiss.write_index(self._index, str(tmp_idx))
 
-        tmp_meta.replace(META_FILE)
-        tmp_proc.replace(PROCESSED_FILE)
-        tmp_idx.replace(INDEX_FILE)
+        tmp_meta.replace(self._meta_file)
+        tmp_proc.replace(self._processed_file)
+        tmp_idx.replace(self._index_file)
 
         logger.info("Vector store saved — %d vectors, %d docs processed",
                     self._index.ntotal, len(self._processed))
@@ -131,6 +137,7 @@ class VectorStore:
         query_vec: np.ndarray,
         score_threshold: float = 0.3,
         candidate_k: int | None = None,
+        workplace_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """
         Retrieve all chunks whose cosine similarity score >= score_threshold.
@@ -154,7 +161,7 @@ class VectorStore:
         if self._index.ntotal == 0:
             return []
 
-        k = candidate_k if candidate_k is not None else min(self._index.ntotal, 50)
+        k = self._index.ntotal if workplace_id else candidate_k if candidate_k is not None else min(self._index.ntotal, 50)
         k = min(k, self._index.ntotal)   # FAISS errors if k > ntotal
 
         scores, indices = self._index.search(query_vec.reshape(1, -1), k)
@@ -162,6 +169,8 @@ class VectorStore:
         results = []
         for score, idx in zip(scores[0], indices[0]):
             if idx < 0:
+                continue
+            if workplace_id and self._metadata[idx].get("workplace_id") != workplace_id:
                 continue
             if float(score) < score_threshold:
                 continue                  # below relevance bar — skip
@@ -177,21 +186,116 @@ class VectorStore:
         )
         return results
 
+    def delete_by_source(self, source: str, workplace_id: str | None = None) -> int:
+        """
+        Remove every vector chunk whose metadata source matches a file name.
+
+        FAISS flat indexes compact row ids after deletion, so rebuild the index
+        and metadata in the same pass to keep metadata rows aligned with vectors.
+        """
+        if not source or self._index.ntotal == 0:
+            return 0
+        if self._index.ntotal != len(self._metadata):
+            logger.warning(
+                "Vector metadata mismatch before deleting %s: index=%d metadata=%d",
+                source,
+                self._index.ntotal,
+                len(self._metadata),
+            )
+
+        limit = min(self._index.ntotal, len(self._metadata))
+        kept_vectors: list[np.ndarray] = []
+        kept_metadata: list[dict[str, Any]] = []
+        removed_hashes: set[str] = set()
+        removed_count = 0
+
+        for idx, metadata in enumerate(self._metadata[:limit]):
+            if metadata.get("source") == source and (workplace_id is None or metadata.get("workplace_id") == workplace_id):
+                removed_count += 1
+                doc_hash = metadata.get("doc_hash")
+                if isinstance(doc_hash, str):
+                    removed_hashes.add(doc_hash)
+                continue
+
+            kept_vectors.append(np.asarray(self._index.reconstruct(idx), dtype=np.float32))
+            kept_metadata.append(metadata)
+
+        for metadata in self._metadata[limit:]:
+            if metadata.get("source") == source and (workplace_id is None or metadata.get("workplace_id") == workplace_id):
+                removed_count += 1
+                doc_hash = metadata.get("doc_hash")
+                if isinstance(doc_hash, str):
+                    removed_hashes.add(doc_hash)
+            else:
+                kept_metadata.append(metadata)
+
+        if removed_count == 0:
+            logger.info("No vectors found for source %s", source)
+            return 0
+
+        new_index = faiss.IndexFlatIP(self._dim)
+        if kept_vectors:
+            new_index.add(np.vstack(kept_vectors).astype(np.float32))
+
+        remaining_hashes = {
+            metadata.get("doc_hash")
+            for metadata in kept_metadata
+            if isinstance(metadata.get("doc_hash"), str)
+        }
+        self._index = new_index
+        self._metadata = kept_metadata
+        self._processed.difference_update(removed_hashes - remaining_hashes)
+        self.save()
+
+        logger.info("Deleted %d vectors for source %s", removed_count, source)
+        return removed_count
+
 
     # ── private ───────────────────────────────────────────────────────────────
+    @staticmethod
+    def _processed_key(doc_hash: str, workplace_id: str | None = None) -> str:
+        return f"{workplace_id}:{doc_hash}" if workplace_id else doc_hash
+
+    @property
+    def _index_file(self) -> Path:
+        return self._dir / "index.faiss"
+
+    @property
+    def _meta_file(self) -> Path:
+        return self._dir / "metadata.json"
+
+    @property
+    def _processed_file(self) -> Path:
+        return self._dir / "processed.json"
+
     def _load_index(self) -> faiss.Index:
-        if INDEX_FILE.exists():
-            logger.info("Loading existing FAISS index from %s", INDEX_FILE)
-            return faiss.read_index(str(INDEX_FILE))
+        if self._index_file.exists():
+            logger.info("Loading existing FAISS index from %s", self._index_file)
+            return faiss.read_index(str(self._index_file))
         logger.info("Creating new FAISS IndexFlatIP (dim=%d)", self._dim)
         return faiss.IndexFlatIP(self._dim)
 
     def _load_metadata(self) -> list[dict[str, Any]]:
-        if META_FILE.exists():
-            return json.loads(META_FILE.read_text())
+        if self._meta_file.exists():
+            return json.loads(self._meta_file.read_text())
         return []
 
     def _load_processed(self) -> set[str]:
-        if PROCESSED_FILE.exists():
-            return set(json.loads(PROCESSED_FILE.read_text()))
+        if self._processed_file.exists():
+            return set(json.loads(self._processed_file.read_text()))
         return set()
+
+    def _migrate_legacy_store(self) -> None:
+        if self._dir == LEGACY_STORE_DIR:
+            return
+        if self._index_file.exists() or self._meta_file.exists() or self._processed_file.exists():
+            return
+        if not LEGACY_STORE_DIR.exists():
+            return
+
+        for filename in ("index.faiss", "metadata.json", "processed.json"):
+            legacy_file = LEGACY_STORE_DIR / filename
+            if legacy_file.exists():
+                shutil.copy2(legacy_file, self._dir / filename)
+
+        logger.info("Migrated legacy vector store from %s to %s", LEGACY_STORE_DIR, self._dir)

@@ -6,8 +6,10 @@ class ActivityRepository:
     def __init__(self, db: Client):
         self.db = db
 
-    def get_feed(self, department: str | None, limit: int) -> list[dict]:
+    def get_feed(self, department: str | None, limit: int, workplace_id: str | None = None) -> list[dict]:
         q = self.db.table("activities").select("*").order("created_at", desc=True).limit(limit)
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
         if department:
             q = q.eq("department", department)
         return q.execute().data

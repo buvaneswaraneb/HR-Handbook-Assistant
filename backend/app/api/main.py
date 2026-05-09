@@ -26,9 +26,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 # Load environment variables from .env file
 load_dotenv()
@@ -54,6 +54,7 @@ from app.services.ingestion.loader import CACHE_DIR                        # noq
 from app.services.ingestion.vector_store import VectorStore                # noqa: E402
 from app.services.e_r_s import file_service as file_svc                    # noqa: E402
 from app.services.rag import RAGQueryEngine                                # noqa: E402
+from app.api.auth_context import get_workplace_id                          # noqa: E402
 
 from app.api.routes import employees, projects, teams, activity, analytics, files, leave, auth, calendar, supabase_auth, google_calendar  # noqa: E402
 
@@ -84,6 +85,7 @@ _running: bool = False
 async def lifespan(app: FastAPI):
     global _store, _engine
     _store  = VectorStore()                        # loads existing FAISS index
+    app.state.vector_store = _store
     _engine = RAGQueryEngine(store=_store)         # caches embedding model
     logger.info("VectorStore loaded — %d vectors", _store.total_vectors)
     yield
@@ -142,15 +144,35 @@ class QueryRequest(BaseModel):
 
 
 class SourceItem(BaseModel):
-    file:     str
-    page:     int
-    chunk_id: str
+    file:     str = "unknown"
+    page:     int = 0
+    chunk_id: str = ""
+
+    @field_validator("page", mode="before")
+    @classmethod
+    def default_missing_page(cls, value):
+        if value in (None, ""):
+            return 0
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
 
 
 class PreviewItem(BaseModel):
-    text: str
-    file: str
-    page: int
+    text: str = ""
+    file: str = "unknown"
+    page: int = 0
+
+    @field_validator("page", mode="before")
+    @classmethod
+    def default_missing_page(cls, value):
+        if value in (None, ""):
+            return 0
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
 
 
 class QueryResponse(BaseModel):
@@ -159,7 +181,26 @@ class QueryResponse(BaseModel):
     context_preview: list[PreviewItem]
 
 
-def _run_ingestion_job() -> IngestionResult:
+def _safe_source_items(items: object) -> list[SourceItem]:
+    safe_items = []
+    for item in items if isinstance(items, list) else []:
+        if isinstance(item, dict):
+            safe_items.append(SourceItem(**item))
+    return safe_items
+
+
+def _safe_preview_items(items: object) -> list[PreviewItem]:
+    safe_items = []
+    for item in items if isinstance(items, list) else []:
+        if isinstance(item, dict):
+            safe_items.append(PreviewItem(**item))
+    return safe_items
+
+
+def _run_ingestion_job(
+    cache_dir: Path = CACHE_DIR,
+    workplace_id: str | None = None,
+) -> IngestionResult:
     """
     Run ingestion against the live VectorStore used by the query engine.
     This keeps newly uploaded documents queryable without restarting the API.
@@ -173,7 +214,7 @@ def _run_ingestion_job() -> IngestionResult:
 
     _running = True
     try:
-        return run_ingestion(store=_store)
+        return run_ingestion(cache_dir=cache_dir, store=_store, workplace_id=workplace_id)
     finally:
         _running = False
 
@@ -196,6 +237,7 @@ async def upload_file(
     department: str | None = Form(None),
     uploaded_by: str | None = Form(None),
     description: str | None = Form(None),
+    authorization: str | None = Header(None),
 ):
     """
     Save the uploaded file to the local RAG cache, ingest the cache, then upload
@@ -204,17 +246,19 @@ async def upload_file(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
 
+    workplace_id = get_workplace_id(authorization)
     filename = os.path.basename(file.filename)
     contents = await file.read()
     if not contents:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")
 
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    cache_path = CACHE_DIR / filename
+    upload_cache_dir = CACHE_DIR / (workplace_id or "anonymous")
+    upload_cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path = upload_cache_dir / filename
     cache_path.write_bytes(contents)
 
     t0 = time.perf_counter()
-    ingestion = _run_ingestion_job()
+    ingestion = _run_ingestion_job(cache_dir=upload_cache_dir, workplace_id=workplace_id)
     if filename in ingestion.failed:
         raise HTTPException(
             status_code=500,
@@ -230,6 +274,7 @@ async def upload_file(
             department=department,
             uploaded_by=uploaded_by,
             description=description,
+            workplace_id=workplace_id,
         )
     except Exception as exc:
         logger.exception("Cloudinary upload failed for %s: %s", filename, exc)
@@ -254,13 +299,15 @@ async def upload_file(
 
 # ── ingestion endpoints ───────────────────────────────────────────────────────
 @app.post("/ingest", response_model=IngestResponse)
-async def trigger_ingestion():
+async def trigger_ingestion(authorization: str | None = Header(None)):
     """
     Ingest all PDFs currently sitting in data/raw-docs-cache/.
     Runs synchronously in the request (suitable for small batches).
     """
     t0 = time.perf_counter()
-    result = _run_ingestion_job()
+    workplace_id = get_workplace_id(authorization)
+    cache_dir = CACHE_DIR / workplace_id if workplace_id else CACHE_DIR
+    result = _run_ingestion_job(cache_dir=cache_dir, workplace_id=workplace_id)
     return _ingestion_response(result, t0)
 
 
@@ -277,7 +324,7 @@ async def store_status():
 
 # ── RAG query endpoint ────────────────────────────────────────────────────────
 @app.post("/query", response_model=QueryResponse)
-async def query_endpoint(body: QueryRequest):
+async def query_endpoint(body: QueryRequest, authorization: str | None = Header(None)):
     """Ask a natural-language question; returns an LLM answer with citations."""
     if _engine is None:
         raise HTTPException(status_code=503, detail="Query engine not initialised")
@@ -287,8 +334,9 @@ async def query_endpoint(body: QueryRequest):
             detail="No documents ingested yet. POST to /ingest first.",
         )
 
+    workplace_id = get_workplace_id(authorization)
     try:
-        result = _engine.query(body.question)
+        result = _engine.query(body.question, workplace_id=workplace_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
@@ -297,8 +345,8 @@ async def query_endpoint(body: QueryRequest):
 
     return QueryResponse(
         answer          = result.answer,
-        sources         = [SourceItem(**s) for s in result.sources],
-        context_preview = [PreviewItem(**p) for p in result.context_preview],
+        sources         = _safe_source_items(result.sources),
+        context_preview = _safe_preview_items(result.context_preview),
     )
 
 

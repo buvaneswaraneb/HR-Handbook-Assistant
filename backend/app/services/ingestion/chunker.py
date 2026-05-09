@@ -46,7 +46,7 @@ class Chunk:
 
 
 # ── public API ────────────────────────────────────────────────────────────────
-def chunk_pages(pages: list[PageRecord], source: str) -> list[Chunk]:
+def chunk_pages(pages: list[PageRecord], source: str, workplace_id: str | None = None) -> list[Chunk]:
     """
     Convert a document's pages into overlapping, semantically-aware chunks.
     Each chunk carries full provenance metadata.
@@ -66,6 +66,7 @@ def chunk_pages(pages: list[PageRecord], source: str) -> list[Chunk]:
                     "chunk_id":    chunk_id,
                     "token_count": _tok(raw_content),
                     "doc_hash":    page.doc_hash,
+                    "workplace_id": workplace_id,
                 },
             )
             chunks.append(chunk)

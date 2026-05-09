@@ -12,14 +12,19 @@ from app.services.e_r_s.config import get_settings
 from app.services.e_r_s.db import get_db
 from app.services.e_r_s.repositories.file_repo import FileRepository
 from app.services.e_r_s.schemas import FileLinkRequest
+from app.services.ingestion.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
 CLOUDINARY_PREFIX = "cloudinary://"
 
 
-def list_files(project_id: str | None = None, department: str | None = None) -> list[dict]:
-    records = FileRepository(get_db()).get_all(project_id, department)
+def list_files(
+    project_id: str | None = None,
+    department: str | None = None,
+    workplace_id: str | None = None,
+) -> list[dict]:
+    records = FileRepository(get_db()).get_all(project_id, department, workplace_id)
     return [_with_cloudinary_fields(record) for record in records]
 
 
@@ -29,6 +34,7 @@ def upload_file(
     department: str | None,
     uploaded_by: str | None,
     description: str | None,
+    workplace_id: str | None = None,
 ) -> dict:
     return upload_file_bytes(
         contents=file.file.read(),
@@ -38,6 +44,7 @@ def upload_file(
         department=department,
         uploaded_by=uploaded_by,
         description=description,
+        workplace_id=workplace_id,
     )
 
 
@@ -49,6 +56,7 @@ def upload_file_bytes(
     department: str | None = None,
     uploaded_by: str | None = None,
     description: str | None = None,
+    workplace_id: str | None = None,
 ) -> dict:
     if not contents:
         raise ValueError("Cannot upload an empty file")
@@ -74,6 +82,8 @@ def upload_file_bytes(
         "uploaded_by": uploaded_by,
         "description": description,
     }
+    if workplace_id:
+        record["workplace_id"] = workplace_id
     try:
         created = repo.create({k: v for k, v in record.items() if v is not None})
     except Exception:
@@ -117,23 +127,36 @@ def upload_cloudinary_bytes(
     }
 
 
-def link_file(file_id: str, data: FileLinkRequest) -> dict:
+def link_file(file_id: str, data: FileLinkRequest, workplace_id: str | None = None) -> dict:
     repo = FileRepository(get_db())
-    return _with_cloudinary_fields(repo.update(file_id, data.model_dump(exclude_none=True, mode="json")))
+    return _with_cloudinary_fields(repo.update(file_id, data.model_dump(exclude_none=True, mode="json"), workplace_id))
 
 
-def delete_file(file_id: str) -> None:
+def delete_file(
+    file_id: str,
+    vector_store: VectorStore | None = None,
+    workplace_id: str | None = None,
+) -> None:
     db   = get_db()
     repo = FileRepository(db)
-    rec  = repo.get_by_id(file_id)
+    rec  = repo.get_by_id(file_id, workplace_id)
     if rec:
+        filename = rec.get("filename")
+        if filename:
+            try:
+                store = vector_store or VectorStore()
+                removed_vectors = store.delete_by_source(filename, workplace_id=workplace_id)
+                logger.info("Deleted %d vector chunks for file %s", removed_vectors, filename)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Vector cleanup failed for %s: %s", filename, exc)
+
         resource_type, public_id = _parse_cloudinary_ref(rec.get("storage_path", ""))
         try:
             if public_id:
                 _destroy_cloudinary_asset(public_id, resource_type)
         except Exception as exc:
             logger.warning("Cloudinary delete failed for %s: %s", rec.get("storage_path"), exc)
-        repo.delete(file_id)
+        repo.delete(file_id, workplace_id)
 
 
 def _upload_to_cloudinary(

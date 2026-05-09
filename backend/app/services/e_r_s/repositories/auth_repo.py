@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 from postgrest.exceptions import APIError
 from supabase import Client
 import hashlib
@@ -32,7 +32,10 @@ class AuthRepository:
 
     def create_user(self, email: str, first_name: str, last_name: str, password: str) -> dict:
         password_hash = self._hash_password(password)
+        user_id = str(uuid4())
         payload = {
+            "id": user_id,
+            "workplace_id": user_id,
             "email": email,
             "password_hash": password_hash,
             "first_name": first_name,
@@ -43,7 +46,10 @@ class AuthRepository:
 
     def create_user_oauth_only(self, email: str, first_name: str, last_name: str) -> dict:
         """Create user account via Google OAuth (no password)."""
+        user_id = str(uuid4())
         payload = {
+            "id": user_id,
+            "workplace_id": user_id,
             "email": email,
             "first_name": first_name,
             "last_name": last_name,

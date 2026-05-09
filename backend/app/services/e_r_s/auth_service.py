@@ -52,6 +52,7 @@ def signup(data: SignupRequest) -> AuthResponse:
 
     return AuthResponse(
         user_id=user["id"],
+        workplace_id=user["id"],
         email=user["email"],
         first_name=user.get("first_name"),
         last_name=user.get("last_name"),
@@ -85,6 +86,7 @@ def login(data: LoginRequest) -> AuthResponse:
 
     return AuthResponse(
         user_id=user["id"],
+        workplace_id=user["id"],
         email=user["email"],
         first_name=user.get("first_name"),
         last_name=user.get("last_name"),
@@ -146,6 +148,7 @@ def handle_google_oauth(google_token: GoogleOAuthToken) -> AuthResponse:
 
     return AuthResponse(
         user_id=user["id"],
+        workplace_id=user["id"],
         email=user["email"],
         first_name=user.get("first_name"),
         last_name=user.get("last_name"),
@@ -167,6 +170,7 @@ def get_user_profile(user_id: str) -> UserProfile:
 
     return UserProfile(
         user_id=user["id"],
+        workplace_id=user["id"],
         email=user["email"],
         first_name=user.get("first_name"),
         last_name=user.get("last_name"),

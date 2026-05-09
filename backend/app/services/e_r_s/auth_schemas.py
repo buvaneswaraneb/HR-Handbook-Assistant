@@ -20,6 +20,7 @@ class SignupRequest(BaseModel):
 
 class AuthResponse(BaseModel):
     user_id: UUID
+    workplace_id: UUID
     email: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None
@@ -47,6 +48,7 @@ class GoogleCallbackRequest(BaseModel):
 # ── User Profile ──────────────────────────────────────────────────────────────
 class UserProfile(BaseModel):
     user_id: UUID
+    workplace_id: UUID
     email: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None

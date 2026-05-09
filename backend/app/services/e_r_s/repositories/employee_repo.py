@@ -10,12 +10,18 @@ class EmployeeRepository:
         self.db = db
 
     # ── core CRUD ─────────────────────────────────────────────────────────────
-    def get_all(self) -> list[dict]:
-        return self.db.table("employees").select("*").execute().data
+    def get_all(self, workplace_id: str | None = None) -> list[dict]:
+        q = self.db.table("employees").select("*")
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
+        return q.execute().data
 
-    def get_by_id(self, emp_id: str) -> dict | None:
-        res = self.db.table("employees").select("*").eq("id", emp_id).single().execute()
-        return res.data
+    def get_by_id(self, emp_id: str, workplace_id: str | None = None) -> dict | None:
+        q = self.db.table("employees").select("*").eq("id", emp_id)
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
+        rows = q.limit(1).execute().data
+        return rows[0] if rows else None
 
     def create(self, payload: dict) -> dict:
         try:
@@ -26,20 +32,31 @@ class EmployeeRepository:
                 raise
             return self.db.table("employees").insert(sanitized).execute().data[0]
 
-    def update(self, emp_id: str, payload: dict) -> dict:
+    def update(self, emp_id: str, payload: dict, workplace_id: str | None = None) -> dict:
         try:
-            return self.db.table("employees").update(payload).eq("id", emp_id).execute().data[0]
+            q = self.db.table("employees").update(payload).eq("id", emp_id)
+            if workplace_id:
+                q = q.eq("workplace_id", workplace_id)
+            return q.execute().data[0]
         except APIError as exc:
             sanitized = _without_unknown_avatar_column(payload, exc)
             if sanitized is None:
                 raise
-            return self.db.table("employees").update(sanitized).eq("id", emp_id).execute().data[0]
+            q = self.db.table("employees").update(sanitized).eq("id", emp_id)
+            if workplace_id:
+                q = q.eq("workplace_id", workplace_id)
+            return q.execute().data[0]
 
-    def delete(self, emp_id: str) -> None:
-        self.db.table("employees").delete().eq("id", emp_id).execute()
+    def delete(self, emp_id: str, workplace_id: str | None = None) -> None:
+        q = self.db.table("employees").delete().eq("id", emp_id)
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
+        q.execute()
 
     def search(self, filters: dict) -> list[dict]:
         q = self.db.table("employees").select("*")
+        if filters.get("workplace_id"):
+            q = q.eq("workplace_id", filters["workplace_id"])
         if filters.get("team"):
             q = q.eq("team", filters["team"])
         if filters.get("role"):
@@ -102,14 +119,11 @@ class EmployeeRepository:
         )
 
     # ── team tree ─────────────────────────────────────────────────────────────
-    def get_direct_reports(self, manager_id: str) -> list[dict]:
-        return (
-            self.db.table("employees")
-            .select("*")
-            .eq("manager_id", manager_id)
-            .execute()
-            .data
-        )
+    def get_direct_reports(self, manager_id: str, workplace_id: str | None = None) -> list[dict]:
+        q = self.db.table("employees").select("*").eq("manager_id", manager_id)
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
+        return q.execute().data
 
     def clear_manager_relations(self, manager_id: str) -> None:
         (

@@ -32,10 +32,11 @@ function decodeJwt(token) {
 export async function initAuth() {
   bindAuthForm();
   bindOAuthMessageHandler();
+  bindUnauthorizedHandler();
 
   if (await handleOAuthReturn()) return Boolean(State.auth?.accessToken);
 
-  restoreStoredSession();
+  await restoreStoredSession();
   authReady = true;
   renderAuthShell();
   return Boolean(State.auth?.accessToken);
@@ -67,6 +68,12 @@ function bindOAuthMessageHandler() {
     }
 
     await applyOAuthSession(event.data);
+  });
+}
+
+function bindUnauthorizedHandler() {
+  State.on('auth:unauthorized', () => {
+    renderAuthShell();
   });
 }
 
@@ -120,6 +127,7 @@ async function applyOAuthSession(session, provider = 'google') {
     accessToken: session.accessToken,
     refreshToken: session.refreshToken || null,
     expiresAt: session.expiresAt || null,
+    workplaceId: claims.sub || null,
     user: {
       id: claims.sub || null,
       email: jwtEmail || 'Google account',
@@ -128,7 +136,7 @@ async function applyOAuthSession(session, provider = 'google') {
     },
   };
 
-  State.set('auth', auth);
+  setAuthenticatedSession(auth);
   persistSession(auth);
   renderAuthShell();          // show name/avatar immediately from JWT
 
@@ -139,6 +147,7 @@ async function applyOAuthSession(session, provider = 'google') {
     State.set('authProfile', profile);
     const nextAuth = {
       ...auth,
+      workplaceId: profile.workplace_id || profile.user_id || auth.workplaceId,
       user: {
         id: profile.user_id || auth.user.id,
         email: profile.email || auth.user.email,
@@ -148,7 +157,7 @@ async function applyOAuthSession(session, provider = 'google') {
         avatar: profile.avatar_url || auth.user.avatar || null,
       },
     };
-    State.set('auth', nextAuth);
+    setAuthenticatedSession(nextAuth);
     persistSession(nextAuth);
     renderAuthShell();        // update again if backend enriched anything
   } catch (e) {
@@ -170,11 +179,40 @@ async function applyOAuthSession(session, provider = 'google') {
   window.loadDashboardGlobal?.();
 }
 
-function restoreStoredSession() {
+async function restoreStoredSession() {
   const saved = JSON.parse(localStorage.getItem('osmium_auth_session') || 'null');
   if (!saved?.accessToken) return;
-  State.set('auth', saved);
+
+  if (isSessionExpired(saved)) {
+    clearSession({ silent: true });
+    return;
+  }
+
+  setAuthenticatedSession(saved);
   renderAuthShell();
+
+  try {
+    const profile = await getAuthProfile();
+    State.set('authProfile', profile);
+    const nextAuth = {
+      ...saved,
+      workplaceId: profile.workplace_id || profile.user_id || saved.workplaceId,
+      user: {
+        ...(saved.user || {}),
+        id: profile.user_id || saved.user?.id || null,
+        email: profile.email || saved.user?.email || 'Account',
+        name: [profile.first_name, profile.last_name].filter(Boolean).join(' ')
+              || profile.email
+              || saved.user?.name
+              || 'Account',
+        avatar: profile.avatar_url || saved.user?.avatar || null,
+      },
+    };
+    setAuthenticatedSession(nextAuth);
+    persistSession(nextAuth);
+  } catch {
+    clearSession({ silent: true });
+  }
 }
 
 function persistSession(auth) {
@@ -237,13 +275,14 @@ function applyPasswordSession(data) {
     accessToken: data.access_token,
     refreshToken: data.refresh_token || null,
     expiresAt: data.expires_at || null,
+    workplaceId: data.workplace_id || data.user_id,
     user: {
       id: data.user_id,
       email: data.email,
       name: [data.first_name, data.last_name].filter(Boolean).join(' ') || data.email,
     },
   };
-  State.set('auth', auth);
+  setAuthenticatedSession(auth);
   persistSession(auth);
   showToast('Signed in successfully.');
   renderAuthShell();
@@ -371,11 +410,30 @@ export async function logout() {
   showToast('Signed out.');
 }
 
-function clearSession() {
+function clearSession(options = {}) {
   localStorage.removeItem('osmium_auth_session');
   State.set('auth', null);
   State.set('authProfile', null);
+  State.resetWorkspaceData?.();
   renderAuthShell();
+  if (!options.silent) window.switchViewGlobal?.('dashboard');
+}
+
+function setAuthenticatedSession(auth) {
+  const previousWorkplace = State.auth?.workplaceId || State.auth?.user?.id || null;
+  const nextWorkplace = auth?.workplaceId || auth?.user?.id || null;
+  if (previousWorkplace && nextWorkplace && previousWorkplace !== nextWorkplace) {
+    State.resetWorkspaceData?.();
+  }
+  State.set('auth', auth);
+}
+
+function isSessionExpired(auth) {
+  if (!auth?.expiresAt) return false;
+  const expiresAt = typeof auth.expiresAt === 'number'
+    ? auth.expiresAt
+    : Math.floor(new Date(auth.expiresAt).getTime() / 1000);
+  return Number.isFinite(expiresAt) && expiresAt <= Math.floor(Date.now() / 1000) + 30;
 }
 
 export function renderAuthShell() {
