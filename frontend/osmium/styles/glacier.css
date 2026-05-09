@@ -1386,6 +1386,37 @@ body {
   stroke: var(--gl-tertiary);
 }
 
+.canvas-edge-delete {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(245, 87, 74, 0.78);
+  background: color-mix(in srgb, var(--gl-surface-lowest) 88%, transparent);
+  color: var(--gl-error);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  z-index: 45;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+  opacity: 0.92;
+  transition: transform 0.15s var(--ease-out), background 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.canvas-edge-delete:hover {
+  transform: scale(1.12);
+  background: var(--gl-error);
+  color: #fff;
+  opacity: 1;
+}
+
+.light .canvas-edge-delete {
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 18px rgba(47, 80, 101, 0.18);
+}
+
 /* ─── INSPECTOR PANEL ─────────────────────────────────────── */
 #inspector {
   position: absolute;

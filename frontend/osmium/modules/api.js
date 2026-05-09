@@ -280,8 +280,8 @@ export async function getOrgTree(managerId) {
 }
 
 // ─── PROJECTS ────────────────────────────────────────────────
-export async function getProjects() {
-  const data = await request('/projects');
+export async function getProjects(options = {}) {
+  const data = await request('/projects', options);
   const list = Array.isArray(data) ? data : (data.projects || []);
   State.set('projects', list);
   return list;
