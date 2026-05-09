@@ -5,15 +5,100 @@
 
 import { State } from '../utils/state.js';
 
+const DEFAULT_GET_CACHE_TTL = 2 * 60 * 1000;
+const cache = new Map();
+const pendingGets = new Map();
+let cacheVersion = 0;
+
+function normalizedApiBase() {
+  return (State.apiBase || '').trim().replace(/\/+$/, '');
+}
+
+function apiUrl(path) {
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${normalizedApiBase()}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+function cloneData(data) {
+  if (data === null || data === undefined) return data;
+  if (typeof structuredClone === 'function') return structuredClone(data);
+  return JSON.parse(JSON.stringify(data));
+}
+
+function cacheKey(path) {
+  return `${normalizedApiBase()}${path}`;
+}
+
+export function invalidateApiCache(prefixes = []) {
+  const list = Array.isArray(prefixes) ? prefixes : [prefixes];
+  if (!list.length) {
+    cacheVersion += 1;
+    cache.clear();
+    pendingGets.clear();
+    return;
+  }
+
+  cacheVersion += 1;
+  for (const key of [...cache.keys()]) {
+    if (list.some(prefix => key.includes(prefix))) cache.delete(key);
+  }
+  for (const key of [...pendingGets.keys()]) {
+    if (list.some(prefix => key.includes(prefix))) pendingGets.delete(key);
+  }
+}
+
+function invalidationPrefixes(path) {
+  if (path.startsWith('/employees')) return ['/employees', '/projects', '/teams', '/analytics', '/leave'];
+  if (path.startsWith('/projects')) return ['/projects', '/employees', '/teams', '/analytics'];
+  if (path.startsWith('/files') || path.startsWith('/upload')) return ['/files'];
+  if (path.startsWith('/leave')) return ['/leave', '/analytics', '/employees'];
+  if (path.startsWith('/activity')) return ['/activity'];
+  if (path.startsWith('/auth/google/calendar') || path.startsWith('/calendar')) {
+    return ['/auth/google/calendar', '/calendar'];
+  }
+  if (path.startsWith('/auth')) return ['/auth'];
+  return [];
+}
+
 function authHeaders() {
   return State.auth?.accessToken ? { Authorization: `Bearer ${State.auth.accessToken}` } : {};
 }
 
 async function request(path, opts = {}) {
-  const url = State.apiBase + path;
+  const {
+    cache: useCache = true,
+    cacheTtl = DEFAULT_GET_CACHE_TTL,
+    invalidate = null,
+    headers = {},
+    ...fetchOpts
+  } = opts;
+  const method = (fetchOpts.method || 'GET').toUpperCase();
+  const url = apiUrl(path);
+  const key = cacheKey(path);
+
+  if (method === 'GET' && useCache !== false) {
+    const cached = cache.get(key);
+    if (cached && Date.now() - cached.time < cacheTtl) return cloneData(cached.data);
+
+    if (pendingGets.has(key)) return cloneData(await pendingGets.get(key));
+
+    const version = cacheVersion;
+    const pending = request(path, { ...fetchOpts, headers, cache: false });
+    pendingGets.set(key, pending);
+    try {
+      const data = await pending;
+      if (version === cacheVersion) {
+        cache.set(key, { data: cloneData(data), time: Date.now() });
+      }
+      return cloneData(data);
+    } finally {
+      pendingGets.delete(key);
+    }
+  }
+
   const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...(opts.headers || {}) },
-    ...opts,
+    ...fetchOpts,
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...headers },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -26,8 +111,14 @@ async function request(path, opts = {}) {
     }
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
+  if (method !== 'GET') {
+    invalidateApiCache(invalidate || invalidationPrefixes(path));
+  }
+
   if (res.status === 204) return null;
-  return res.json();
+  const data = await res.json();
+
+  return data;
 }
 
 // ─── HEALTH ──────────────────────────────────────────────────
@@ -61,7 +152,7 @@ export async function logoutBackend() {
 
 export async function checkHealth() {
   try {
-    await request('/health');
+    await request('/health', { cache: false });
     State.set('apiConnected', true);
     State.emit('api:status', 'ok');
     return true;
@@ -179,11 +270,13 @@ export async function postActivity(body) {
 export async function getFiles(department = null) {
   let url = '/files';
   if (department) url += `?department=${encodeURIComponent(department)}`;
-  return request(url);
+  const files = await request(url);
+  if (!department) State.set('files', files);
+  return files;
 }
 
 export async function uploadFile(formData) {
-  const res = await fetch(State.apiBase + '/upload', {
+  const res = await fetch(apiUrl('/upload'), {
     method: 'POST',
     headers: authHeaders(),
     body: formData,
@@ -192,7 +285,9 @@ export async function uploadFile(formData) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
-  return res.json();
+  const data = await res.json();
+  invalidateApiCache(invalidationPrefixes('/upload'));
+  return data;
 }
 
 export async function deleteFile(id) {

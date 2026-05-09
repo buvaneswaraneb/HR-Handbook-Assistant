@@ -63,6 +63,9 @@ export function initAI() {
     loadAIFiles();
     inputEl?.focus();
   });
+  State.on('data:files:refresh', () => {
+    if (State.currentView === 'ai') loadAIFiles();
+  });
 
   // Load right panel when view initialises
   loadAIFiles();
@@ -162,7 +165,7 @@ window._deleteAIFile = async function(fileId) {
     await deleteFile(fileId);
     injectedFiles = injectedFiles.filter(id => id !== fileId);
     showToast('File deleted.');
-    loadAIFiles();
+    State.emit('data:files:refresh');
     updateContextBadge();
   } catch (e) { showToast(e.message, 'error'); }
 };
@@ -220,7 +223,7 @@ async function sendMessage() {
         if (result?.id) {
           injectedFiles.push(result.id);
           updateContextBadge();
-          loadAIFiles();
+          State.emit('data:files:refresh');
           showToast(`"${attachedName}" uploaded & injected`);
         }
       } catch (e) {

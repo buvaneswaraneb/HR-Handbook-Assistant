@@ -95,9 +95,11 @@ export function initApiStatus() {
     txt.textContent = status === 'ok' ? 'API Connected' : 'API Offline';
   });
 
-  // Poll every 30s
   checkHealth();
-  setInterval(checkHealth, 30000);
+  setInterval(() => {
+    if (document.visibilityState === 'visible') checkHealth();
+  }, 120000);
+  window.addEventListener('focus', checkHealth);
 }
 
 // ─── CONTEXT MENU ────────────────────────────────────────────

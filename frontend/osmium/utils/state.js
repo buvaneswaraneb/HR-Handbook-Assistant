@@ -3,9 +3,11 @@
 // Osmium ERM · Glacier Design System
 // ============================================================
 
+export const DEFAULT_API_BASE = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
+
 export const State = {
   // API
-  apiBase: 'http://localhost:8000',
+  apiBase: DEFAULT_API_BASE,
   apiConnected: false,
 
   // Auth
@@ -48,7 +50,7 @@ export const State = {
 
   // Settings
   settings: {
-    apiBase: 'http://localhost:8000',
+    apiBase: DEFAULT_API_BASE,
     theme: 'dark',
     snapToGrid: false,
     gridSize: 20,
@@ -115,8 +117,12 @@ export const State = {
   loadSettings() {
     try {
       const saved = JSON.parse(localStorage.getItem('osmium_settings') || '{}');
+      const savedApiBase = (saved.apiBase || '').replace(/\/+$/, '');
+      if (savedApiBase === 'http://localhost:8000' || savedApiBase === 'http://127.0.0.1:8000') {
+        saved.apiBase = DEFAULT_API_BASE;
+      }
       Object.assign(this.settings, saved);
-      this.apiBase = this.settings.apiBase || this.apiBase;
+      this.apiBase = this.settings.apiBase || DEFAULT_API_BASE;
       this.theme = this.settings.theme || 'dark';
     } catch {}
   },

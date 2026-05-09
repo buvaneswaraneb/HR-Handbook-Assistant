@@ -385,7 +385,7 @@ function showPasswordSetupDialog() {
 
 function signInGoogle() {
   const redirectTo = window.location.origin + window.location.pathname;
-  const url = `${State.apiBase}/auth/google/login?redirect_to=${encodeURIComponent(redirectTo)}`;
+  const url = `${(State.apiBase || '').replace(/\/+$/, '')}/auth/google/login?redirect_to=${encodeURIComponent(redirectTo)}`;
   const width = 520;
   const height = 680;
   const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);

@@ -5,7 +5,7 @@
 
 import { State } from '../utils/state.js';
 import { applyTheme } from './ui.js';
-import { checkHealth } from './api.js';
+import { checkHealth, invalidateApiCache } from './api.js';
 import { showToast } from './ui.js';
 
 export function initSettings() {
@@ -61,10 +61,11 @@ export function closeSettings() {
 
 // ─── SAVE HANDLERS (called from HTML) ─────────────────────────
 window._saveApiUrl = function() {
-  const val = document.getElementById('setting-api-url')?.value.trim();
+  const val = document.getElementById('setting-api-url')?.value.trim().replace(/\/+$/, '');
   if (!val) return;
   State.apiBase = val;
   State.setSettings({ apiBase: val });
+  invalidateApiCache();
   checkHealth();
   showToast('API URL updated');
 };
@@ -94,6 +95,7 @@ window._resetLayout = function() {
 };
 
 window._clearCache = function() {
+  invalidateApiCache();
   State.employees = [];
   State.projects  = [];
   State.files     = [];
