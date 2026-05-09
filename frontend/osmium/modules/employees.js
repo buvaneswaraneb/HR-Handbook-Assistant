@@ -331,8 +331,8 @@ async function submitEmployee() {
     }
     closeModal('add-employee-modal');
     resetEmployeeForm();
-    await loadEmployees();
     State.emit('data:employees:refresh');
+    State.emit('data:projects:refresh');
   } catch (e) { showToast(e.message, 'error'); }
   finally { if (btn) { btn.textContent = editingEmployeeId ? 'Save Changes' : 'Create Employee'; btn.disabled = false; } }
 }
@@ -391,8 +391,8 @@ async function removeEmployee(empId) {
     document.getElementById('inspector-close')?.click();
   }
   showToast('Employee deleted.');
-  await loadEmployees();
   State.emit('data:employees:refresh');
+  State.emit('data:projects:refresh');
 }
 
 // ─── GLOBAL HANDLERS ──────────────────────────────────────────

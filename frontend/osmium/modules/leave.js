@@ -4,12 +4,13 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getLeaveRecords, createLeaveRecord, deleteLeaveRecord, getEmployees } from './api.js';
+import { getAnalytics, getLeaveRecords, createLeaveRecord, deleteLeaveRecord, getEmployees } from './api.js';
 import { escHtml, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js';
 import { showToast, openModal, closeModal } from './ui.js';
 
 export function initLeave() {
   State.on('view:leave', loadLeave);
+  State.on('data:leave:refresh', () => { if (State.currentView === 'leave') loadLeave(); });
   document.getElementById('add-leave-form')?.addEventListener('submit', e => {
     e.preventDefault();
     submitLeave();
@@ -45,7 +46,7 @@ async function loadLeaveCalendar() {
   try {
     const [records, analytics] = await Promise.all([
       getLeaveRecords(),
-      fetch(State.apiBase + '/analytics/summary').then(r => r.json()).catch(() => ({}))
+      getAnalytics().catch(() => ({}))
     ]);
 
     const totalEmployees = analytics.total_employees || 1;
@@ -194,9 +195,10 @@ function renderCalendarHeatmap(container, records, totalEmployees, selectedYear)
 
 window._changeLeaveCalendarYear = async function(year) {
   const container = document.getElementById('leave-calendar');
-  const records = await getLeaveRecords();
-  const analyticsRes = await fetch(State.apiBase + '/analytics/summary').catch(() => ({}));
-  const analytics = analyticsRes.ok ? await analyticsRes.json() : {};
+  const [records, analytics] = await Promise.all([
+    getLeaveRecords(),
+    getAnalytics().catch(() => ({})),
+  ]);
   const totalEmployees = analytics.total_employees || 1;
   renderCalendarHeatmap(container, records, totalEmployees, parseInt(year));
 };
@@ -268,7 +270,8 @@ async function submitLeave() {
     await createLeaveRecord(body);
     showToast('Leave record added!');
     closeModal('add-leave-modal');
-    loadLeave();
+    State.emit('data:leave:refresh');
+    State.emit('data:employees:refresh');
   } catch (e) { showToast(e.message, 'error'); }
   finally { if (btn) { btn.textContent = 'Add Leave'; btn.disabled = false; } }
 }
@@ -278,6 +281,7 @@ window._deleteLeave = async function(id) {
   try {
     await deleteLeaveRecord(id);
     showToast('Leave record deleted.');
-    loadLeave();
+    State.emit('data:leave:refresh');
+    State.emit('data:employees:refresh');
   } catch (e) { showToast(e.message, 'error'); }
 };

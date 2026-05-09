@@ -270,7 +270,8 @@ async function submitProject() {
     projRoleTags = [];
     projMemberIds = new Set();
     renderAssignmentSummary();
-    loadProjects();
+    State.emit('data:projects:refresh');
+    State.emit('data:employees:refresh');
   } catch (e) { showToast(e.message, 'error'); }
   finally { if (btn) { btn.textContent = 'Create Project'; btn.disabled = false; } }
 }

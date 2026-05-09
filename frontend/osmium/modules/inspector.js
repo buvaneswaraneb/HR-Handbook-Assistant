@@ -222,6 +222,7 @@ window._toggleAvail = async function(empId, val) {
     }
     showToast(`Availability updated`);
     State.emit('data:employees:refresh');
+    State.emit('data:projects:refresh');
   } catch (e) {
     showToast(e.message, 'error');
   }
@@ -248,6 +249,7 @@ window._deleteEmployeeFromInspector = async function(empId) {
     showToast('Employee deleted.');
     closeInspector();
     State.emit('data:employees:refresh');
+    State.emit('data:projects:refresh');
   } catch (e) {
     showToast(e.message, 'error');
   }
