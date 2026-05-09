@@ -4,7 +4,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getAnalytics, getProjects, getGoogleCalendarStatus, getGoogleCalendarEvents, syncCalendarEvents, getGoogleCalendarAuthUrl, handleGoogleCalendarCallback } from './api.js?v=20260509-3';
+import { getAnalytics, getProjects, getGoogleCalendarStatus, getGoogleCalendarEvents, syncCalendarEvents, getGoogleCalendarAuthUrl, handleGoogleCalendarCallback } from './api.js?v=20260509-4';
 import { showToast } from './ui.js';
 import { escHtml, fmtDate } from '../utils/helpers.js';
 

@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Header, Query
 from fastapi.responses import RedirectResponse
 from typing import Optional
 
+from app.services.e_r_s import auth_service
 from app.services.e_r_s import supabase_auth_service as auth_svc
 from app.services.e_r_s import google_calendar_service as cal_svc
 
@@ -27,7 +28,20 @@ def _get_current_user(authorization: Optional[str]) -> dict:
         user = auth_svc._get_current_user(f"Bearer {token}")
         return user
     except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+        pass
+
+    try:
+        auth_user = auth_service.get_current_user_from_token(token)
+        if auth_user:
+            return {
+                "user_id": auth_user["id"],
+                "email": auth_user["email"],
+                "raw_token": auth_user,
+            }
+    except Exception:
+        pass
+
+    raise HTTPException(status_code=401, detail="Invalid or expired token")
 
 @router.get("/connect")
 def connect_google_calendar(

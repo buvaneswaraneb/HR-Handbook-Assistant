@@ -5,7 +5,7 @@
 
 import { State } from '../utils/state.js';
 import { escHtml } from '../utils/helpers.js';
-import { checkHealth } from './api.js?v=20260509-3';
+import { checkHealth } from './api.js?v=20260509-4';
 
 // ─── TOAST ───────────────────────────────────────────────────
 export function showToast(msg, type = 'success', duration = 3500) {

@@ -6,7 +6,7 @@
 import { State } from '../utils/state.js';
 import { escHtml, fmtDate, ratingStars, avatarMarkup, statusBadge, initials, avatarColor, avatarTextColor } from '../utils/helpers.js';
 import { showToast } from './ui.js';
-import { patchAvailability, addSkill, deleteEmployee, unassignFromProject } from './api.js?v=20260509-3';
+import { patchAvailability, addSkill, deleteEmployee, unassignFromProject } from './api.js?v=20260509-4';
 
 let panel, body;
 

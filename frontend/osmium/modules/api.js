@@ -121,6 +121,7 @@ async function request(path, opts = {}) {
   const {
     cache: useCache = true,
     cacheTtl = DEFAULT_GET_CACHE_TTL,
+    clearAuthOnUnauthorized = true,
     invalidate = null,
     headers = {},
     ...fetchOpts
@@ -138,7 +139,7 @@ async function request(path, opts = {}) {
     if (pendingGets.has(key)) return cloneData(await pendingGets.get(key));
 
     const version = cacheVersion;
-    const pending = request(path, { ...fetchOpts, headers, cache: false });
+    const pending = request(path, { ...fetchOpts, headers, clearAuthOnUnauthorized, cache: false });
     pendingGets.set(key, pending);
     try {
       const data = await pending;
@@ -157,7 +158,7 @@ async function request(path, opts = {}) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    if (res.status === 401) {
+    if (res.status === 401 && clearAuthOnUnauthorized) {
       clearAuthSession();
     }
     throw new Error(err.detail || `HTTP ${res.status}`);
@@ -405,7 +406,7 @@ export async function getGoogleCalendarEvents(days = 30) {
 }
 
 export async function getGoogleCalendarStatus() {
-  return request('/auth/google/calendar/status');
+  return request('/auth/google/calendar/status', { clearAuthOnUnauthorized: false });
 }
 
 export async function disconnectGoogleCalendar() {
