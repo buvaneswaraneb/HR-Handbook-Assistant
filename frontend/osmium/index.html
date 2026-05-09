@@ -461,12 +461,15 @@
             <div class="card" style="overflow:hidden">
               <div
                 style="padding:18px 20px 14px;border-bottom:1px solid var(--gl-outline);display:flex;align-items:center;gap:12px">
-                <span class="material-symbols-outlined" style="color:#4285f4">calendar_month</span>
-                <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface);flex:1">Google Calendar Sync
-                </div>
+                <span class="material-symbols-outlined" style="color:#f5574a">event_busy</span>
+                <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface);flex:1">Leave Heatmap</div>
+                <button class="btn btn-ghost btn-sm" onclick="switchViewGlobal('leave')">
+                  <span class="material-symbols-outlined" style="font-size:14px">open_in_new</span>
+                  View
+                </button>
               </div>
-              <div id="calendar-widget"
-                style="padding:22px 24px;min-height:170px;display:flex;align-items:center;justify-content:center">
+              <div id="dashboard-leave-heatmap"
+                style="padding:18px 20px;min-height:170px;display:flex;align-items:center;justify-content:center;overflow-x:auto">
                 <div style="text-align:center;color:var(--gl-on-surface-4)">
                   <div style="font-size:0.82rem">Loading...</div>
                 </div>
@@ -1172,7 +1175,7 @@
     import { initModalOverlays, switchView, initApiStatus, initKeyboardShortcuts, showToast, openModal, closeModal, applyTheme } from './modules/ui.js';
     import { initCanvas, addEmployeeToCanvas, renderNodes } from './modules/canvas.js';
     import { initInspector } from './modules/inspector.js';
-    import { initDashboard, loadDashboard } from './modules/dashboard.js';
+    import { initDashboard, loadDashboard } from './modules/dashboard.js?v=20260509-2';
     import { initEmployees, loadEmployees } from './modules/employees.js';
     import { initProjects } from './modules/projects.js';
     import { initFiles } from './modules/files.js';

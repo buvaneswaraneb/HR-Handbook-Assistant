@@ -2,11 +2,12 @@
 query.py — RAG query layer.
 
 Flow:
-  1. Embed user question via sentence-transformers (same model as ingestion).
-  2. Retrieve top-k chunks from FAISS vector store.
-  3. Format chunks into the context block the LLM expects.
-  4. Call Groq (llama-3.1-8b-instant) with the strict system prompt.
-  5. Parse and return structured JSON response.
+  1. Rewrite the user's question into semantic search variants.
+  2. Embed those search queries via sentence-transformers.
+  3. Retrieve and merge relevant chunks from FAISS.
+  4. Format chunks into the context block the LLM expects.
+  5. Call Groq (llama-3.1-8b-instant) with the strict system prompt.
+  6. Parse and return structured JSON response.
 """
 
 from __future__ import annotations
@@ -140,9 +141,10 @@ BATCH_SIZE       = 10     # max chunks per API call to avoid 413 payload errors
 GROQ_RETRY_COUNT = 2
 
 # Retrieval settings
-SCORE_THRESHOLD  = 0.30   # min cosine similarity to include a chunk (0–1)
-CANDIDATE_K      = 5     # how many candidates FAISS returns before filtering
+SCORE_THRESHOLD  = 0.25   # min cosine similarity to include a chunk (0–1)
+CANDIDATE_K      = 20     # how many candidates FAISS returns before filtering
 CONTEXT_TOKEN_BUDGET = 4_000  # ~4 chars per token; trim context if too long
+MAX_QUERY_VARIANTS = 3
 
 SYSTEM_PROMPT = """ You are an internal HR assistant.
 
@@ -201,6 +203,16 @@ OUTPUT FORMAT — return ONLY valid JSON:
   ]
 }
 """
+
+QUERY_REWRITE_PROMPT = """You rewrite HR/document questions into search queries for a vector database.
+
+Your job is NOT to answer the question.
+Create concise semantic search queries that would retrieve the right policy/document chunks.
+Include synonyms, policy terms, likely section names, and concrete entities from the user question.
+
+Return ONLY valid JSON:
+{"queries":["<query 1>","<query 2>","<query 3>"]}
+"""
 # ── data models ───────────────────────────────────────────────────────────────
 @dataclass
 class QueryResult:
@@ -236,63 +248,99 @@ class RAGQueryEngine:
         if not question.strip():
             raise ValueError("Question cannot be empty.")
 
-        # 1. Embed question
-        vec = self._embedder.embed([question])[0]
+        # 1. Convert the user's intent into multiple semantic search queries.
+        search_queries = self._build_search_queries(question)
 
-        # 2. Retrieve ALL chunks that pass the relevance threshold
-        raw_chunks = self._store.search_with_threshold(
-            vec,
-            score_threshold=self._score_threshold,
-            candidate_k=self._candidate_k,
-            workplace_id=workplace_id,
-        )
+        # 2. Retrieve and merge chunks across all query variants.
+        raw_chunks = self._retrieve_for_queries(search_queries, workplace_id=workplace_id)
         logger.info(
-            "Retrieved %d relevant chunks (threshold=%.2f) for: %s",
-            len(raw_chunks), self._score_threshold, question[:60],
+            "Retrieved %d relevant chunks across %d query variants (threshold=%.2f) for: %s",
+            len(raw_chunks), len(search_queries), self._score_threshold, question[:60],
         )
 
         # 3. Trim to context token budget
         raw_chunks = _trim_to_budget(raw_chunks, budget_chars=CONTEXT_TOKEN_BUDGET * 4)
-
-        # 4. Process chunks in batches of BATCH_SIZE to avoid 413 Payload Too Large
-        batch_results = []
-        num_batches = (len(raw_chunks) + BATCH_SIZE - 1) // BATCH_SIZE
-        
-        for batch_idx in range(num_batches):
-            start_idx = batch_idx * BATCH_SIZE
-            end_idx = min(start_idx + BATCH_SIZE, len(raw_chunks))
-            batch_chunks = raw_chunks[start_idx:end_idx]
-            
-            logger.info(
-                "Processing batch %d/%d (%d chunks)",
-                batch_idx + 1, num_batches, len(batch_chunks)
+        if not raw_chunks:
+            return QueryResult(
+                answer="I don't know based on the provided documents.",
+                sources=[],
+                context_preview=[],
+                raw_chunks=[],
             )
-            
-            # Build context for this batch
-            context_block = _build_context(batch_chunks)
-            
-            # Estimate token count
-            token_count = _estimate_token_count(SYSTEM_PROMPT, question, context_block)
-            logger.debug(
-                "Batch %d token estimation: ~%d tokens",
-                batch_idx + 1, token_count
+
+        # 4. Make one answer call. The context budget above prevents oversized
+        # payloads while avoiding extra rate-limit pressure from batch calls.
+        context_block = _build_context(raw_chunks)
+        token_count = _estimate_token_count(SYSTEM_PROMPT, question, context_block)
+        logger.debug("Final answer token estimation: ~%d tokens", token_count)
+
+        llm_response = self._call_groq(question, context_block)
+        return _parse_response(llm_response, raw_chunks)
+
+    def _build_search_queries(self, question: str) -> list[str]:
+        normalized_question = " ".join(question.split())
+        if _is_greeting(normalized_question):
+            return [normalized_question]
+
+        queries = [normalized_question]
+        try:
+            rewritten = self._rewrite_search_queries(normalized_question)
+            for query in rewritten:
+                cleaned = " ".join(str(query).split())
+                if cleaned and cleaned.lower() not in {q.lower() for q in queries}:
+                    queries.append(cleaned)
+                if len(queries) >= MAX_QUERY_VARIANTS:
+                    break
+        except Exception as exc:
+            logger.warning("Query rewrite failed, using original question only: %s", exc)
+
+        logger.info("Search query variants: %s", queries)
+        return queries
+
+    def _rewrite_search_queries(self, question: str) -> list[str]:
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": GROQ_MODEL,
+            "max_tokens": 256,
+            "temperature": 0.1,
+            "messages": [
+                {"role": "system", "content": QUERY_REWRITE_PROMPT},
+                {"role": "user", "content": question},
+            ],
+        }
+        raw = self._post_groq(payload, headers)
+        try:
+            data = json.loads(_strip_markdown_json(raw))
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Query rewrite returned non-JSON: {raw[:120]}") from exc
+        queries = data.get("queries", [])
+        return queries if isinstance(queries, list) else []
+
+    def _retrieve_for_queries(self, queries: list[str], workplace_id: str | None = None) -> list[dict]:
+        merged: dict[str, dict] = {}
+
+        for query in queries:
+            vec = self._embedder.embed([query], is_query=True)[0]
+            chunks = self._store.search_with_threshold(
+                vec,
+                score_threshold=self._score_threshold,
+                candidate_k=self._candidate_k,
+                workplace_id=workplace_id,
             )
-            
-            # Call Groq for this batch
-            llm_response = self._call_groq(question, context_block)
-            batch_result = _parse_response(llm_response, batch_chunks)
-            batch_results.append(batch_result)
+            logger.info("Retrieved %d chunks for query variant: %s", len(chunks), query[:80])
 
-        # 5. Synthesize results from all batches
-        if num_batches == 1:
-            # Only one batch, return as-is
-            final_result = batch_results[0]
-        else:
-            # Multiple batches: synthesize into final answer
-            logger.info("Synthesizing %d batch results into final answer", num_batches)
-            final_result = self._synthesize_batch_results(question, batch_results, raw_chunks)
+            for chunk in chunks:
+                key = chunk.get("chunk_id") or f"{chunk.get('source')}:{chunk.get('page')}:{hash(chunk.get('content', ''))}"
+                existing = merged.get(key)
+                if not existing or chunk.get("_score", 0) > existing.get("_score", 0):
+                    merged[key] = {**chunk, "matched_queries": [query]}
+                else:
+                    existing.setdefault("matched_queries", []).append(query)
 
-        return final_result
+        return sorted(merged.values(), key=lambda item: item.get("_score", 0), reverse=True)
 
     def _synthesize_batch_results(
         self, question: str, batch_results: list[QueryResult], all_chunks: list[dict]
@@ -369,6 +417,16 @@ class RAGQueryEngine:
 
         try:
             return self._post_groq(payload, headers)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 429:
+                retry_after = exc.response.headers.get("retry-after")
+                logger.warning("Groq rate limit hit for question %r. retry-after=%s", question[:80], retry_after)
+                return json.dumps({
+                    "answer": "The language service is rate limited right now. Please wait a moment and try again.",
+                    "sources": [],
+                    "context_preview": [],
+                })
+            raise
         except (httpx.TimeoutException, httpx.NetworkError, httpx.ProtocolError) as exc:
             logger.warning("Groq network call failed for question %r: %s", question[:80], exc)
             return json.dumps({
@@ -387,6 +445,16 @@ class RAGQueryEngine:
                     resp = client.post(GROQ_API_URL, headers=headers, json=payload)
                     resp.raise_for_status()
                 return resp.json()["choices"][0]["message"]["content"]
+            except httpx.HTTPStatusError as exc:
+                last_exc = exc
+                status = exc.response.status_code
+                if status == 429 and attempt <= GROQ_RETRY_COUNT:
+                    retry_after = _retry_after_seconds(exc.response.headers.get("retry-after"))
+                    wait_s = retry_after if retry_after is not None else 1.2 * attempt
+                    logger.warning("Groq rate limit attempt %d; retrying in %.1fs", attempt, wait_s)
+                    time.sleep(wait_s)
+                    continue
+                raise
             except (httpx.TimeoutException, httpx.NetworkError, httpx.ProtocolError) as exc:
                 last_exc = exc
                 logger.warning("Groq request attempt %d failed: %s", attempt, exc)
@@ -438,13 +506,7 @@ def _build_context(chunks: list[dict]) -> str:
 
 def _parse_response(raw: str, chunks: list[dict]) -> QueryResult:
     """Parse LLM JSON output — with a safe fallback if malformed."""
-    # Strip markdown fences if the model adds them despite instructions
-    cleaned = raw.strip()
-    if cleaned.startswith("```"):
-        cleaned = cleaned.split("```")[1]
-        if cleaned.startswith("json"):
-            cleaned = cleaned[4:]
-    cleaned = cleaned.strip()
+    cleaned = _strip_markdown_json(raw)
 
     try:
         data = json.loads(cleaned)
@@ -462,6 +524,28 @@ def _parse_response(raw: str, chunks: list[dict]) -> QueryResult:
         context_preview = _normalize_previews(data.get("context_preview", []), chunks),
         raw_chunks      = chunks,
     )
+
+
+def _strip_markdown_json(raw: str) -> str:
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("```")[1]
+        if cleaned.startswith("json"):
+            cleaned = cleaned[4:]
+    return cleaned.strip()
+
+
+def _is_greeting(text: str) -> bool:
+    return text.strip().lower() in {"hi", "hello", "hey", "hai", "good morning", "good afternoon", "good evening"}
+
+
+def _retry_after_seconds(value: str | None) -> float | None:
+    if not value:
+        return None
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        return None
 
 
 def _normalize_sources(sources: object, chunks: list[dict]) -> list[dict]:

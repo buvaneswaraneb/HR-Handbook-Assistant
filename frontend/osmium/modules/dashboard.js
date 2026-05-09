@@ -4,9 +4,9 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getAnalytics, getProjects, getGoogleCalendarStatus, getGoogleCalendarEvents, syncCalendarEvents, getGoogleCalendarAuthUrl, handleGoogleCalendarCallback } from './api.js?v=20260509-5';
+import { getAnalytics, getProjects, getLeaveRecords, getGoogleCalendarStatus, getGoogleCalendarEvents, syncCalendarEvents, getGoogleCalendarAuthUrl, handleGoogleCalendarCallback } from './api.js?v=20260509-5';
 import { showToast } from './ui.js';
-import { escHtml, fmtDate } from '../utils/helpers.js?v=20260509-3';
+import { dateKey, escHtml, fmtDate, parseLocalDate, todayLocalDate } from '../utils/helpers.js?v=20260509-3';
 
 const FRONTEND_AUTH_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
 
@@ -33,7 +33,7 @@ async function checkGoogleCalendarCallback() {
 }
 
 export async function loadDashboard() {
-  await Promise.all([loadAnalytics(), loadDeadlines(), loadCalendarWidget()]);
+  await Promise.all([loadAnalytics(), loadDeadlines(), loadCalendarWidget(), loadDashboardLeaveHeatmap()]);
 }
 
 // ─── ANALYTICS ────────────────────────────────────────────────
@@ -62,6 +62,109 @@ function animateCount(id, target) {
   const el = document.getElementById(id);
   if (!el) return;
   el.textContent = target;
+}
+
+// ─── LEAVE HEATMAP ───────────────────────────────────────────
+async function loadDashboardLeaveHeatmap() {
+  const el = document.getElementById('dashboard-leave-heatmap');
+  if (!el) return;
+
+  try {
+    const [records, analytics] = await Promise.all([
+      getLeaveRecords({ cache: false }),
+      getAnalytics().catch(() => ({})),
+    ]);
+    renderDashboardLeaveHeatmap(el, records, analytics.total_employees || 1);
+  } catch (err) {
+    el.innerHTML = `<div style="color:var(--gl-error);font-size:0.82rem">Could not load leave heatmap.</div>`;
+  }
+}
+
+function renderDashboardLeaveHeatmap(el, records, totalEmployees) {
+  const today = todayLocalDate();
+  const todayKey = dateKey(today);
+  const leaveByDate = {};
+
+  records.forEach(rec => {
+    if (!rec.start_date || !rec.end_date) return;
+    const start = parseLocalDate(rec.start_date);
+    const end = parseLocalDate(rec.end_date);
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const key = dateKey(d);
+      leaveByDate[key] = (leaveByDate[key] || 0) + 1;
+    }
+  });
+
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - 7 * 17);
+  startDate.setDate(startDate.getDate() - startDate.getDay());
+
+  const weeks = [];
+  const cursor = new Date(startDate);
+  for (let wi = 0; wi < 18; wi++) {
+    const week = [];
+    for (let di = 0; di < 7; di++) {
+      week.push(new Date(cursor));
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    weeks.push(week);
+  }
+
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  let monthLabels = '';
+  let previousMonth = -1;
+  weeks.forEach((week, wi) => {
+    const month = week[0].getMonth();
+    if (month !== previousMonth) {
+      monthLabels += `<div style="grid-column:${wi + 2};grid-row:1;font-size:10px;color:var(--gl-on-surface-4);white-space:nowrap">${monthNames[month]}</div>`;
+      previousMonth = month;
+    }
+  });
+
+  const cells = weeks.flatMap((week, wi) => week.map((day, di) => {
+    const key = dateKey(day);
+    const count = leaveByDate[key] || 0;
+    const pct = totalEmployees ? (count / totalEmployees) * 100 : 0;
+    const isFuture = day > today;
+    const isToday = key === todayKey;
+    const bg = count === 0 ? 'var(--gl-surface-high)'
+      : pct < 10 ? '#3dd68c'
+        : pct < 25 ? '#f5a623'
+          : '#f5574a';
+    const opacity = isFuture ? '0.45' : '1';
+    return `<div
+      title="${escHtml(`${key}: ${count ? `${count} on leave` : 'No leaves'}`)}"
+      style="grid-column:${wi + 2};grid-row:${di + 2};width:13px;height:13px;border-radius:2px;background:${bg};opacity:${opacity};border:${isToday ? '2px solid var(--gl-primary)' : '1px solid var(--gl-outline)'}">
+    </div>`;
+  })).join('');
+
+  const activeToday = leaveByDate[todayKey] || 0;
+  el.innerHTML = `
+    <div style="width:100%">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
+        <div>
+          <div style="font-size:0.82rem;font-weight:700;color:var(--gl-on-surface)">${activeToday} on leave today</div>
+          <div style="font-size:0.72rem;color:var(--gl-on-surface-4)">Last 18 weeks · today outlined</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;font-size:0.68rem;color:var(--gl-on-surface-4)">
+          <span>Less</span>
+          <span style="width:11px;height:11px;border-radius:2px;background:var(--gl-surface-high);border:1px solid var(--gl-outline);display:inline-block"></span>
+          <span style="width:11px;height:11px;border-radius:2px;background:#3dd68c;display:inline-block"></span>
+          <span style="width:11px;height:11px;border-radius:2px;background:#f5a623;display:inline-block"></span>
+          <span style="width:11px;height:11px;border-radius:2px;background:#f5574a;display:inline-block"></span>
+          <span>More</span>
+        </div>
+      </div>
+      <div style="overflow-x:auto;padding-bottom:4px">
+        <div style="display:grid;grid-template-columns:24px repeat(${weeks.length}, 13px);grid-template-rows:16px repeat(7, 13px);gap:3px;min-width:max-content">
+          ${monthLabels}
+          <div style="grid-column:1;grid-row:3;font-size:10px;color:var(--gl-on-surface-4);text-align:right;padding-right:5px">Mon</div>
+          <div style="grid-column:1;grid-row:5;font-size:10px;color:var(--gl-on-surface-4);text-align:right;padding-right:5px">Wed</div>
+          <div style="grid-column:1;grid-row:7;font-size:10px;color:var(--gl-on-surface-4);text-align:right;padding-right:5px">Fri</div>
+          ${cells}
+        </div>
+      </div>
+    </div>`;
 }
 
 // ─── DEADLINES ────────────────────────────────────────────────
