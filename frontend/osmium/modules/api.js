@@ -19,6 +19,10 @@ function apiUrl(path) {
   return `${normalizedApiBase()}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
+function tunnelHeaders() {
+  return normalizedApiBase().includes('.ngrok-free.dev') ? { 'ngrok-skip-browser-warning': 'true' } : {};
+}
+
 function cloneData(data) {
   if (data === null || data === undefined) return data;
   if (typeof structuredClone === 'function') return structuredClone(data);
@@ -98,7 +102,7 @@ async function request(path, opts = {}) {
 
   const res = await fetch(url, {
     ...fetchOpts,
-    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...headers },
+    headers: { 'Content-Type': 'application/json', ...tunnelHeaders(), ...authHeaders(), ...headers },
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
@@ -278,7 +282,7 @@ export async function getFiles(department = null) {
 export async function uploadFile(formData) {
   const res = await fetch(apiUrl('/upload'), {
     method: 'POST',
-    headers: authHeaders(),
+    headers: { ...tunnelHeaders(), ...authHeaders() },
     body: formData,
   });
   if (!res.ok) {

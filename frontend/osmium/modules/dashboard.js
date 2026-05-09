@@ -8,6 +8,8 @@ import { getAnalytics, getProjects, getGoogleCalendarStatus, getGoogleCalendarEv
 import { showToast } from './ui.js';
 import { escHtml, fmtDate } from '../utils/helpers.js';
 
+const FRONTEND_AUTH_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
+
 // ─── INIT ─────────────────────────────────────────────────────
 export function initDashboard() {
   State.on('view:dashboard', loadDashboard);
@@ -207,7 +209,7 @@ async function loadCalendarWidget() {
 
 window._connectGoogleCalendar = async function () {
   try {
-    const callbackUrl = window.location.origin + window.location.pathname;
+    const callbackUrl = FRONTEND_AUTH_URL;
     const response = await getGoogleCalendarAuthUrl(callbackUrl);
     const popup = window.open(response.authorization_url, 'google-calendar-auth', 'width=600,height=600');
     

@@ -3,7 +3,8 @@
 // Osmium ERM · Glacier Design System
 // ============================================================
 
-export const DEFAULT_API_BASE = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
+export const DEFAULT_API_BASE = 'https://nonsignificantly-bilgier-particia.ngrok-free.dev';
+const FRONTEND_PAGES_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
 
 export const State = {
   // API
@@ -118,7 +119,11 @@ export const State = {
     try {
       const saved = JSON.parse(localStorage.getItem('osmium_settings') || '{}');
       const savedApiBase = (saved.apiBase || '').replace(/\/+$/, '');
-      if (savedApiBase === 'http://localhost:8000' || savedApiBase === 'http://127.0.0.1:8000') {
+      if (
+        savedApiBase === FRONTEND_PAGES_URL ||
+        savedApiBase === 'http://localhost:8000' ||
+        savedApiBase === 'http://127.0.0.1:8000'
+      ) {
         saved.apiBase = DEFAULT_API_BASE;
       }
       Object.assign(this.settings, saved);
