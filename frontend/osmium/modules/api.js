@@ -68,18 +68,6 @@ function authHeaders() {
   return State.auth?.accessToken ? { Authorization: `Bearer ${State.auth.accessToken}` } : {};
 }
 
-function apiBase() {
-  return (State.apiBase || '').trim().replace(/\/+$/, '');
-}
-
-function apiUrl(path) {
-  return `${apiBase()}${path.startsWith('/') ? path : `/${path}`}`;
-}
-
-function tunnelHeaders() {
-  return apiBase().includes('.ngrok-free.dev') ? { 'ngrok-skip-browser-warning': 'true' } : {};
-}
-
 async function request(path, opts = {}) {
   const {
     cache: useCache = true,
