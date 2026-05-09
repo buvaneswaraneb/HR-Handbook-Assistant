@@ -20,7 +20,7 @@ let isConnecting = false, connectFromId = null, connectPreviewPath = null;
 const MIN_ZOOM = 0.15, MAX_ZOOM = 3.0;
 const ZOOM_STEP = 0.1;
 const PROJECT_NODE_W = 240;
-const PROJECT_NODE_H = 112;
+const PROJECT_NODE_H = 128;
 const EMPLOYEE_NODE_W = 116;
 const EMPLOYEE_NODE_H = 118;
 const EMPLOYEE_ORB_R = 40;
@@ -38,10 +38,10 @@ export function initCanvas() {
   svgLayer.innerHTML = `
     <defs>
       <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="var(--gl-outline-3)" />
+        <polygon points="0 0, 8 3, 0 6" fill="var(--canvas-edge-muted)" />
       </marker>
       <marker id="arrowhead-primary" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-        <polygon points="0 0, 8 3, 0 6" fill="var(--gl-primary)" />
+        <polygon points="0 0, 8 3, 0 6" fill="var(--canvas-edge-strong)" />
       </marker>
     </defs>`;
 
@@ -102,7 +102,9 @@ export function initCanvas() {
 // ─── TRANSFORM ────────────────────────────────────────────────
 function applyTransform() {
   const { zoom, panX, panY } = State.canvas;
-  world.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  const transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+  world.style.transform = transform;
+  svgLayer.style.transform = transform;
   updateGridBg();
   updateZoomLabel();
   renderEdges();
@@ -747,12 +749,11 @@ export function renderEdges() {
     const start = getConnectionPoint(fromNode, toNode);
     const end = getConnectionPoint(toNode, fromNode);
     const d = edgePath(start, end);
-    const isManager = edge.type === 'manager';
-    const isProject = edge.type === 'project';
-    const isPending = edge.type === 'pending';
-    const marker = (isManager || isProject || isPending) ? 'url(#arrowhead-primary)' : 'url(#arrowhead)';
-    const stroke = isProject ? 'var(--gl-secondary)' : isManager ? 'var(--gl-success)' : isPending ? 'var(--gl-primary)' : 'var(--gl-outline-3)';
-    const width = (isManager || isProject || isPending) ? '2' : '1.5';
+    const isProjectConnection = Boolean(edge.projectId) ||
+      ['project', 'manager', 'teamlead', 'team_lead', 'member', 'pending'].includes(edge.type);
+    const marker = isProjectConnection ? 'url(#arrowhead-primary)' : 'url(#arrowhead)';
+    const stroke = isProjectConnection ? 'var(--canvas-edge-strong)' : 'var(--canvas-edge-muted)';
+    const width = isProjectConnection ? '2' : '1.5';
 
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     g.classList.add('canvas-edge-group');
