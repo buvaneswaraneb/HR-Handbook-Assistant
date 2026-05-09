@@ -11,6 +11,7 @@ let pendingFile = null;
 
 export function initFiles() {
   State.on('view:files', () => loadFiles(null));
+  State.on('data:files:refresh', () => { if (State.currentView === 'files') loadFiles(null); });
 
   const dropzone = document.getElementById('file-dropzone');
   const fileInput = document.getElementById('file-input');
@@ -111,7 +112,7 @@ window._uploadFileSubmit = async function() {
     pendingFile = null;
     document.getElementById('upload-form').style.display = 'none';
     document.getElementById('file-input').value = '';
-    loadFiles(null);
+    State.emit('data:files:refresh');
   } catch (e) { showToast(e.message, 'error'); }
   finally { if (btn) { btn.textContent = 'Upload'; btn.disabled = false; } }
 };
@@ -121,7 +122,7 @@ window._deleteFile = async function(id) {
   try {
     await deleteFile(id);
     showToast('File deleted.');
-    loadFiles(null);
+    State.emit('data:files:refresh');
   } catch (e) { showToast(e.message, 'error'); }
 };
 

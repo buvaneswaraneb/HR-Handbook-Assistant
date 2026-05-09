@@ -42,7 +42,8 @@ def connect_google_calendar(
     user_id = user.get("user_id")
     
     try:
-        callback_redirect = f"{os.getenv('FRONTEND_URL', 'http://localhost:5502')}/google-calendar-callback"
+        frontend_url = os.getenv("FRONTEND_URL", "https://buvaneswaraneb.github.io/HR-Handbook-Assistant").rstrip("/")
+        callback_redirect = f"{frontend_url}/google-calendar-callback"
         oauth_url = cal_svc.get_google_oauth_url(user_id, callback_redirect)
         return {"authorization_url": oauth_url}
     except Exception as e:
