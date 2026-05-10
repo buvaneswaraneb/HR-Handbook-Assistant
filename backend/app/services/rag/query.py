@@ -626,9 +626,20 @@ def _coerce_page(value: object, matched_chunk: dict | None = None) -> int | None
     if value is None or value == "":
         value = (matched_chunk or {}).get("page")
 
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if not isinstance(value, str):
+        return None
+
+    value = value.strip()
+    if not value:
+        return None
+
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except ValueError:
         return None
 
 

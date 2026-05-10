@@ -10,6 +10,10 @@ import { dateKey, escHtml, fmtDate, parseLocalDate, todayLocalDate } from '../ut
 
 const FRONTEND_AUTH_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
 
+function hasCalendarAuthToken() {
+  return Boolean(State.auth?.accessToken);
+}
+
 // ─── INIT ─────────────────────────────────────────────────────
 export function initDashboard() {
   State.on('view:dashboard', loadDashboard);
@@ -230,7 +234,7 @@ async function loadCalendarWidget() {
     dateHeader.textContent = today.toLocaleDateString('en-GB', { weekday: 'long', month: 'long', day: 'numeric' });
   }
 
-  if (!State.auth?.accessToken || !State.authProfile) {
+  if (!hasCalendarAuthToken()) {
     renderSevenDayCalendar(el, [], {
       title: 'Google Calendar Sync',
       message: 'Sign in again to connect your calendar.',
@@ -380,7 +384,7 @@ function calendarEventPill(evt) {
 }
 
 window._connectGoogleCalendar = async function () {
-  if (!State.auth?.accessToken || !State.authProfile) {
+  if (!hasCalendarAuthToken()) {
     showToast('Sign in again before connecting Calendar.', 'error');
     return;
   }
@@ -409,7 +413,7 @@ window._connectGoogleCalendar = async function () {
 };
 
 window._syncGoogleCalendar = async function () {
-  if (!State.auth?.accessToken || !State.authProfile) {
+  if (!hasCalendarAuthToken()) {
     showToast('Sign in again before syncing Calendar.', 'error');
     return;
   }
