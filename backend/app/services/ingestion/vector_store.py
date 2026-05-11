@@ -138,6 +138,7 @@ class VectorStore:
         score_threshold: float = 0.3,
         candidate_k: int | None = None,
         workplace_id: str | None = None,
+        source_names: set[str] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Retrieve all chunks whose cosine similarity score >= score_threshold.
@@ -161,7 +162,8 @@ class VectorStore:
         if self._index.ntotal == 0:
             return []
 
-        k = self._index.ntotal if workplace_id else candidate_k if candidate_k is not None else min(self._index.ntotal, 50)
+        source_filter = {name for name in (source_names or set()) if name}
+        k = self._index.ntotal if workplace_id or source_filter else candidate_k if candidate_k is not None else min(self._index.ntotal, 50)
         k = min(k, self._index.ntotal)   # FAISS errors if k > ntotal
 
         scores, indices = self._index.search(query_vec.reshape(1, -1), k)
@@ -171,6 +173,8 @@ class VectorStore:
             if idx < 0:
                 continue
             if workplace_id and self._metadata[idx].get("workplace_id") != workplace_id:
+                continue
+            if source_filter and self._metadata[idx].get("source") not in source_filter:
                 continue
             if float(score) < score_threshold:
                 continue                  # below relevance bar — skip

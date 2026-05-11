@@ -12,6 +12,16 @@ let messagesEl, inputEl, filesPanelEl;
 let injectedFiles = [];   // files currently "active" in context
 let pendingAttach = null; // file staged for upload
 let isSending = false;
+let chatHistory = [];
+let aiFilesCache = [];
+let loadedMemoryKey = null;
+
+const CHAT_HISTORY_LIMIT = 40;
+const API_HISTORY_LIMIT = 10;
+const WELCOME_HTML = `
+  <div style="margin-bottom:8px">Hello! I am the Osmium AI Assistant.</div>
+  <div>I have full context of your enterprise data. You can ask me questions about employees, projects, or
+    attach documents to query against them.</div>`;
 
 export function initAI() {
   messagesEl   = document.getElementById('ai-messages');
@@ -24,6 +34,11 @@ export function initAI() {
   document.getElementById('ai-send')?.addEventListener('click', e => {
     e.preventDefault();
     sendMessage();
+  });
+
+  document.getElementById('ai-new-chat')?.addEventListener('click', e => {
+    e.preventDefault();
+    startNewConversation();
   });
 
   // Textarea: Enter sends (Shift+Enter = newline)
@@ -60,14 +75,98 @@ export function initAI() {
 
   // State listeners
   State.on('view:ai', () => {
+    loadConversationMemory();
     loadAIFiles();
     inputEl?.focus();
   });
   State.on('data:files:refresh', () => {
     if (State.currentView === 'ai') loadAIFiles();
   });
+  State.on('change:auth', () => loadConversationMemory(true));
 
+  loadConversationMemory();
   if (State.currentView === 'ai') loadAIFiles();
+}
+
+// ─── CHAT MEMORY ─────────────────────────────────────────────
+function memoryKey() {
+  const id = State.auth?.workplaceId || State.authProfile?.workplace_id || State.authProfile?.user_id || State.auth?.user?.id || 'anonymous';
+  return `osmium_ai_memory_${id}`;
+}
+
+function loadConversationMemory(force = false) {
+  if (!messagesEl) return;
+  const key = memoryKey();
+  if (!force && loadedMemoryKey === key) return;
+  loadedMemoryKey = key;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) || '{}');
+    chatHistory = Array.isArray(saved.messages) ? saved.messages.slice(-CHAT_HISTORY_LIMIT) : [];
+    injectedFiles = Array.isArray(saved.injectedFiles) ? saved.injectedFiles : [];
+  } catch {
+    chatHistory = [];
+    injectedFiles = [];
+  }
+
+  renderConversation();
+  updateContextBadge();
+}
+
+function persistConversation() {
+  try {
+    localStorage.setItem(memoryKey(), JSON.stringify({
+      messages: chatHistory.slice(-CHAT_HISTORY_LIMIT),
+      injectedFiles,
+    }));
+  } catch {}
+}
+
+function renderConversation() {
+  if (!messagesEl) return;
+  messagesEl.innerHTML = '';
+  if (!chatHistory.length) {
+    appendMsg('bot', WELCOME_HTML);
+    return;
+  }
+
+  chatHistory.forEach(item => {
+    if (item.role === 'user') {
+      appendMsg('user', userMessageHtml(item.content || '', item.attachmentName ? { name: item.attachmentName } : null));
+    } else {
+      appendMsg('bot', botMessageHtml(item.content || '', item.sources || []));
+    }
+  });
+  scrollToBottom();
+}
+
+function pushHistory(item) {
+  chatHistory.push(item);
+  if (chatHistory.length > CHAT_HISTORY_LIMIT) {
+    chatHistory = chatHistory.slice(-CHAT_HISTORY_LIMIT);
+  }
+  persistConversation();
+}
+
+function apiHistory() {
+  return chatHistory.slice(-API_HISTORY_LIMIT).map(item => ({
+    role: item.role === 'bot' ? 'assistant' : item.role,
+    content: item.content || '',
+    attachment_name: item.attachmentName || null,
+    file_names: item.fileNames || [],
+  }));
+}
+
+function startNewConversation() {
+  chatHistory = [];
+  injectedFiles = [];
+  pendingAttach = null;
+  renderPendingAttachment();
+  persistConversation();
+  renderConversation();
+  loadAIFiles();
+  updateContextBadge();
+  inputEl?.focus();
 }
 
 // ─── FILE RIGHT PANEL ─────────────────────────────────────────
@@ -88,7 +187,10 @@ export async function loadAIFiles() {
 function renderAIFilePanel(files) {
   if (!filesPanelEl) return;
   const pdfFiles = (files || []).filter(isPdfFile);
+  aiFilesCache = pdfFiles;
+  const before = injectedFiles.length;
   injectedFiles = injectedFiles.filter(id => pdfFiles.some(file => file.id === id));
+  if (before !== injectedFiles.length) persistConversation();
   updateContextBadge();
 
   if (!pdfFiles.length) {
@@ -158,6 +260,7 @@ window._toggleInjectFile = function(fileId, filename) {
     injectedFiles.push(fileId);
     showToast(`Injecting "${filename}" into context`);
   }
+  persistConversation();
   loadAIFiles();
   updateContextBadge();
 };
@@ -167,6 +270,7 @@ window._deleteAIFile = async function(fileId) {
   try {
     await deleteFile(fileId);
     injectedFiles = injectedFiles.filter(id => id !== fileId);
+    persistConversation();
     showToast('File deleted.');
     State.emit('data:files:refresh');
     updateContextBadge();
@@ -182,6 +286,12 @@ function updateContextBadge() {
   if (!badge) return;
   badge.textContent = injectedFiles.length ? `${injectedFiles.length} file${injectedFiles.length > 1 ? 's' : ''} in context` : 'No files in context';
   badge.style.color = injectedFiles.length ? '#3dd68c' : 'var(--gl-on-surface-4)';
+}
+
+function injectedFileNames() {
+  return injectedFiles
+    .map(id => aiFilesCache.find(file => file.id === id)?.filename)
+    .filter(Boolean);
 }
 
 // ─── ATTACHMENT STAGING ───────────────────────────────────────
@@ -234,6 +344,8 @@ async function sendMessage() {
     const attachment = pendingAttach;
     const attachedName = attachment?.name || '';
     const activeFileIds = [...injectedFiles];
+    const previousHistory = apiHistory();
+    const activeNamesBeforeSend = injectedFileNames();
 
     if (inputEl) {
       inputEl.value = '';
@@ -243,6 +355,12 @@ async function sendMessage() {
 
     const userHtml = userMessageHtml(q, attachment);
     appendMsg('user', userHtml);
+    pushHistory({
+      role: 'user',
+      content: q || '',
+      attachmentName: attachedName || null,
+      fileNames: activeNamesBeforeSend,
+    });
 
     const thinkingEl = appendMsg('bot', attachment
       ? processingFileHtml(attachedName)
@@ -256,8 +374,12 @@ async function sendMessage() {
       try {
         const result = await uploadFile(formData);
         if (result?.id) {
-          injectedFiles.push(result.id);
-          activeFileIds.push(result.id);
+          if (!injectedFiles.includes(result.id)) injectedFiles.push(result.id);
+          if (!activeFileIds.includes(result.id)) activeFileIds.push(result.id);
+          if (result.filename && !aiFilesCache.some(file => file.id === result.id)) {
+            aiFilesCache.unshift(result);
+          }
+          persistConversation();
           updateContextBadge();
           State.emit('data:files:refresh');
           showToast(`"${attachedName}" uploaded & injected`);
@@ -271,46 +393,34 @@ async function sendMessage() {
     }
 
     if (!q) {
+      const content = `File processed and added to context: ${attachedName}`;
       thinkingEl.innerHTML = `File processed and added to context: <strong>${escHtml(attachedName)}</strong>`;
+      pushHistory({ role: 'assistant', content, sources: [], fileNames: [attachedName] });
       scrollToBottom();
       return;
     }
 
     try {
       thinkingEl.innerHTML = `<span style="color:var(--gl-on-surface-4);font-style:italic">Thinking…</span>`;
-      const data = await queryRAG(q, activeFileIds);
+      const data = await queryRAG(q, activeFileIds, previousHistory);
       const answer = data.answer || '';
-
-      // Format answer with line breaks preserved
-      let html = `<div style="line-height:1.7;white-space:pre-wrap">${escHtml(answer)}</div>`;
 
       const validSources = (data.sources || []).filter(s => {
         const page = s.page ?? s.page_number;
         return (s.file || s.filename || s.source) && page !== undefined && page !== null && page !== '';
       });
-      if (validSources.length) {
-        html += `<div class="ai-sources">
-          <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gl-on-surface-4);margin-bottom:8px">Sources</div>
-          <div style="display:flex;flex-direction:column;gap:6px">
-            ${validSources.map(s => {
-              const fileName = s.file || s.filename || s.source;
-              const page = s.page ?? s.page_number;
-              const snippet = s.preview || s.snippet || s.text || '';
-              return `<div class="ai-source-chip" style="display:block;line-height:1.45">
-                <div style="display:flex;align-items:center;gap:5px;font-weight:700">
-                  <span class="material-symbols-outlined" style="font-size:12px">description</span>
-                  ${escHtml(fileName)} · Page ${escHtml(String(page))}
-                </div>
-                ${snippet ? `<div style="margin-top:3px;color:var(--gl-on-surface-3);font-weight:400">${escHtml(String(snippet).slice(0, 180))}</div>` : ''}
-              </div>`;
-            }).join('')}
-          </div>
-        </div>`;
-      }
 
-      thinkingEl.innerHTML = html;
+      thinkingEl.innerHTML = botMessageHtml(answer, validSources);
+      pushHistory({
+        role: 'assistant',
+        content: answer,
+        sources: validSources,
+        fileNames: injectedFileNames(),
+      });
     } catch (e) {
-      thinkingEl.innerHTML = `<span style="color:#f5574a">Error: ${escHtml(e.message)}</span>`;
+      const content = `Error: ${e.message}`;
+      thinkingEl.innerHTML = `<span style="color:#f5574a">${escHtml(content)}</span>`;
+      pushHistory({ role: 'assistant', content, sources: [] });
     }
 
     scrollToBottom();
@@ -328,6 +438,36 @@ function userMessageHtml(text, attachment) {
       <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(attachment.name)}</span>
     </div>` : '';
   return `${body}${fileChip}`;
+}
+
+function botMessageHtml(answer, sources = []) {
+  let html = `<div style="line-height:1.7;white-space:pre-wrap">${escHtml(answer || '')}</div>`;
+  const validSources = (sources || []).filter(s => {
+    const page = s.page ?? s.page_number;
+    return (s.file || s.filename || s.source) && page !== undefined && page !== null && page !== '';
+  });
+
+  if (!validSources.length) return html;
+
+  html += `<div class="ai-sources">
+    <div style="font-size:0.65rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--gl-on-surface-4);margin-bottom:8px">Sources</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${validSources.map(s => {
+        const fileName = s.file || s.filename || s.source;
+        const page = s.page ?? s.page_number;
+        const snippet = s.preview || s.snippet || s.text || '';
+        return `<div class="ai-source-chip" style="display:block;line-height:1.45">
+          <div style="display:flex;align-items:center;gap:5px;font-weight:700">
+            <span class="material-symbols-outlined" style="font-size:12px">description</span>
+            ${escHtml(fileName)} · Page ${escHtml(String(page))}
+          </div>
+          ${snippet ? `<div style="margin-top:3px;color:var(--gl-on-surface-3);font-weight:400">${escHtml(String(snippet).slice(0, 180))}</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+
+  return html;
 }
 
 function processingFileHtml(filename) {

@@ -158,6 +158,10 @@ STRICT RULES:
 - Use ONLY facts explicitly present in the context.
 - Every answer MUST include citations from the provided metadata only.
 - If the context does not explicitly support the answer, return the fallback JSON exactly.
+- Conversation history is provided only to understand follow-up wording,
+  remember attached PDF names, and answer questions about this chat.
+- For company/document facts, use document context and citations only.
+- If answering only from conversation history or active PDF names, use sources: [].
 
 If the input is a greeting like "hi" or "hello", return:
 {"answer":"Hello! How can I help you?","sources":[],"context_preview":[]}
@@ -244,15 +248,37 @@ class RAGQueryEngine:
                 "Export it: export GROQ_API_KEY=gsk_..."
             )
 
-    def query(self, question: str, workplace_id: str | None = None) -> QueryResult:
+    def query(
+        self,
+        question: str,
+        workplace_id: str | None = None,
+        source_names: list[str] | None = None,
+        history: list[dict] | None = None,
+    ) -> QueryResult:
         if not question.strip():
             raise ValueError("Question cannot be empty.")
 
+        normalized_question = " ".join(question.split())
+        if _is_greeting(normalized_question):
+            return QueryResult(
+                answer="Hello! How can I help you?",
+                sources=[],
+                context_preview=[],
+                raw_chunks=[],
+            )
+
+        history_context = _format_history(history or [])
+        active_sources = [name for name in (source_names or []) if name]
+
         # 1. Convert the user's intent into multiple semantic search queries.
-        search_queries = self._build_search_queries(question)
+        search_queries = self._build_search_queries(question, history_context)
 
         # 2. Retrieve and merge chunks across all query variants.
-        raw_chunks = self._retrieve_for_queries(search_queries, workplace_id=workplace_id)
+        raw_chunks = self._retrieve_for_queries(
+            search_queries,
+            workplace_id=workplace_id,
+            source_names=set(active_sources) if active_sources else None,
+        )
         logger.info(
             "Retrieved %d relevant chunks across %d query variants (threshold=%.2f) for: %s",
             len(raw_chunks), len(search_queries), self._score_threshold, question[:60],
@@ -260,7 +286,7 @@ class RAGQueryEngine:
 
         # 3. Trim to context token budget
         raw_chunks = _trim_to_budget(raw_chunks, budget_chars=CONTEXT_TOKEN_BUDGET * 4)
-        if not raw_chunks:
+        if not raw_chunks and not history_context and not active_sources:
             return QueryResult(
                 answer="I don't know based on the provided documents.",
                 sources=[],
@@ -270,21 +296,33 @@ class RAGQueryEngine:
 
         # 4. Make one answer call. The context budget above prevents oversized
         # payloads while avoiding extra rate-limit pressure from batch calls.
-        context_block = _build_context(raw_chunks)
-        token_count = _estimate_token_count(SYSTEM_PROMPT, question, context_block)
+        context_block = _build_context(raw_chunks) if raw_chunks else "(No matching document chunks were retrieved.)"
+        token_count = _estimate_token_count(SYSTEM_PROMPT, question, context_block + history_context)
         logger.debug("Final answer token estimation: ~%d tokens", token_count)
 
-        llm_response = self._call_groq(question, context_block)
+        llm_response = self._call_groq(
+            question,
+            context_block,
+            history_context=history_context,
+            active_sources=active_sources,
+        )
         return _parse_response(llm_response, raw_chunks)
 
-    def _build_search_queries(self, question: str) -> list[str]:
+    def _build_search_queries(self, question: str, history_context: str = "") -> list[str]:
         normalized_question = " ".join(question.split())
         if _is_greeting(normalized_question):
             return [normalized_question]
 
-        queries = [normalized_question]
+        history_aware_question = normalized_question
+        if history_context:
+            history_aware_question = (
+                f"Recent conversation:\n{history_context}\n\n"
+                f"Current question: {normalized_question}"
+            )
+
+        queries = [history_aware_question]
         try:
-            rewritten = self._rewrite_search_queries(normalized_question)
+            rewritten = self._rewrite_search_queries(history_aware_question)
             for query in rewritten:
                 cleaned = " ".join(str(query).split())
                 if cleaned and cleaned.lower() not in {q.lower() for q in queries}:
@@ -319,7 +357,12 @@ class RAGQueryEngine:
         queries = data.get("queries", [])
         return queries if isinstance(queries, list) else []
 
-    def _retrieve_for_queries(self, queries: list[str], workplace_id: str | None = None) -> list[dict]:
+    def _retrieve_for_queries(
+        self,
+        queries: list[str],
+        workplace_id: str | None = None,
+        source_names: set[str] | None = None,
+    ) -> list[dict]:
         merged: dict[str, dict] = {}
 
         for query in queries:
@@ -329,6 +372,7 @@ class RAGQueryEngine:
                 score_threshold=self._score_threshold,
                 candidate_k=self._candidate_k,
                 workplace_id=workplace_id,
+                source_names=source_names,
             )
             logger.info("Retrieved %d chunks for query variant: %s", len(chunks), query[:80])
 
@@ -398,8 +442,21 @@ class RAGQueryEngine:
         
         return result
 
-    def _call_groq(self, question: str, context: str) -> str:
-        user_message = f"Context:\n{context}\n\nQuestion: {question}"
+    def _call_groq(
+        self,
+        question: str,
+        context: str,
+        history_context: str = "",
+        active_sources: list[str] | None = None,
+    ) -> str:
+        active_pdf_block = "\n".join(f"- {name}" for name in (active_sources or [])) or "(none)"
+        history_block = history_context or "(none)"
+        user_message = (
+            f"Conversation history:\n{history_block}\n\n"
+            f"Active PDF context:\n{active_pdf_block}\n\n"
+            f"Document context:\n{context}\n\n"
+            f"Question: {question}"
+        )
 
         headers = {
             "Authorization": f"Bearer {self._api_key}",
@@ -470,6 +527,41 @@ class RAGQueryEngine:
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+def _format_history(history: list[dict], max_turns: int = 8, max_chars: int = 3_000) -> str:
+    """Compact chat history for follow-up resolution without bloating prompts."""
+    lines: list[str] = []
+    for item in history[-max_turns:]:
+        if not isinstance(item, dict):
+            continue
+
+        role = str(item.get("role") or "").strip().lower()
+        if role not in {"user", "assistant", "bot"}:
+            continue
+        role_label = "assistant" if role == "bot" else role
+
+        content = " ".join(str(item.get("content") or item.get("text") or "").split())
+        attachment_name = str(item.get("attachment_name") or item.get("attachmentName") or "").strip()
+        file_names = item.get("file_names") or item.get("fileNames") or []
+        if isinstance(file_names, str):
+            file_names = [file_names]
+        file_names = [str(name).strip() for name in file_names if str(name).strip()]
+
+        extras = []
+        if attachment_name:
+            extras.append(f"attached PDF: {attachment_name}")
+        if file_names:
+            extras.append("active PDFs: " + ", ".join(file_names[:5]))
+
+        detail = content
+        if extras:
+            detail = f"{detail} ({'; '.join(extras)})" if detail else f"({'; '.join(extras)})"
+        if detail:
+            lines.append(f"{role_label}: {detail[:700]}")
+
+    formatted = "\n".join(lines)
+    return formatted[-max_chars:]
+
+
 def _trim_to_budget(chunks: list[dict], budget_chars: int) -> list[dict]:
     """
     Keep chunks in score order until the cumulative content length would

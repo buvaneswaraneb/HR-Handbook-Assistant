@@ -32,12 +32,38 @@ class AnalyticsRepository:
         rows = q.execute().data
         return {row["employee_id"] for row in rows if row.get("employee_id")}
 
+    @staticmethod
+    def _project_progress(row: dict) -> int:
+        try:
+            return int(float(row.get("percent_complete") or 0))
+        except (TypeError, ValueError):
+            return 0
+
     def active_project_count(self, workplace_id: str | None = None) -> int:
-        q = self.db.table("projects").select("id").eq("status", "active")
+        q = self.db.table("projects").select("id, status, percent_complete")
         if workplace_id:
             q = q.eq("workplace_id", workplace_id)
         rows = q.execute().data
-        return len(rows)
+
+        def is_live_project(row: dict) -> bool:
+            status = (row.get("status") or "active").lower()
+            return status == "active" and self._project_progress(row) < 100
+
+        return sum(1 for row in rows if is_live_project(row))
+
+    def completed_project_count(self, workplace_id: str | None = None) -> int:
+        q = self.db.table("projects").select("id, status, percent_complete")
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
+        rows = q.execute().data
+
+        def is_completed_project(row: dict) -> bool:
+            status = (row.get("status") or "active").lower()
+            if status == "cancelled":
+                return False
+            return status == "completed" or self._project_progress(row) >= 100
+
+        return sum(1 for row in rows if is_completed_project(row))
 
     def required_skills(self, workplace_id: str | None = None) -> list[dict]:
         q = self.db.table("required_skills").select("department, head_count, skills(name)")

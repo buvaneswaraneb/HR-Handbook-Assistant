@@ -29,7 +29,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 # Load environment variables from .env file
 load_dotenv()
@@ -54,6 +54,8 @@ from app.services.ingestion import IngestionResult, run_ingestion          # noq
 from app.services.ingestion.loader import CACHE_DIR                        # noqa: E402
 from app.services.ingestion.vector_store import VectorStore                # noqa: E402
 from app.services.e_r_s import file_service as file_svc                    # noqa: E402
+from app.services.e_r_s.db import get_db                                   # noqa: E402
+from app.services.e_r_s.repositories.file_repo import FileRepository       # noqa: E402
 from app.services.rag import RAGQueryEngine                                # noqa: E402
 from app.api.auth_context import get_workplace_id                          # noqa: E402
 
@@ -140,8 +142,17 @@ class StoreStatus(BaseModel):
     docs_processed: int
 
 
+class ChatHistoryItem(BaseModel):
+    role: str
+    content: str = ""
+    attachment_name: str | None = None
+    file_names: list[str] = Field(default_factory=list)
+
+
 class QueryRequest(BaseModel):
     question: str
+    file_ids: list[str] = Field(default_factory=list)
+    history: list[ChatHistoryItem] = Field(default_factory=list)
 
 
 class SourceItem(BaseModel):
@@ -196,6 +207,21 @@ def _safe_preview_items(items: object) -> list[PreviewItem]:
         if isinstance(item, dict):
             safe_items.append(PreviewItem(**item))
     return safe_items
+
+
+def _resolve_file_sources(file_ids: list[str], workplace_id: str | None) -> list[str]:
+    """Map selected UI file IDs to vector-store source filenames."""
+    if not file_ids:
+        return []
+
+    repo = FileRepository(get_db())
+    filenames: list[str] = []
+    for file_id in dict.fromkeys(file_ids):
+        record = repo.get_by_id(str(file_id), workplace_id)
+        filename = (record or {}).get("filename")
+        if filename and filename not in filenames:
+            filenames.append(filename)
+    return filenames
 
 
 def _run_ingestion_job(
@@ -349,15 +375,19 @@ async def query_endpoint(body: QueryRequest, authorization: str | None = Header(
     """Ask a natural-language question; returns an LLM answer with citations."""
     if _engine is None:
         raise HTTPException(status_code=503, detail="Query engine not initialised")
-    if _store and _store.total_vectors == 0:
-        raise HTTPException(
-            status_code=400,
-            detail="No documents ingested yet. POST to /ingest first.",
-        )
 
     workplace_id = get_workplace_id(authorization)
+    source_names = _resolve_file_sources(body.file_ids, workplace_id)
+    if body.file_ids and not source_names:
+        raise HTTPException(status_code=400, detail="Selected PDF context is no longer available.")
+
     try:
-        result = _engine.query(body.question, workplace_id=workplace_id)
+        result = _engine.query(
+            body.question,
+            workplace_id=workplace_id,
+            source_names=source_names,
+            history=[item.model_dump() for item in body.history],
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:

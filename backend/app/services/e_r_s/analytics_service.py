@@ -9,6 +9,7 @@ def get_summary(workplace_id: str | None = None) -> dict:
 
     counts      = repo.employee_counts(workplace_id)
     active_proj = repo.active_project_count(workplace_id)
+    completed_proj = repo.completed_project_count(workplace_id)
     required    = repo.required_skills(workplace_id)
     actual_rows = repo.actual_skill_counts(workplace_id)
 
@@ -40,6 +41,8 @@ def get_summary(workplace_id: str | None = None) -> dict:
     return {
         "total_employees": counts["total"],
         "active_projects":  active_proj,
+        "live_projects":    active_proj,
+        "completed_projects": completed_proj,
         "on_leave":         counts["on_leave"],
         "available":        counts["available"],
         "skill_coverage":   skill_coverage,

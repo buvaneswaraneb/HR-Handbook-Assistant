@@ -30,10 +30,19 @@ export function showToast(msg, type = 'success', duration = 3500) {
 }
 
 // ─── MODAL ───────────────────────────────────────────────────
+function modalHookName(id, suffix) {
+  return `_on${id.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('')}${suffix}`;
+}
+
+function canCloseModal(id) {
+  const hook = window[modalHookName(id, 'CloseRequest')];
+  return hook ? hook() !== false : true;
+}
+
 export function openModal(id) {
   const el = document.getElementById(id);
   if (el) {
-    const hookName = `_on${id.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('')}Open`;
+    const hookName = modalHookName(id, 'Open');
     window[hookName]?.();
     el.classList.add('open');
     el.querySelector('[autofocus]')?.focus();
@@ -42,16 +51,16 @@ export function openModal(id) {
 
 export function closeModal(id) {
   const el = document.getElementById(id);
-  if (el) el.classList.remove('open');
+  if (el && canCloseModal(id)) el.classList.remove('open');
 }
 
 export function initModalOverlays() {
   document.querySelectorAll('.modal-overlay').forEach(m => {
-    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+    m.addEventListener('click', e => { if (e.target === m) closeModal(m.id); });
   });
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+      document.querySelectorAll('.modal-overlay.open').forEach(m => closeModal(m.id));
     }
   });
 }

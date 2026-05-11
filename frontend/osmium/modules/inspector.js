@@ -23,6 +23,7 @@ export function initInspector() {
     if (type === 'employee') renderEmployee(data);
     if (type === 'project')  renderProject(data);
   });
+  State.on('inspector:close', closeInspector);
 
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape' && State.inspectorOpen) closeInspector();

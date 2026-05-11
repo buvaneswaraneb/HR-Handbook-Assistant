@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import date, time, datetime
-from typing import Optional, List
+from typing import Literal, Optional, List
 from uuid import UUID
 from pydantic import BaseModel, EmailStr, Field, condecimal, model_validator
 
@@ -155,6 +155,32 @@ class ProjectUpdate(BaseModel):
     team_member_ids: Optional[List[UUID]] = None
 
 
+class ProjectRequirementsSuggestRequest(BaseModel):
+    target: Literal["skills", "roles", "both"] = "both"
+    project_name: str
+    client_name: Optional[str] = None
+    project_description: Optional[str] = None
+    existing_skills: List[str] = Field(default_factory=list)
+    existing_roles: List[str] = Field(default_factory=list)
+
+
+class ProjectRequirementsSuggestResponse(BaseModel):
+    required_skills: List[str] = Field(default_factory=list)
+    required_roles: List[str] = Field(default_factory=list)
+
+
+class ProjectSummarySuggestRequest(BaseModel):
+    project_name: str
+    client_name: Optional[str] = None
+    project_description: Optional[str] = None
+    required_skills: List[str] = Field(default_factory=list)
+    required_roles: List[str] = Field(default_factory=list)
+
+
+class ProjectSummarySuggestResponse(BaseModel):
+    summary: str
+
+
 class ProjectOut(BaseModel):
     id: UUID
     project_name: str
@@ -247,6 +273,8 @@ class SkillCoverageItem(BaseModel):
 class AnalyticsSummary(BaseModel):
     total_employees: int
     active_projects: int
+    live_projects: int = 0
+    completed_projects: int = 0
     on_leave: int
     available: int
     skill_coverage: List[SkillCoverageItem]

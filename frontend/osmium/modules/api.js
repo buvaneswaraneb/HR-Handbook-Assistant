@@ -164,7 +164,7 @@ async function request(path, opts = {}) {
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
   if (method !== 'GET') {
-    invalidateApiCache(invalidate || invalidationPrefixes(path));
+    if (invalidate !== false) invalidateApiCache(invalidate || invalidationPrefixes(path));
   }
 
   if (res.status === 204) return null;
@@ -295,6 +295,14 @@ export async function createProject(body) {
   return request('/projects', { method: 'POST', body: JSON.stringify(body) });
 }
 
+export async function updateProject(id, body) {
+  return request(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+}
+
+export async function deleteProject(id) {
+  return request(`/projects/${id}`, { method: 'DELETE' });
+}
+
 export async function assignToProject(projId, body) {
   return request(`/projects/${projId}/assign`, { method: 'POST', body: JSON.stringify(body) });
 }
@@ -305,6 +313,22 @@ export async function unassignFromProject(projId, empId) {
 
 export async function getProjectTeam(projId) {
   return request(`/projects/${projId}/team`);
+}
+
+export async function suggestProjectRequirements(body) {
+  return request('/projects/ai/requirements', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    invalidate: false,
+  });
+}
+
+export async function suggestProjectSummary(body) {
+  return request('/projects/ai/summary', {
+    method: 'POST',
+    body: JSON.stringify(body),
+    invalidate: false,
+  });
 }
 
 // ─── ACTIVITY ────────────────────────────────────────────────
@@ -351,10 +375,10 @@ export async function linkFile(fileId, body) {
 }
 
 // ─── RAG / AI ─────────────────────────────────────────────────
-export async function queryRAG(question, fileIds = []) {
+export async function queryRAG(question, fileIds = [], history = []) {
   return request('/query', {
     method: 'POST',
-    body: JSON.stringify({ question, file_ids: fileIds }),
+    body: JSON.stringify({ question, file_ids: fileIds, history }),
   });
 }
 

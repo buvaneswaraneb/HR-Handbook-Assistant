@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Osmium — Enterprise Resource Management</title>
-  <link rel="stylesheet" href="styles/glacier.css" />
+  <link rel="stylesheet" href="styles/glacier.css?v=20260510-3" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
     rel="stylesheet" />
   <link rel="icon" href="icon/osmium_logo.svg" type="image/svg+xml" />
@@ -320,7 +320,7 @@
           </div>
 
           <!-- Metric cards -->
-          <div class="grid-4" style="margin-bottom:24px">
+          <div class="grid-4" style="margin-bottom:24px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
             <div class="card metric-card" style="padding:18px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                 <div
@@ -345,7 +345,7 @@
               <div id="metric-projects"
                 style="font-size:2rem;font-weight:800;color:var(--gl-on-surface);letter-spacing:-0.03em"><span
                   class="spinner"></span></div>
-              <div style="font-size:0.78rem;color:var(--gl-on-surface-3);margin-top:4px">Total Projects</div>
+              <div style="font-size:0.78rem;color:var(--gl-on-surface-3);margin-top:4px">Live Projects</div>
             </div>
             <div class="card metric-card" style="padding:18px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -386,6 +386,19 @@
                   class="spinner"></span></div>
               <div style="font-size:0.78rem;color:var(--gl-on-surface-3);margin-top:4px">On Leave</div>
             </div>
+            <div class="card metric-card" style="padding:18px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+                <div
+                  style="width:36px;height:36px;border-radius:var(--r-md);background:var(--gl-success-muted);display:flex;align-items:center;justify-content:center;color:var(--gl-success)">
+                  <span class="material-symbols-outlined">task_alt</span>
+                </div>
+                <span style="font-size:0.72rem;font-weight:600;color:var(--gl-success)">Done</span>
+              </div>
+              <div id="metric-completed-projects"
+                style="font-size:2rem;font-weight:800;color:var(--gl-on-surface);letter-spacing:-0.03em"><span
+                  class="spinner"></span></div>
+              <div style="font-size:0.78rem;color:var(--gl-on-surface-3);margin-top:4px">Completed Projects</div>
+            </div>
           </div>
 
           <!-- Google Calendar + Deadlines -->
@@ -418,8 +431,8 @@
               <div
                 style="padding:18px 18px 14px;border-bottom:1px solid var(--gl-outline);display:flex;align-items:center;justify-content:space-between">
                 <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface)">Deadlines</div>
-                <span
-                  style="font-size:0.68rem;font-weight:700;letter-spacing:0.06em;color:#f5574a;text-transform:uppercase">Critical</span>
+                <span id="deadline-critical-count"
+                  style="font-size:0.68rem;font-weight:700;letter-spacing:0.06em;color:#f5574a;text-transform:uppercase">0 Critical</span>
               </div>
               <div id="deadlines-list" style="padding:14px 16px">
                 <div style="display:flex;align-items:center;gap:10px;color:var(--gl-on-surface-4)">
@@ -730,6 +743,11 @@
               <div style="font-size:0.9rem;font-weight:700;color:var(--gl-on-surface)">Osmium Intelligence</div>
               <div style="font-size:0.7rem;color:var(--gl-on-surface-4)">Enterprise RAG Assistant</div>
             </div>
+            <div style="flex:1"></div>
+            <button type="button" class="btn btn-ghost btn-sm" id="ai-new-chat" title="Start new chat">
+              <span class="material-symbols-outlined" style="font-size:16px">add_comment</span>
+              New chat
+            </button>
           </div>
           <div id="ai-messages">
             <div class="ai-msg ai-msg-bot">
@@ -766,8 +784,7 @@
         <div id="ai-files-sidebar">
           <div id="ai-files-header">
             <div style="font-size:0.8rem;font-weight:700;color:var(--gl-on-surface)">Injected Context</div>
-            <span id="ai-context-badge" style="font-size:0.65rem;color:var(--gl-on-surface-4);font-weight:600">0
-              files</span>
+            <span id="ai-context-badge" style="font-size:0.65rem;color:var(--gl-on-surface-4);font-weight:600">No files in context</span>
           </div>
           <div id="ai-files-panel">
             <div style="padding:24px;text-align:center;color:var(--gl-on-surface-4)">
@@ -1033,7 +1050,7 @@
     <div class="modal">
       <div class="modal-header">
         <span class="material-symbols-outlined" style="color:var(--gl-primary)">create_new_folder</span>
-        <span style="font-size:1rem;font-weight:700;color:var(--gl-on-surface);flex:1">New Project</span>
+        <span id="proj-modal-title" style="font-size:1rem;font-weight:700;color:var(--gl-on-surface);flex:1">New Project</span>
         <button class="btn btn-ghost btn-icon" onclick="closeModal('add-project-modal')">
           <span class="material-symbols-outlined" style="font-size:18px">close</span>
         </button>
@@ -1082,17 +1099,37 @@
           </div>
         </div>
         <div style="margin-top:12px">
+          <div class="label">Description</div>
+          <div class="ai-textarea-wrap" id="proj-desc-wrap">
+            <textarea id="proj-desc" class="input ai-textarea-input" rows="3"
+              placeholder="Project description…" style="resize:vertical"></textarea>
+            <button type="button" class="ai-field-btn ai-summary-btn" id="proj-ai-summary-btn"
+              title="Refine and summarize project description with AI">
+              <img class="ai-summary-icon-dark" src="icon/summary/ai_summary_dark.svg" alt="">
+              <img class="ai-summary-icon-light" src="icon/summary/ai_summary_light.svg" alt="">
+            </button>
+          </div>
+        </div>
+        <div style="margin-top:12px">
           <div class="label">Required Skills</div>
-          <div class="skill-tag-wrap">
+          <div class="skill-tag-wrap" id="proj-skill-wrap">
             <div id="proj-skill-tags" style="display:inline-flex;flex-wrap:wrap;gap:4px"></div><input
               id="proj-skill-input" class="skill-tag-input" placeholder="e.g. React, Node.js">
+            <button type="button" class="ai-field-btn" id="proj-ai-skills-btn" title="Generate required skills with AI">
+              <img class="ai-input-icon-dark" src="icon/ai_input_dark.svg" alt="">
+              <img class="ai-input-icon-light" src="icon/ai_input_light.svg" alt="">
+            </button>
           </div>
         </div>
         <div style="margin-top:12px">
           <div class="label">Roles Needed</div>
-          <div class="skill-tag-wrap">
+          <div class="skill-tag-wrap" id="proj-role-wrap">
             <div id="proj-role-tags" style="display:inline-flex;flex-wrap:wrap;gap:4px"></div><input
               id="proj-role-input" class="skill-tag-input" placeholder="e.g. Designer, QA">
+            <button type="button" class="ai-field-btn" id="proj-ai-roles-btn" title="Generate roles needed with AI">
+              <img class="ai-input-icon-dark" src="icon/ai_input_dark.svg" alt="">
+              <img class="ai-input-icon-light" src="icon/ai_input_light.svg" alt="">
+            </button>
           </div>
         </div>
         <div style="margin-top:12px">
@@ -1106,10 +1143,6 @@
               employees...</div>
           </div>
           <div id="proj-assignment-summary" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
-        </div>
-        <div style="margin-top:12px">
-          <div class="label">Description</div><textarea id="proj-desc" class="input" rows="3"
-            placeholder="Project description…" style="resize:vertical"></textarea>
         </div>
       </form>
       <div class="modal-footer">
@@ -1173,18 +1206,18 @@
   <script type="module">
     import { State } from './utils/state.js';
     import { initModalOverlays, switchView, initApiStatus, initKeyboardShortcuts, showToast, openModal, closeModal, applyTheme } from './modules/ui.js';
-    import { initCanvas, addEmployeeToCanvas, renderNodes } from './modules/canvas.js';
-    import { initInspector } from './modules/inspector.js';
-    import { initDashboard, loadDashboard } from './modules/dashboard.js?v=20260510-1';
-    import { initEmployees, loadEmployees } from './modules/employees.js';
-    import { initProjects } from './modules/projects.js';
+    import { initCanvas, addEmployeeToCanvas, renderNodes } from './modules/canvas.js?v=20260511-2';
+    import { initInspector } from './modules/inspector.js?v=20260510-1';
+    import { initDashboard, loadDashboard } from './modules/dashboard.js?v=20260510-3';
+    import { initEmployees, loadEmployees } from './modules/employees.js?v=20260510-1';
+    import { initProjects } from './modules/projects.js?v=20260510-5';
     import { initFiles } from './modules/files.js';
     import { initTree } from './modules/tree.js';
     import { initAI } from './modules/ai.js';
     import { initSettings } from './modules/settings.js';
     import { initLeave } from './modules/leave.js?v=20260509-3';
     import { debounce } from './utils/helpers.js?v=20260509-3';
-    import { initAuth } from './modules/auth.js';
+    import { initAuth } from './modules/auth.js?v=20260510-1';
 
     // ── Load settings first ─────────────────────────
     State.loadSettings();

@@ -8,7 +8,7 @@ import { State } from '../utils/state.js';
 import { uid, clamp, snap, throttle } from '../utils/helpers.js?v=20260509-3';
 import { showContextMenu, showToast } from './ui.js';
 import { escHtml, initials, avatarColor, avatarTextColor } from '../utils/helpers.js?v=20260509-3';
-import { getEmployees, getProjects, assignToProject, unassignFromProject } from './api.js?v=20260509-5';
+import { getEmployees, getProjects, assignToProject, unassignFromProject } from './api.js?v=20260510-4';
 
 let world, svgLayer, bgEl, zoomLabel, selBox;
 let isPanning = false, isSpaceDown = false;
@@ -17,9 +17,13 @@ let isSelecting = false, selStartX = 0, selStartY = 0;
 let panStartX = 0, panStartY = 0, panOriginX = 0, panOriginY = 0;
 let isConnecting = false, connectFromId = null, connectSnapTargetId = null, connectPreviewPath = null;
 let hoveredEmployeeNodeId = null, hoveredEdgeDeleteEmployeeId = null;
+const aiAssigningProjectNodeIds = new Set();
+let lastProjectTapNodeId = null;
+let lastProjectTapAt = 0;
 
 const MIN_ZOOM = 0.15, MAX_ZOOM = 3.0;
 const ZOOM_STEP = 0.1;
+const DOUBLE_TAP_MS = 320;
 const PROJECT_NODE_W = 240;
 const PROJECT_NODE_H = 128;
 const EMPLOYEE_NODE_W = 116;
@@ -127,6 +131,10 @@ function updateZoomLabel() {
 // ─── MOUSE ────────────────────────────────────────────────────
 function onMouseDown(e) {
   const target = e.target;
+
+  if (target.closest('button,input,textarea,select,a,[data-canvas-control]')) {
+    return;
+  }
 
   // Right click → context menu on node
   if (e.button === 2) {
@@ -584,7 +592,7 @@ function canvasNodeRenderKey(node) {
   if (node.type === 'project') {
     const proj = State.projects.find(p => sameId(p.id, node.projectId)) || {};
     const connectedCount = State.canvas.edges.filter(edge => edge.fromId === node.id || edge.toId === node.id).length;
-    return ['project', node.projectId, proj.project_name, proj.client_name, proj.status, proj.percent_complete, connectedCount].join('|');
+    return ['project', node.projectId, proj.project_name, proj.client_name, proj.status, proj.percent_complete, connectedCount, node.childrenHidden].join('|');
   }
   const emp = getEmployeeForNode(node);
   return ['employee', node.empId, emp.name, emp.role, emp.availability, node.projectRole].join('|');
@@ -673,16 +681,21 @@ function canvasRoleLabel(role) {
 function createProjectNodeElement(node) {
   const proj = State.projects.find(p => sameId(p.id, node.projectId)) || {};
   const el = document.createElement('div');
-  el.className = 'canvas-node canvas-node-project';
+  const isAiAssigning = aiAssigningProjectNodeIds.has(node.id);
+  const childrenHidden = node.childrenHidden === true;
+  el.className = `canvas-node canvas-node-project${isAiAssigning ? ' ai-generating' : ''}${childrenHidden ? ' children-hidden' : ''}`;
   el.dataset.id = node.id;
 
   const status = String(proj.status || 'active').toLowerCase();
   const isActive = status === 'active';
   const sc = isActive ? 'var(--gl-success)' : 'var(--gl-error)';
   const pct = proj.percent_complete ?? 0;
-  const connectedCount = State.canvas.edges.filter(edge =>
+  const visibleConnectionCount = State.canvas.edges.filter(edge =>
     edge.fromId === node.id || edge.toId === node.id
-  ).length || (Array.isArray(proj.team) ? proj.team.length : 0);
+  ).length;
+  const teamCount = Array.isArray(proj.team) ? proj.team.length : 0;
+  const connectedCount = visibleConnectionCount || teamCount;
+  const childCountLabel = childrenHidden ? `${connectedCount} hidden` : `${connectedCount} connected`;
 
   el.innerHTML = `
     <div class="project-node-topline">
@@ -696,7 +709,7 @@ function createProjectNodeElement(node) {
       <span class="project-status-dot" style="background:${sc}" title="${escHtml(proj.status || 'active')}"></span>
     </div>
     <div class="project-node-meta">
-      <span>${connectedCount} connected</span>
+      <span>${childCountLabel}</span>
       <span>${pct}%</span>
     </div>
     <div class="project-node-progress">
@@ -704,20 +717,52 @@ function createProjectNodeElement(node) {
     </div>
     <div class="project-node-footer">
       <span>${escHtml(proj.status || 'active')}</span>
-      <button class="node-mini-action" title="Inspect" onclick="window._inspectNode('${node.id}')">
-        <span class="material-symbols-outlined" style="font-size:13px">open_in_new</span>
-      </button>
+      <div class="project-node-actions">
+        <button class="node-mini-action canvas-ai-assign-btn${isAiAssigning ? ' is-loading' : ''}" data-canvas-control title="AI assign available team" onmousedown="event.stopPropagation()" onclick="event.preventDefault(); event.stopPropagation(); window._aiAssignProjectNode('${node.id}')" ${isAiAssigning ? 'disabled' : ''}>
+          <img class="ai-input-icon-dark" src="icon/ai_input_dark.svg" alt="">
+          <img class="ai-input-icon-light" src="icon/ai_input_light.svg" alt="">
+        </button>
+        <button class="node-mini-action" data-canvas-control title="Inspect" onmousedown="event.stopPropagation()" onclick="event.preventDefault(); event.stopPropagation(); window._inspectNode('${node.id}')">
+          <span class="material-symbols-outlined" style="font-size:13px">open_in_new</span>
+        </button>
+      </div>
     </div>
     <div class="node-port node-port-t" data-node="${node.id}" title="Drag to connect"></div>
     <div class="node-port node-port-r" data-node="${node.id}" title="Drag to connect"></div>
     <div class="node-port node-port-b" data-node="${node.id}" title="Drag to connect"></div>
     <div class="node-port node-port-l" data-node="${node.id}" title="Drag to connect"></div>`;
 
-  el.addEventListener('click', async e => {
+  let clickTimer = null;
+  el.addEventListener('click', e => {
     if (e.target.closest('button,.node-port')) return;
-    State.selectNode(node.id, e.shiftKey);
-    const latest = await syncProjectTeamToCanvas(proj, node).catch(() => proj);
-    State.emit('inspector:open', { type: 'project', data: latest || proj });
+    e.stopPropagation();
+
+    const now = Date.now();
+    const isDoubleTap = e.detail > 1 ||
+      (lastProjectTapNodeId === node.id && now - lastProjectTapAt <= DOUBLE_TAP_MS);
+    lastProjectTapNodeId = node.id;
+    lastProjectTapAt = now;
+
+    if (isDoubleTap) {
+      clearTimeout(clickTimer);
+      lastProjectTapAt = 0;
+      toggleProjectChildren(node, proj);
+      return;
+    }
+
+    clearTimeout(clickTimer);
+    clickTimer = setTimeout(async () => {
+      State.selectNode(node.id, e.shiftKey);
+      const latest = node.childrenHidden
+        ? (State.projects.find(p => sameId(p.id, node.projectId)) || proj)
+        : await syncProjectTeamToCanvas(proj, node).catch(() => proj);
+      State.emit('inspector:open', { type: 'project', data: latest || proj });
+    }, DOUBLE_TAP_MS);
+  });
+
+  el.addEventListener('dblclick', e => {
+    e.preventDefault();
+    e.stopPropagation();
   });
 
   el.addEventListener('contextmenu', e => {
@@ -1200,6 +1245,241 @@ async function assignConnectedEmployeeRole(projectLink, employeeNode, emp, role)
   }
 }
 
+async function aiAssignProjectTeam(nodeId) {
+  const projectNode = State.canvas.nodes.find(node => node.id === nodeId && node.type === 'project');
+  if (!projectNode?.projectId || aiAssigningProjectNodeIds.has(nodeId)) return;
+
+  setProjectAiAssigning(nodeId, true);
+  showToast('AI is matching available employees to this project...', 'info', 2200);
+
+  try {
+    const [employees, projects] = await Promise.all([
+      getEmployees({ cache: false }),
+      getProjects({ cache: false }),
+    ]);
+    const project = projects.find(item => sameId(item.id, projectNode.projectId)) ||
+      State.projects.find(item => sameId(item.id, projectNode.projectId));
+
+    if (!project) {
+      showToast('Project could not be found.', 'error');
+      return;
+    }
+
+    const plan = buildAiProjectAssignmentPlan(project, employees);
+    if (!plan.length) {
+      showToast('No available matching employees found for this project.', 'warning');
+      return;
+    }
+
+    const successful = [];
+    const failed = [];
+    let updatedProject = project;
+
+    for (const item of plan) {
+      try {
+        updatedProject = await assignToProject(projectNode.projectId, {
+          employee_id: item.employee.id,
+          role_in_project: item.role,
+        });
+        if (updatedProject?.id) upsertStateProject(updatedProject);
+        successful.push(item);
+      } catch (err) {
+        failed.push({ item, message: err.message || 'Could not assign employee.' });
+      }
+    }
+
+    await getEmployees({ cache: false }).catch(() => null);
+    const refreshedProjects = await getProjects({ cache: false }).catch(() => null);
+    const finalProject = refreshedProjects?.find(item => sameId(item.id, projectNode.projectId)) || updatedProject;
+    if (finalProject?.id) upsertStateProject(finalProject);
+
+    if (!successful.length) {
+      showToast(failed[0]?.message || 'AI could not assign this team.', 'error');
+      return;
+    }
+
+    projectNode.childrenHidden = false;
+    await syncProjectTeamToCanvas(finalProject, projectNode);
+    renderNodes();
+    renderEdges();
+    initSidePanel();
+    fitToScreenIfVisible();
+    State.emit('data:projects:refresh');
+    State.emit('data:employees:refresh');
+
+    const lead = successful.find(item => item.role === 'team_lead');
+    const leadText = lead ? ` Team Lead: ${lead.employee.name}.` : '';
+    showToast(`AI assigned ${successful.length} employee${successful.length === 1 ? '' : 's'}.${leadText}`);
+    if (failed.length) {
+      showToast(`${failed.length} recommendation${failed.length === 1 ? '' : 's'} could not be saved.`, 'warning');
+    }
+  } catch (err) {
+    showToast(err.message || 'AI assignment failed.', 'error');
+  } finally {
+    setProjectAiAssigning(nodeId, false);
+  }
+}
+
+function setProjectAiAssigning(nodeId, busy) {
+  if (busy) aiAssigningProjectNodeIds.add(nodeId);
+  else aiAssigningProjectNodeIds.delete(nodeId);
+  const el = world?.querySelector(`.canvas-node[data-id="${nodeId}"]`);
+  el?.classList.toggle('ai-generating', busy);
+  const btn = el?.querySelector('.canvas-ai-assign-btn');
+  if (btn) {
+    btn.disabled = busy;
+    btn.classList.toggle('is-loading', busy);
+  }
+}
+
+function buildAiProjectAssignmentPlan(project, employees) {
+  const team = Array.isArray(project.team) ? project.team : [];
+  const assignedIds = new Set(team.map(teamMemberEmployeeId).filter(Boolean));
+  const selectedIds = new Set(assignedIds);
+  const roleTags = cleanAiTags(project.required_roles || []);
+  const skillTags = cleanAiTags(project.required_skills || []);
+  const hasManager = team.some(member => normalizeProjectRole(member.role_in_project) === 'manager');
+  const hasTeamLead = team.some(member => normalizeProjectRole(member.role_in_project) === 'teamlead');
+  const pool = employees.filter(emp => isEmployeeAvailableForAiProject(emp, project.id, assignedIds));
+  const plan = [];
+
+  const addPick = (role, roleLabel, filter) => {
+    const candidate = pickBestAiCandidate(
+      pool,
+      selectedIds,
+      emp => filter(emp),
+      emp => scoreAiCandidate(emp, roleLabel, skillTags, role),
+    );
+    if (!candidate) return null;
+    selectedIds.add(normId(candidate.id));
+    plan.push({ employee: candidate, role, roleLabel });
+    return candidate;
+  };
+
+  const managerNeeded = roleTags.some(isManagerRoleTag);
+  if (!hasManager && managerNeeded) {
+    addPick('manager', 'Project Manager', isManagerEmployee);
+  }
+
+  const memberRoleTags = roleTags.filter(tag => !isManagerRoleTag(tag) && !isLeadRoleTag(tag));
+  const leadNeeded = roleTags.some(isLeadRoleTag) || memberRoleTags.length > 0 || skillTags.length > 0 || !team.length;
+  if (!hasTeamLead && leadNeeded) {
+    addPick('team_lead', 'Team Lead', emp => !isManagerEmployee(emp));
+  }
+
+  const memberTargets = memberRoleTags.length
+    ? memberRoleTags.slice(0, 5)
+    : fallbackMemberTargets(skillTags);
+
+  memberTargets.forEach(roleLabel => {
+    addPick('member', roleLabel, emp => !isManagerEmployee(emp));
+  });
+
+  return plan;
+}
+
+function pickBestAiCandidate(pool, selectedIds, filter, score) {
+  return pool
+    .filter(emp => emp?.id && !selectedIds.has(normId(emp.id)) && filter(emp))
+    .map(emp => ({ emp, score: score(emp) }))
+    .sort((a, b) => b.score - a.score || String(a.emp.name || '').localeCompare(String(b.emp.name || '')))[0]?.emp || null;
+}
+
+function isEmployeeAvailableForAiProject(emp, projectId, assignedIds) {
+  if (!emp?.id || assignedIds.has(normId(emp.id)) || emp.availability !== true) return false;
+  if (isManagerEmployee(emp)) return true;
+  return !(emp.projects || []).some(project => !sameId(project.project_id, projectId));
+}
+
+function isManagerEmployee(emp) {
+  return String(emp?.role || '').trim().toLowerCase().split(/\s+/).includes('manager');
+}
+
+function cleanAiTags(values) {
+  const seen = new Set();
+  const tags = [];
+  (values || []).forEach(value => {
+    const tag = String(value || '').trim();
+    const key = tag.toLowerCase();
+    if (!tag || seen.has(key)) return;
+    seen.add(key);
+    tags.push(tag);
+  });
+  return tags;
+}
+
+function isManagerRoleTag(tag) {
+  return /\bmanager\b/i.test(tag);
+}
+
+function isLeadRoleTag(tag) {
+  return /\b(team\s*)?lead(er)?\b/i.test(tag);
+}
+
+function fallbackMemberTargets(skillTags) {
+  if (!skillTags.length) return ['Project Member'];
+  const slots = Math.min(3, Math.max(1, Math.ceil(skillTags.length / 2)));
+  return Array.from({ length: slots }, (_, idx) => skillTags[idx] || 'Project Member');
+}
+
+function scoreAiCandidate(emp, roleLabel, skillTags, projectRole) {
+  const text = employeeAiText(emp);
+  const rating = Number(emp.rating) || 0;
+  const exp = Number(emp.total_experience_years) || 0;
+  const roleHits = tokenHits(roleLabel, text);
+  const skillHits = skillTags.reduce((sum, skill) => sum + tokenHits(skill, text), 0);
+  const directSkillHits = skillTags.reduce((sum, skill) => sum + directSkillScore(emp, skill), 0);
+  const skillExp = (emp.skills || []).reduce((sum, skill) => sum + (Number(skill.experience_years_with_skill) || 0), 0);
+
+  let score = rating * 12 + Math.min(exp, 20) * 2 + roleHits * 16 + skillHits * 5 + directSkillHits * 18 + Math.min(skillExp, 16) * 1.5;
+  if (projectRole === 'team_lead') {
+    score += rating * 14 + Math.min(exp, 24) * 3 + (/\blead(er)?\b/.test(text) ? 18 : 0);
+  }
+  if (projectRole === 'manager') {
+    score += rating * 10 + Math.min(exp, 25) * 2 + (isManagerEmployee(emp) ? 60 : 0);
+  }
+  return score;
+}
+
+function employeeAiText(emp) {
+  return [
+    emp.name,
+    emp.role,
+    emp.team,
+    ...(emp.skills || []).flatMap(skill => [skill.skill_name, skill.name, skill.notes]),
+    ...(emp.experience || []).flatMap(item => [item.job_title, item.company_name, item.description]),
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function tokenHits(value, text) {
+  return meaningfulTokens(value).reduce((count, token) => count + (text.includes(token) ? 1 : 0), 0);
+}
+
+function directSkillScore(emp, requiredSkill) {
+  const tokens = meaningfulTokens(requiredSkill);
+  if (!tokens.length) return 0;
+  return (emp.skills || []).reduce((score, skill) => {
+    const name = String(skill.skill_name || skill.name || '').toLowerCase();
+    const matched = tokens.some(token => name.includes(token));
+    if (!matched) return score;
+    return score + 1 + (Number(skill.skill_level) || 0) / 5;
+  }, 0);
+}
+
+function meaningfulTokens(value) {
+  return String(value || '')
+    .toLowerCase()
+    .split(/[^a-z0-9+#.]+/)
+    .map(token => token.trim())
+    .filter(token => token.length > 1 && !['and', 'for', 'the', 'with', 'project'].includes(token));
+}
+
+function upsertStateProject(project) {
+  const idx = State.projects.findIndex(item => sameId(item.id, project.id));
+  if (idx >= 0) State.projects.splice(idx, 1, project);
+  else State.projects.push(project);
+}
+
 function projectHasAssignment(project, employeeId, normalizedRole) {
   return project.team.some(member =>
     sameId(teamMemberEmployeeId(member), employeeId) &&
@@ -1264,6 +1544,74 @@ async function deleteCanvasConnection(edgeId) {
   }
 }
 
+async function toggleProjectChildren(projectNode, project = null) {
+  if (!projectNode?.projectId) return;
+  State.selectNode(projectNode.id);
+
+  const hasVisibleChildren = State.canvas.edges.some(edge =>
+    edgeBelongsToProject(edge, projectNode, normId(projectNode.projectId))
+  );
+
+  if (projectNode.childrenHidden || !hasVisibleChildren) {
+    projectNode.childrenHidden = false;
+    const latest = project ||
+      State.projects.find(item => sameId(item.id, projectNode.projectId)) ||
+      { id: projectNode.projectId };
+    await syncProjectTeamToCanvas(latest, projectNode);
+    renderNodes();
+    renderEdges();
+    fitToScreenIfVisible();
+    showToast('Project children shown.', 'info', 1800);
+    return;
+  }
+
+  projectNode.childrenHidden = true;
+  hideProjectChildren(projectNode);
+  renderNodes();
+  renderEdges();
+  showToast('Project children hidden.', 'info', 1800);
+}
+
+function hideProjectChildren(projectNode) {
+  const projectId = normId(projectNode.projectId);
+  const removableNodeIds = new Set();
+  const removedEdgeIds = new Set();
+
+  State.canvas.edges.forEach(edge => {
+    if (!edgeBelongsToProject(edge, projectNode, projectId)) return;
+    removedEdgeIds.add(edge.id);
+    const employeeNode = getProjectEdgeEmployeeNode(edge);
+    if (
+      employeeNode &&
+      sameId(employeeNode.projectChildOf, projectId) &&
+      !hasOtherCanvasConnections(employeeNode.id, projectId)
+    ) {
+      removableNodeIds.add(employeeNode.id);
+    }
+  });
+
+  State.canvas.edges = State.canvas.edges.filter(edge => !removedEdgeIds.has(edge.id));
+  State.canvas.nodes = State.canvas.nodes.filter(node => !removableNodeIds.has(node.id));
+  removableNodeIds.forEach(id => State.canvas.selectedIds.delete(id));
+  removedEdgeIds.forEach(id => world?.querySelector(`.canvas-edge-delete[data-edge-id="${id}"]`)?.remove());
+  normalizeProjectConnectionRoles();
+  State.emit('canvas:nodes:change', State.canvas.nodes);
+  State.emit('canvas:edges:change', State.canvas.edges);
+}
+
+function getProjectEdgeEmployeeNode(edge) {
+  const fromNode = State.canvas.nodes.find(node => node.id === edge.fromId);
+  const toNode = State.canvas.nodes.find(node => node.id === edge.toId);
+  return fromNode?.type === 'project' ? toNode : fromNode;
+}
+
+function hasOtherCanvasConnections(nodeId, projectId) {
+  return State.canvas.edges.some(edge => {
+    if (edge.fromId !== nodeId && edge.toId !== nodeId) return false;
+    return !sameId(edge.projectId, projectId);
+  });
+}
+
 function hasProjectConnection(employeeNodeId, ignoredEdgeId = null) {
   return State.canvas.edges.some(edge => {
     if (edge.id === ignoredEdgeId) return false;
@@ -1319,6 +1667,7 @@ function addEmployeeToCanvasAt(emp, x, y) {
 async function addProjectNodeToCanvas(proj, x, y) {
   const existing = State.canvas.nodes.find(n => n.type === 'project' && sameId(n.projectId, proj.id));
   if (existing) {
+    existing.childrenHidden = false;
     existing.x = x;
     existing.y = y;
     syncNodeEl(existing.id);
@@ -1341,6 +1690,7 @@ export async function addProjectTreeToCanvas(proj) {
 
   const existingRoot = State.canvas.nodes.find(n => n.type === 'project' && sameId(n.projectId, proj.id));
   if (existingRoot) {
+    existingRoot.childrenHidden = false;
     await syncProjectTeamToCanvas(proj, existingRoot);
     State.selectNode(existingRoot.id);
     fitToScreenIfVisible();
@@ -1356,6 +1706,7 @@ export async function addProjectTreeToCanvas(proj) {
     id: uid(),
     type: 'project',
     projectId: proj.id,
+    childrenHidden: false,
     x: rootX,
     y: rootY + rowGap,
   };
@@ -1396,6 +1747,12 @@ async function syncProjectTeamToCanvas(proj, projectNode) {
   const team = (Array.isArray(latest?.team) ? latest.team : [])
     .filter(member => teamMemberEmployeeId(member));
   const teamEmployeeIds = new Set(team.map(teamMemberEmployeeId));
+
+  if (projectNode.childrenHidden) {
+    hideProjectChildren(projectNode);
+    return latest;
+  }
+
   resetProjectConnectionEdges(projectNode, projectId, teamEmployeeIds);
 
   const peopleX = projectNode.x + 360;
@@ -1409,7 +1766,7 @@ async function syncProjectTeamToCanvas(proj, projectNode) {
 
     employeeNode ||= State.canvas.nodes.find(node => sameId(node.empId, employeeId));
     if (!employeeNode) {
-      employeeNode = nodeFromTeamMember(member, peopleX, startY + idx * rowGap, projectRole);
+      employeeNode = nodeFromTeamMember(member, peopleX, startY + idx * rowGap, projectRole, projectId);
       State.canvas.nodes.push(employeeNode);
     } else {
       employeeNode.projectRole = projectRole;
@@ -1507,13 +1864,14 @@ function fitToScreenIfVisible() {
   fitToScreen();
 }
 
-function nodeFromTeamMember(member, x, y, projectRole) {
+function nodeFromTeamMember(member, x, y, projectRole, projectId) {
   return {
     id: uid(),
     empId: teamMemberEmployeeId(member),
     x,
     y,
     projectRole,
+    projectChildOf: projectId,
     name: member.name || member.employee_name,
     role: member.role,
     availability: member.availability,
@@ -1578,4 +1936,8 @@ window._inspectNode = function (nodeId) {
     return;
   }
   State.emit('inspector:open', { type: 'employee', data: getEmployeeForNode(node) });
+};
+
+window._aiAssignProjectNode = function (nodeId) {
+  aiAssignProjectTeam(nodeId);
 };

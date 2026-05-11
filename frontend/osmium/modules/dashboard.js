@@ -4,7 +4,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getAnalytics, getProjects, getLeaveRecords, getGoogleCalendarStatus, getGoogleCalendarEvents, syncCalendarEvents, getGoogleCalendarAuthUrl, handleGoogleCalendarCallback } from './api.js?v=20260509-5';
+import { getAnalytics, getProjects, getLeaveRecords, getGoogleCalendarStatus, getGoogleCalendarEvents, syncCalendarEvents, getGoogleCalendarAuthUrl, handleGoogleCalendarCallback } from './api.js?v=20260510-4';
 import { showToast } from './ui.js';
 import { dateKey, escHtml, fmtDate, parseLocalDate, todayLocalDate } from '../utils/helpers.js?v=20260509-3';
 
@@ -45,7 +45,8 @@ async function loadAnalytics() {
   try {
     const data = await getAnalytics();
     animateCount('metric-employees', data.total_employees ?? 0);
-    animateCount('metric-projects', data.total_projects ?? data.active_projects ?? 0);
+    animateCount('metric-projects', data.live_projects ?? data.active_projects ?? data.total_projects ?? 0);
+    animateCount('metric-completed-projects', data.completed_projects ?? 0);
     animateCount('metric-assignments', data.active_assignments ?? data.assignments ?? data.assigned_employees ?? 0);
     animateCount('metric-available', data.available ?? 0);
     animateCount('metric-on-leave', data.on_leave ?? 0);
@@ -57,7 +58,7 @@ async function loadAnalytics() {
     if (el) el.textContent = pct + '% of total';
 
   } catch {
-    ['metric-employees', 'metric-projects', 'metric-assignments', 'metric-available', 'metric-on-leave']
+    ['metric-employees', 'metric-projects', 'metric-completed-projects', 'metric-assignments', 'metric-available', 'metric-on-leave']
       .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '—'; });
   }
 }
@@ -179,11 +180,22 @@ function renderDashboardLeaveHeatmap(el, records, totalEmployees) {
 async function loadDeadlines() {
   const el = document.getElementById('deadlines-list');
   if (!el) return;
+  const criticalEl = document.getElementById('deadline-critical-count');
 
   try {
     const projects = await getProjects();
-    const sorted = projects
-      .filter(p => p.days_remaining !== null && !['completed', 'cancelled'].includes(p.status))
+    const openDeadlines = projects.filter(p => {
+      const status = String(p.status || '').toLowerCase();
+      const days = Number(p.days_remaining);
+      const pct = Number(p.percent_complete || 0);
+      return Number.isFinite(days)
+        && !['completed', 'cancelled'].includes(status)
+        && pct < 100;
+    });
+    const criticalCount = openDeadlines.filter(p => Number(p.days_remaining) <= 3).length;
+    if (criticalEl) criticalEl.textContent = `${criticalCount} Critical`;
+
+    const sorted = openDeadlines
       .sort((a, b) => a.days_remaining - b.days_remaining)
       .slice(0, 5);
 
@@ -197,7 +209,7 @@ async function loadDeadlines() {
       const label = days < 0 ? `Overdue ${Math.abs(days)}d`
         : days === 0 ? 'Due today'
           : `Due in ${days}d`;
-      const pct = p.percent_complete || 0;
+      const pct = Math.max(0, Math.min(100, Number(p.percent_complete || 0)));
       const isUrgent = days <= 3;
       const isWarn = days <= 7 && days > 3;
 
@@ -219,6 +231,7 @@ async function loadDeadlines() {
         </div>`;
     }).join('');
   } catch {
+    if (criticalEl) criticalEl.textContent = '— Critical';
     el.innerHTML = `<div style="color:var(--gl-on-surface-4);font-size:0.82rem">Could not load deadlines.</div>`;
   }
 }

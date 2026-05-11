@@ -6,7 +6,7 @@
 import { State } from '../utils/state.js';
 import { showToast } from './ui.js';
 import { escHtml } from '../utils/helpers.js?v=20260509-3';
-import { getAuthProfile, getEmailAuthStatus, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260509-5';
+import { getAuthProfile, getEmailAuthStatus, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260510-1';
 
 let authPopup = null;
 let authReady = false;
@@ -212,7 +212,10 @@ async function restoreStoredSession() {
     setAuthenticatedSession(nextAuth);
     persistSession(nextAuth);
   } catch {
-    clearSession({ silent: true });
+    // In local dev the API/profile endpoint can briefly fail during reloads,
+    // focus changes, or tunnel reconnects. Keep the decoded stored session
+    // unless the API client already cleared it because of a real 401.
+    if (!State.auth?.accessToken) clearSession({ silent: true });
   }
 }
 

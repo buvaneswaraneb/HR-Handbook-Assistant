@@ -28,6 +28,12 @@ class ProjectRepository:
             q = q.eq("workplace_id", workplace_id)
         return q.execute().data[0]
 
+    def delete(self, project_id: str, workplace_id: str | None = None) -> None:
+        q = self.db.table("projects").delete().eq("id", project_id)
+        if workplace_id:
+            q = q.eq("workplace_id", workplace_id)
+        q.execute()
+
     def get_assignments(self, project_id: str, workplace_id: str | None = None) -> list[dict]:
         q = (
             self.db.table("project_assignments")

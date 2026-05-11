@@ -3,15 +3,17 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getEmployees, getProjects, createProject, assignToProject } from './api.js?v=20260509-5';
+import { getEmployees, getProjects, createProject, updateProject, deleteProject, suggestProjectRequirements, suggestProjectSummary } from './api.js?v=20260510-4';
 import { escHtml, fmtDate, statusBadge, initials, avatarColor, avatarTextColor, emptyState, skeletonRows } from '../utils/helpers.js?v=20260509-3';
 import { showToast, openModal, closeModal } from './ui.js';
-import { addProjectTreeToCanvas } from './canvas.js';
+import { addProjectTreeToCanvas } from './canvas.js?v=20260511-2';
 
 // Tag state
 let projSkillTags = [];
 let projRoleTags  = [];
 let projMemberIds = new Set();
+let allowProjectModalClose = false;
+let editingProjectId = null;
 
 function isManagerEmployee(emp) {
   return /\bmanager\b/i.test(String(emp?.role || '').trim());
@@ -32,6 +34,9 @@ export function initProjects() {
   // Skill & role tag inputs
   initTagInput('proj-skill-input', 'proj-skill-tags', () => projSkillTags, v => { projSkillTags = v; });
   initTagInput('proj-role-input',  'proj-role-tags',  () => projRoleTags,  v => { projRoleTags  = v; });
+  document.getElementById('proj-ai-skills-btn')?.addEventListener('click', () => generateProjectRequirements('skills'));
+  document.getElementById('proj-ai-roles-btn')?.addEventListener('click', () => generateProjectRequirements('roles'));
+  document.getElementById('proj-ai-summary-btn')?.addEventListener('click', generateProjectSummary);
 
   // Member chip selector
   document.getElementById('proj-member-search')?.addEventListener('input', filterMemberSearch);
@@ -43,12 +48,25 @@ function initTagInput(inputId, tagsId, getArr, setArr) {
   const input = document.getElementById(inputId);
   const tagsEl = document.getElementById(tagsId);
   if (!input || !tagsEl) return;
+  const placeholder = input.getAttribute('placeholder') || '';
+  const wrap = input.closest('.skill-tag-wrap');
 
   const renderTags = () => {
     tagsEl.innerHTML = getArr().map((t, i) =>
       `<span class="skill-tag">${escHtml(t)}<button type="button" onclick="window._removeTag('${inputId}',${i})">×</button></span>`
     ).join('');
+    input.placeholder = getArr().length ? '' : placeholder;
+    wrap?.classList.toggle('has-tags', getArr().length > 0);
   };
+
+  wrap?.addEventListener('click', e => {
+    if (!e.target.closest('.ai-field-btn') && !e.target.closest('.skill-tag button')) input.focus();
+  });
+
+  input.addEventListener('focus', () => wrap?.classList.add('is-editing'));
+  input.addEventListener('blur', () => {
+    if (!input.value.trim()) wrap?.classList.remove('is-editing');
+  });
 
   input.addEventListener('keydown', e => {
     if ((e.key === 'Enter' || e.key === ',') && input.value.trim()) {
@@ -59,6 +77,7 @@ function initTagInput(inputId, tagsId, getArr, setArr) {
         renderTags();
       }
       input.value = '';
+      wrap?.classList.add('is-editing');
     } else if (e.key === 'Backspace' && !input.value && getArr().length) {
       setArr(getArr().slice(0, -1));
       renderTags();
@@ -75,12 +94,191 @@ window._removeTag = function(inputId, idx) {
   ref.renderTags();
 };
 
+function projectFormHasDraft() {
+  if (editingProjectId) return true;
+  const value = id => document.getElementById(id)?.value?.trim() || '';
+  return !!(
+    value('proj-name') ||
+    value('proj-client') ||
+    value('proj-client-email') ||
+    value('proj-start') ||
+    value('proj-end') ||
+    value('proj-pct') ||
+    value('proj-desc') ||
+    value('proj-manager') ||
+    value('proj-teamlead') ||
+    value('proj-member-search') ||
+    projSkillTags.length ||
+    projRoleTags.length ||
+    projMemberIds.size
+  );
+}
+
+function dismissProjectClosePrompt() {
+  document.getElementById('project-close-confirm')?.remove();
+}
+
+function showProjectClosePrompt() {
+  if (document.getElementById('project-close-confirm')) return;
+  const prompt = document.createElement('div');
+  prompt.id = 'project-close-confirm';
+  prompt.className = 'project-close-confirm';
+  prompt.innerHTML = `
+    <div class="project-close-card" role="dialog" aria-modal="true" aria-labelledby="project-close-title">
+      <div class="project-close-icon">
+        <span class="material-symbols-outlined">draft</span>
+      </div>
+      <div id="project-close-title" class="project-close-title">Close project draft?</div>
+      <div class="project-close-copy">Your project details are still in progress.</div>
+      <div class="project-close-actions">
+        <button type="button" class="btn btn-ghost" id="project-close-resume">Resume</button>
+        <button type="button" class="btn btn-primary" id="project-close-discard">Close</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(prompt);
+  document.getElementById('project-close-resume')?.addEventListener('click', dismissProjectClosePrompt);
+  document.getElementById('project-close-discard')?.addEventListener('click', () => {
+    dismissProjectClosePrompt();
+    allowProjectModalClose = true;
+    closeModal('add-project-modal');
+    allowProjectModalClose = false;
+    editingProjectId = null;
+    resetProjectForm();
+  });
+}
+
+window._onAddProjectModalCloseRequest = function() {
+  if (allowProjectModalClose || !projectFormHasDraft()) {
+    dismissProjectClosePrompt();
+    return true;
+  }
+  showProjectClosePrompt();
+  return false;
+};
+
+function projectRequirementPayload(target) {
+  const value = id => document.getElementById(id)?.value?.trim() || '';
+  return {
+    target,
+    project_name: value('proj-name'),
+    client_name: value('proj-client'),
+    project_description: value('proj-desc'),
+    existing_skills: projSkillTags,
+    existing_roles: projRoleTags,
+  };
+}
+
+function projectSummaryPayload() {
+  const value = id => document.getElementById(id)?.value?.trim() || '';
+  return {
+    project_name: value('proj-name'),
+    client_name: value('proj-client'),
+    project_description: value('proj-desc'),
+    required_skills: projSkillTags,
+    required_roles: projRoleTags,
+  };
+}
+
+function mergeUniqueTags(current, incoming) {
+  const seen = new Set(current.map(item => item.toLowerCase()));
+  const next = [...current];
+  (incoming || []).forEach(item => {
+    const clean = String(item || '').trim().replace(/,$/, '');
+    if (!clean || seen.has(clean.toLowerCase())) return;
+    seen.add(clean.toLowerCase());
+    next.push(clean);
+  });
+  return next.slice(0, 12);
+}
+
+function pulseGeneratedEl(el) {
+  el?.classList.add('ai-generated');
+  setTimeout(() => el?.classList.remove('ai-generated'), 1200);
+}
+
+function pulseGeneratedWrap(wrap) {
+  pulseGeneratedEl(wrap);
+}
+
+async function generateProjectSummary() {
+  const button = document.getElementById('proj-ai-summary-btn');
+  const wrap = document.getElementById('proj-desc-wrap');
+  const input = document.getElementById('proj-desc');
+  const payload = projectSummaryPayload();
+  const hasContext = payload.project_name || payload.project_description || payload.client_name || payload.required_skills.length || payload.required_roles.length;
+  if (!hasContext) {
+    showToast('Add project details before using AI summary.', 'warning');
+    document.getElementById('proj-name')?.focus();
+    return;
+  }
+
+  button?.classList.add('is-loading');
+  if (button) button.disabled = true;
+  wrap?.classList.add('ai-generating');
+
+  try {
+    const data = await suggestProjectSummary(payload);
+    if (input && data.summary) {
+      input.value = data.summary;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    pulseGeneratedEl(wrap);
+    showToast('Project description refined.');
+  } catch (e) {
+    showToast(`AI summary failed: ${e.message}`, 'error');
+  } finally {
+    wrap?.classList.remove('ai-generating');
+    button?.classList.remove('is-loading');
+    if (button) button.disabled = false;
+  }
+}
+
+async function generateProjectRequirements(target) {
+  const button = document.getElementById(target === 'skills' ? 'proj-ai-skills-btn' : 'proj-ai-roles-btn');
+  const wrap = document.getElementById(target === 'skills' ? 'proj-skill-wrap' : 'proj-role-wrap');
+  const payload = projectRequirementPayload(target);
+  const hasContext = payload.project_name || payload.project_description || payload.client_name;
+  if (!hasContext) {
+    showToast('Add a project name or description before using AI.', 'warning');
+    document.getElementById('proj-name')?.focus();
+    return;
+  }
+
+  button?.classList.add('is-loading');
+  if (button) button.disabled = true;
+  wrap?.classList.add('ai-generating');
+
+  try {
+    const data = await suggestProjectRequirements(payload);
+    if (target === 'skills') {
+      projSkillTags = mergeUniqueTags(projSkillTags, data.required_skills);
+      window['_tagRef_proj-skill-input']?.setArr(projSkillTags);
+      window['_tagRef_proj-skill-input']?.renderTags();
+    } else {
+      projRoleTags = mergeUniqueTags(projRoleTags, data.required_roles);
+      window['_tagRef_proj-role-input']?.setArr(projRoleTags);
+      window['_tagRef_proj-role-input']?.renderTags();
+    }
+    pulseGeneratedWrap(wrap);
+    showToast(target === 'skills' ? 'Required skills generated.' : 'Roles needed generated.');
+  } catch (e) {
+    showToast(`AI suggestion failed: ${e.message}`, 'error');
+  } finally {
+    wrap?.classList.remove('ai-generating');
+    button?.classList.remove('is-loading');
+    if (button) button.disabled = false;
+  }
+}
+
 async function populateProjDropdowns() {
   try {
     const emps = await getEmployees({ cache: false });
     const managerSel = document.getElementById('proj-manager');
     const teamLeadSel = document.getElementById('proj-teamlead');
     const memberList  = document.getElementById('proj-member-list');
+    const editingProject = editingProjectId ? State.projects.find(p => p.id === editingProjectId) : null;
+    const assignedIds = new Set((editingProject?.team || []).map(m => m.employee_id).filter(Boolean));
 
     const managerOpts = `<option value="">— None —</option>` +
       emps
@@ -90,7 +288,7 @@ async function populateProjDropdowns() {
 
     const contributorOpts = `<option value="">— None —</option>` +
       emps
-        .filter(isAssignableNonManager)
+        .filter(e => !isManagerEmployee(e) && (isAssignableNonManager(e) || assignedIds.has(e.id)))
         .map(e => `<option value="${e.id}">${escHtml(e.name)} – ${escHtml(e.role || '—')}</option>`)
         .join('');
 
@@ -101,13 +299,13 @@ async function populateProjDropdowns() {
     if (teamLeadSel) teamLeadSel.innerHTML = contributorOpts;
 
     if (memberList) {
-      const eligibleMembers = emps.filter(isAssignableNonManager);
+      const eligibleMembers = emps.filter(e => !isManagerEmployee(e) && (isAssignableNonManager(e) || assignedIds.has(e.id)));
       memberList.innerHTML = eligibleMembers.length ? eligibleMembers.map(e => {
         const bg = avatarColor(e.name);
         const fc = avatarTextColor(e.name);
         return `
           <label class="member-select-item" data-name="${escHtml((e.name || '').toLowerCase())}">
-            <input type="checkbox" value="${e.id}" onchange="window._toggleMember('${e.id}')">
+            <input type="checkbox" value="${e.id}" onchange="window._toggleMember('${e.id}')" ${projMemberIds.has(e.id) ? 'checked' : ''}>
             <div style="width:28px;height:28px;border-radius:50%;background:${bg};color:${fc};display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0">${initials(e.name)}</div>
             <div style="flex:1;min-width:0">
               <div style="font-size:0.82rem;font-weight:600;color:var(--gl-on-surface)">${escHtml(e.name)}</div>
@@ -168,9 +366,50 @@ function resetProjectForm() {
   if (status) status.value = 'active';
   if (pct) pct.value = '';
   if (search) search.value = '';
+  const title = document.getElementById('proj-modal-title');
+  const submit = document.getElementById('proj-submit-btn');
+  if (title) title.textContent = 'New Project';
+  if (submit) submit.textContent = 'Create Project';
   document.querySelectorAll('#proj-member-list input[type="checkbox"]').forEach(input => {
     input.checked = false;
   });
+  renderAssignmentSummary();
+}
+
+function setProjectFormValues(project) {
+  const set = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = value ?? '';
+  };
+  const team = project?.team || [];
+  const manager = team.find(m => m.role_in_project === 'manager');
+  const lead = team.find(m => m.role_in_project === 'team_lead');
+  const members = team.filter(m => !['manager', 'team_lead'].includes(m.role_in_project));
+
+  set('proj-name', project.project_name);
+  set('proj-client', project.client_name);
+  set('proj-client-email', project.client_email);
+  set('proj-desc', project.project_description);
+  set('proj-start', project.start_date);
+  set('proj-end', project.end_date);
+  set('proj-status', project.status || 'active');
+  set('proj-pct', project.percent_complete ?? '');
+  set('proj-manager', manager?.employee_id || '');
+  set('proj-teamlead', lead?.employee_id || '');
+
+  projSkillTags = [...(project.required_skills || [])];
+  projRoleTags = [...(project.required_roles || [])];
+  projMemberIds = new Set(members.map(m => m.employee_id).filter(Boolean));
+  window['_tagRef_proj-skill-input']?.renderTags();
+  window['_tagRef_proj-role-input']?.renderTags();
+  document.querySelectorAll('#proj-member-list input[type="checkbox"]').forEach(input => {
+    input.checked = projMemberIds.has(input.value);
+  });
+
+  const title = document.getElementById('proj-modal-title');
+  const submit = document.getElementById('proj-submit-btn');
+  if (title) title.textContent = 'Edit Project';
+  if (submit) submit.textContent = 'Update Project';
   renderAssignmentSummary();
 }
 
@@ -227,11 +466,14 @@ function projectRow(p) {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
           <div style="display:flex;gap:6px">
-            <button class="btn btn-secondary btn-sm" onclick="window._openProjInspector('${p.id}')">
-              <span class="material-symbols-outlined" style="font-size:14px">info</span>
+            <button class="btn btn-secondary btn-sm" title="Edit project" onclick="window._editProject('${p.id}')">
+              <span class="material-symbols-outlined" style="font-size:14px">edit</span>
             </button>
             <button class="btn btn-ghost btn-sm" title="Add to canvas" onclick="window._addProjToCanvas('${p.id}')">
               <span class="material-symbols-outlined" style="font-size:14px">add_box</span>
+            </button>
+            <button class="btn btn-ghost btn-sm" title="Delete project" onclick="window._deleteProject('${p.id}')">
+              <span class="material-symbols-outlined" style="font-size:14px;color:var(--gl-error)">delete</span>
             </button>
           </div>
           <div style="display:flex;align-items:center">
@@ -273,49 +515,93 @@ async function submitProject() {
     required_roles: projRoleTags,
     manager_id:   get('proj-manager') || null,
     team_lead_id: get('proj-teamlead') || null,
-    member_ids:   [...projMemberIds],
+    team_member_ids: [...projMemberIds],
   };
 
   if (!body.project_name) { showToast('Project name required.', 'error'); return; }
   if (body.manager_id && body.team_lead_id && body.manager_id === body.team_lead_id) { showToast('Manager and team leader must be separate employees.', 'error'); return; }
-  if (body.manager_id && body.member_ids.includes(body.manager_id)) { showToast('Manager cannot also be assigned as a team member.', 'error'); return; }
-  if (body.team_lead_id && body.member_ids.includes(body.team_lead_id)) { showToast('Team leader cannot also be assigned as a team member.', 'error'); return; }
+  if (body.manager_id && body.team_member_ids.includes(body.manager_id)) { showToast('Manager cannot also be assigned as a team member.', 'error'); return; }
+  if (body.team_lead_id && body.team_member_ids.includes(body.team_lead_id)) { showToast('Team leader cannot also be assigned as a team member.', 'error'); return; }
 
   const btn = document.getElementById('proj-submit-btn');
-  if (btn) { btn.textContent = 'Creating…'; btn.disabled = true; }
+  if (btn) { btn.textContent = editingProjectId ? 'Updating…' : 'Creating…'; btn.disabled = true; }
 
   try {
-    const created = await createProject(body);
-    // Assign members if any
-    if (body.member_ids.length && created?.id) {
-      try {
-        await assignToProject(created.id, { member_ids: body.member_ids, manager_id: body.manager_id, team_lead_id: body.team_lead_id });
-      } catch {}
+    const saved = editingProjectId
+      ? await updateProject(editingProjectId, body)
+      : await createProject(body);
+    showToast(editingProjectId ? 'Project updated!' : 'Project created!');
+    if (saved?.id) {
+      const idx = State.projects.findIndex(p => p.id === saved.id);
+      if (idx >= 0) State.projects.splice(idx, 1, saved);
+      else State.projects.push(saved);
     }
-    showToast('Project created!');
+    editingProjectId = null;
+    allowProjectModalClose = true;
     closeModal('add-project-modal');
+    allowProjectModalClose = false;
     resetProjectForm();
     State.emit('data:projects:refresh');
     State.emit('data:employees:refresh');
   } catch (e) { showToast(e.message, 'error'); }
-  finally { if (btn) { btn.textContent = 'Create Project'; btn.disabled = false; } }
+  finally { if (btn) { btn.textContent = editingProjectId ? 'Update Project' : 'Create Project'; btn.disabled = false; } }
 }
 
-window._openProjInspector = async function(projId) {
+window._editProject = async function(projId) {
+  let proj = State.projects.find(p => p.id === projId);
+  if (!proj) {
+    const projects = await getProjects({ cache: false }).catch(() => []);
+    proj = projects.find(p => p.id === projId);
+  }
+  if (!proj) {
+    showToast('Project not found.', 'error');
+    return;
+  }
+  editingProjectId = projId;
+  openModal('add-project-modal');
+};
+
+window._deleteProject = async function(projId) {
   const proj = State.projects.find(p => p.id === projId);
-  if (proj) State.emit('inspector:open', { type: 'project', data: proj });
+  const name = proj?.project_name || 'this project';
+  if (!confirm(`Delete ${name} permanently?`)) return;
+  try {
+    await deleteProject(projId);
+    showToast('Project deleted.');
+    State.set('projects', State.projects.filter(p => p.id !== projId));
+    State.emit('data:projects:refresh');
+    State.emit('data:employees:refresh');
+    if (State.inspectorTarget?.type === 'project' && State.inspectorTarget?.data?.id === projId) {
+      State.emit('inspector:close');
+    }
+  } catch (e) {
+    showToast(e.message || 'Could not delete project.', 'error');
+  }
 };
 
 window._addProjToCanvas = async function(projId) {
-  const proj = State.projects.find(p => p.id === projId);
-  if (proj) {
-    await addProjectTreeToCanvas(proj);
-    showToast('Added project tree to canvas');
+  let proj = State.projects.find(p => p.id === projId);
+  if (!proj) {
+    const projects = await getProjects({ cache: false }).catch(() => []);
+    proj = projects.find(p => p.id === projId);
   }
+  if (!proj) {
+    showToast('Project not found.', 'error');
+    return;
+  }
+  window.switchViewGlobal?.('canvas');
+  await addProjectTreeToCanvas(proj);
+  showToast('Project added to canvas');
 };
 
 // Called when project modal opens
 window._onAddProjectModalOpen = async function() {
+  let project = editingProjectId ? State.projects.find(p => p.id === editingProjectId) : null;
+  if (editingProjectId && !project) {
+    const projects = await getProjects({ cache: false }).catch(() => []);
+    project = projects.find(p => p.id === editingProjectId);
+  }
   resetProjectForm();
   await populateProjDropdowns();
+  if (editingProjectId && project) setProjectFormValues(project);
 };
