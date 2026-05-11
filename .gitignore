@@ -8,3 +8,4 @@ backend/app/logs
 .runtime/
 settings.json
 .vscode/
+.vercel

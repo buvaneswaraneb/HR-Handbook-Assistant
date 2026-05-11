@@ -267,11 +267,13 @@ class RAGQueryEngine:
                 raw_chunks=[],
             )
 
-        history_context = _format_history(history or [])
+        history_items = history or []
+        history_context = _format_history(history_items)
+        history_search_text = _history_search_text(history_items)
         active_sources = [name for name in (source_names or []) if name]
 
         # 1. Convert the user's intent into multiple semantic search queries.
-        search_queries = self._build_search_queries(question, history_context)
+        search_queries = self._build_search_queries(question, history_context, history_search_text)
 
         # 2. Retrieve and merge chunks across all query variants.
         raw_chunks = self._retrieve_for_queries(
@@ -308,16 +310,23 @@ class RAGQueryEngine:
         )
         return _parse_response(llm_response, raw_chunks)
 
-    def _build_search_queries(self, question: str, history_context: str = "") -> list[str]:
+    def _build_search_queries(
+        self,
+        question: str,
+        history_context: str = "",
+        history_search_text: str = "",
+    ) -> list[str]:
         normalized_question = " ".join(question.split())
         if _is_greeting(normalized_question):
             return [normalized_question]
 
         history_aware_question = normalized_question
+        if history_search_text and _is_follow_up(normalized_question):
+            history_aware_question = f"{history_search_text}\nFollow-up question: {normalized_question}"
         if history_context:
             history_aware_question = (
                 f"Recent conversation:\n{history_context}\n\n"
-                f"Current question: {normalized_question}"
+                f"Current question: {history_aware_question}"
             )
 
         queries = [history_aware_question]
@@ -560,6 +569,52 @@ def _format_history(history: list[dict], max_turns: int = 8, max_chars: int = 3_
 
     formatted = "\n".join(lines)
     return formatted[-max_chars:]
+
+
+def _history_search_text(history: list[dict], max_items: int = 4, max_chars: int = 1_200) -> str:
+    """Extract recent conversational content that helps resolve vague follow-ups."""
+    lines: list[str] = []
+    for item in history[-max_items:]:
+        if not isinstance(item, dict):
+            continue
+        content = " ".join(str(item.get("content") or item.get("text") or "").split())
+        if content and not content.lower().startswith("error:"):
+            lines.append(content[:400])
+
+        attachment_name = str(item.get("attachment_name") or item.get("attachmentName") or "").strip()
+        if attachment_name:
+            lines.append(f"Attached PDF: {attachment_name}")
+
+        file_names = item.get("file_names") or item.get("fileNames") or []
+        if isinstance(file_names, str):
+            file_names = [file_names]
+        clean_names = [str(name).strip() for name in file_names if str(name).strip()]
+        if clean_names:
+            lines.append("Active PDFs: " + ", ".join(clean_names[:5]))
+
+    return "\n".join(lines)[-max_chars:]
+
+
+def _is_follow_up(text: str) -> bool:
+    normalized = text.strip().lower()
+    if len(normalized.split()) <= 5:
+        return True
+    follow_up_terms = (
+        "tell me more",
+        "explain more",
+        "more about",
+        "what about",
+        "why",
+        "how so",
+        "continue",
+        "that",
+        "this",
+        "it",
+        "he",
+        "she",
+        "they",
+    )
+    return any(term in normalized for term in follow_up_terms)
 
 
 def _trim_to_budget(chunks: list[dict], budget_chars: int) -> list[dict]:

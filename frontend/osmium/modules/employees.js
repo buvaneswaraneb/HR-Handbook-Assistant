@@ -417,8 +417,13 @@ async function removeEmployee(empId) {
 
 // ─── GLOBAL HANDLERS ──────────────────────────────────────────
 window._openEmpInspector = async function(empId) {
-  const emp = State.employees.find(e => e.id === empId) || await getEmployee(empId).catch(() => null);
-  if (emp) State.emit('inspector:open', { type: 'employee', data: emp });
+  const fallback = State.employees.find(e => e.id === empId) || null;
+  const emp = await getEmployee(empId).catch(() => fallback);
+  if (emp) {
+    State.emit('inspector:open', { type: 'employee', data: emp });
+  } else {
+    showToast('Employee details not found.', 'error');
+  }
 };
 
 window._editEmployee = async function(empId) {

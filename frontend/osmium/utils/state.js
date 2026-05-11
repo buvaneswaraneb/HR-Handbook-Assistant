@@ -3,8 +3,17 @@
 // Osmium ERM · Glacier Design System
 // ============================================================
 
-export const DEFAULT_API_BASE = 'https://nonsignificantly-bilgier-particia.ngrok-free.dev';
+const LEGACY_API_BASE = 'https://nonsignificantly-bilgier-particia.ngrok-free.dev';
 const FRONTEND_PAGES_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
+
+function defaultApiBase() {
+  if (window.location.hostname.endsWith('vercel.app')) {
+    return `${window.location.origin}/api`;
+  }
+  return LEGACY_API_BASE;
+}
+
+export const DEFAULT_API_BASE = defaultApiBase();
 
 export const State = {
   // API
@@ -122,7 +131,8 @@ export const State = {
       if (
         savedApiBase === FRONTEND_PAGES_URL ||
         savedApiBase === 'http://localhost:8000' ||
-        savedApiBase === 'http://127.0.0.1:8000'
+        savedApiBase === 'http://127.0.0.1:8000' ||
+        (DEFAULT_API_BASE !== LEGACY_API_BASE && savedApiBase === LEGACY_API_BASE)
       ) {
         saved.apiBase = DEFAULT_API_BASE;
       }

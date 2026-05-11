@@ -3,7 +3,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getEmployees, getProjects, createProject, updateProject, deleteProject, suggestProjectRequirements, suggestProjectSummary } from './api.js?v=20260510-4';
+import { getEmployees, getProjects, getProject, createProject, updateProject, deleteProject, suggestProjectRequirements, suggestProjectSummary } from './api.js?v=20260510-4';
 import { escHtml, fmtDate, statusBadge, initials, avatarColor, avatarTextColor, emptyState, skeletonRows } from '../utils/helpers.js?v=20260509-3';
 import { showToast, openModal, closeModal } from './ui.js';
 import { addProjectTreeToCanvas } from './canvas.js?v=20260511-2';
@@ -444,7 +444,10 @@ function projectRow(p) {
   ).join('');
 
   return `
-    <div class="card" style="padding:18px;margin-bottom:12px;transition:all 0.2s;${isUrgent ? 'border-left:3px solid #f5574a' : ''}">
+    <div class="card" style="padding:18px;margin-bottom:12px;transition:all 0.2s;cursor:pointer;${isUrgent ? 'border-left:3px solid #f5574a' : ''}"
+      onclick="window._openProjectInspector('${p.id}')"
+      onmouseenter="this.style.transform='translateY(-1px)'"
+      onmouseleave="this.style.transform='translateY(0)'">
       <div style="display:flex;align-items:flex-start;gap:14px">
         <div style="width:40px;height:40px;border-radius:var(--r-md);background:rgba(90,191,232,0.12);
           display:flex;align-items:center;justify-content:center;color:#5abfe8;flex-shrink:0">
@@ -466,13 +469,17 @@ function projectRow(p) {
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;flex-shrink:0">
           <div style="display:flex;gap:6px">
-            <button class="btn btn-secondary btn-sm" title="Edit project" onclick="window._editProject('${p.id}')">
+            <button class="btn btn-secondary btn-sm" title="View project details" onclick="event.stopPropagation();window._openProjectInspector('${p.id}')">
+              <span class="material-symbols-outlined" style="font-size:14px">info</span>
+              Details
+            </button>
+            <button class="btn btn-ghost btn-sm" title="Edit project" onclick="event.stopPropagation();window._editProject('${p.id}')">
               <span class="material-symbols-outlined" style="font-size:14px">edit</span>
             </button>
-            <button class="btn btn-ghost btn-sm" title="Add to canvas" onclick="window._addProjToCanvas('${p.id}')">
+            <button class="btn btn-ghost btn-sm" title="Add to canvas" onclick="event.stopPropagation();window._addProjToCanvas('${p.id}')">
               <span class="material-symbols-outlined" style="font-size:14px">add_box</span>
             </button>
-            <button class="btn btn-ghost btn-sm" title="Delete project" onclick="window._deleteProject('${p.id}')">
+            <button class="btn btn-ghost btn-sm" title="Delete project" onclick="event.stopPropagation();window._deleteProject('${p.id}')">
               <span class="material-symbols-outlined" style="font-size:14px;color:var(--gl-error)">delete</span>
             </button>
           </div>
@@ -546,6 +553,16 @@ async function submitProject() {
   } catch (e) { showToast(e.message, 'error'); }
   finally { if (btn) { btn.textContent = editingProjectId ? 'Update Project' : 'Create Project'; btn.disabled = false; } }
 }
+
+window._openProjectInspector = async function(projId) {
+  const fallback = State.projects.find(p => p.id === projId) || null;
+  const proj = await getProject(projId).catch(() => fallback);
+  if (proj) {
+    State.emit('inspector:open', { type: 'project', data: proj });
+  } else {
+    showToast('Project details not found.', 'error');
+  }
+};
 
 window._editProject = async function(projId) {
   let proj = State.projects.find(p => p.id === projId);

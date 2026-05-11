@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Osmium — Enterprise Resource Management</title>
-  <link rel="stylesheet" href="styles/glacier.css?v=20260510-3" />
+  <link rel="stylesheet" href="styles/glacier.css?v=20260511-9" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
     rel="stylesheet" />
   <link rel="icon" href="icon/osmium_logo.svg" type="image/svg+xml" />
@@ -554,18 +554,18 @@
           </button>
         </div>
 
-        <!-- Inspector panel -->
-        <div id="inspector"
-          style="position:absolute;top:0;right:0;bottom:0;width:var(--inspector-w);background:var(--gl-surface-lowest);border-left:1px solid var(--gl-outline);z-index:30;display:flex;flex-direction:column;transform:translateX(100%);transition:transform 0.3s var(--ease-out);box-shadow:var(--shadow-lg)">
-          <div class="inspector-header">
-            <span class="material-symbols-outlined" style="color:var(--gl-primary)">info</span>
-            <span style="font-size:0.88rem;font-weight:600;color:var(--gl-on-surface);flex:1">Inspector</span>
-            <button class="btn btn-ghost btn-icon" id="inspector-close">
-              <span class="material-symbols-outlined" style="font-size:18px">close</span>
-            </button>
-          </div>
-          <div id="inspector-body" class="inspector-body"></div>
+      </div>
+
+      <!-- Inspector panel -->
+      <div id="inspector">
+        <div class="inspector-header">
+          <span class="material-symbols-outlined inspector-title-icon">info</span>
+          <span style="font-size:0.88rem;font-weight:600;color:var(--gl-on-surface);flex:1">Inspector</span>
+          <button class="btn btn-ghost btn-icon" id="inspector-close">
+            <span class="material-symbols-outlined" style="font-size:18px">close</span>
+          </button>
         </div>
+        <div id="inspector-body" class="inspector-body"></div>
       </div>
 
       <!-- ── EMPLOYEES ─────────────────────────────────── -->
@@ -584,21 +584,20 @@
           </div>
 
           <!-- Filters -->
-          <div class="card"
-            style="padding:14px 16px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-            <input id="emp-search-skill" class="input" style="width:160px" placeholder="Skill (e.g. Python)" />
-            <input id="emp-search-team" class="input" style="width:160px" placeholder="Team (e.g. Platform)" />
-            <select id="emp-search-avail" class="select" style="width:160px">
+          <div class="card employee-filter-bar">
+            <input id="emp-search-skill" class="input" placeholder="Skill (e.g. Python)" />
+            <input id="emp-search-team" class="input" placeholder="Team (e.g. Platform)" />
+            <select id="emp-search-avail" class="select">
               <option value="">Any Availability</option>
               <option value="true">Available</option>
               <option value="false">Unavailable</option>
             </select>
-            <input id="emp-search-rating" class="input" style="width:130px" type="number" step="0.1" min="0" max="5"
+            <input id="emp-search-rating" class="input" type="number" step="0.1" min="0" max="5"
               placeholder="Min rating" />
-            <button class="btn btn-primary btn-sm" id="emp-search-btn">
+            <button class="btn btn-primary" id="emp-search-btn">
               <span class="material-symbols-outlined" style="font-size:15px">search</span> Search
             </button>
-            <button class="btn btn-ghost btn-sm" id="emp-reset-btn">Reset</button>
+            <button class="btn btn-ghost" id="emp-reset-btn">Reset</button>
           </div>
 
           <div id="employees-grid"
@@ -1207,13 +1206,13 @@
     import { State } from './utils/state.js';
     import { initModalOverlays, switchView, initApiStatus, initKeyboardShortcuts, showToast, openModal, closeModal, applyTheme } from './modules/ui.js';
     import { initCanvas, addEmployeeToCanvas, renderNodes } from './modules/canvas.js?v=20260511-2';
-    import { initInspector } from './modules/inspector.js?v=20260510-1';
+    import { initInspector } from './modules/inspector.js?v=20260511-1';
     import { initDashboard, loadDashboard } from './modules/dashboard.js?v=20260510-3';
-    import { initEmployees, loadEmployees } from './modules/employees.js?v=20260510-1';
-    import { initProjects } from './modules/projects.js?v=20260510-5';
+    import { initEmployees, loadEmployees } from './modules/employees.js?v=20260511-1';
+    import { initProjects } from './modules/projects.js?v=20260511-1';
     import { initFiles } from './modules/files.js';
-    import { initTree } from './modules/tree.js';
-    import { initAI } from './modules/ai.js';
+    import { initTree } from './modules/tree.js?v=20260511-4';
+    import { initAI } from './modules/ai.js?v=20260511-2';
     import { initSettings } from './modules/settings.js';
     import { initLeave } from './modules/leave.js?v=20260509-3';
     import { debounce } from './utils/helpers.js?v=20260509-3';

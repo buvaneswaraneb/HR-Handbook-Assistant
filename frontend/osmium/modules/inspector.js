@@ -144,8 +144,7 @@ function renderProject(proj) {
   body.innerHTML = `
     <div style="padding:8px 0 20px">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-        <div style="width:40px;height:40px;border-radius:var(--r-md);background:var(--gl-primary-muted);
-          display:flex;align-items:center;justify-content:center;color:var(--gl-primary)">
+        <div class="inspector-project-icon">
           <span class="material-symbols-outlined">folder</span>
         </div>
         <div>
