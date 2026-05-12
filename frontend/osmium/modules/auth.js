@@ -6,7 +6,7 @@
 import { State } from '../utils/state.js';
 import { showToast } from './ui.js';
 import { escHtml } from '../utils/helpers.js?v=20260509-3';
-import { getAuthProfile, getEmailAuthStatus, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260510-1';
+import { getAuthProfile, getEmailAuthStatus, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260512-3';
 
 let authPopup = null;
 let authReady = false;

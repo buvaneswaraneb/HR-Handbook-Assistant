@@ -1,11 +1,12 @@
 from __future__ import annotations
 from uuid import UUID
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, File, Header, HTTPException, Query, UploadFile
 from typing import Optional
 
 from app.services.e_r_s import (
     employee_service as svc,
 )
+from app.services.e_r_s import file_service
 from app.services.e_r_s.schemas import (
     EmployeeCreate, EmployeeUpdate, AvailabilityUpdate,
     EmployeeSkillCreate, EmployeeSkillUpdate,
@@ -51,12 +52,28 @@ def bulk_upload(body: list[BulkEmployeeItem], authorization: Optional[str] = Hea
     return svc.bulk_upload(body, get_workplace_id(authorization))
 
 
-@router.get("/linkedin-avatar")
-def linkedin_avatar(url: str = Query(..., min_length=1)):
+@router.post("/avatar-upload", status_code=201)
+async def upload_avatar(file: UploadFile = File(...)):
+    content_type = (file.content_type or "").lower()
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Upload an image file.")
+
     try:
-        return svc.resolve_linkedin_avatar(url)
+        contents = await file.read()
+        result = file_service.upload_cloudinary_bytes(
+            contents=contents,
+            filename=file.filename or "employee-avatar",
+            department="employee-photos",
+            description="Employee profile photo",
+        )
+        return {
+            "avatar_url": result.get("secure_url") or result.get("url"),
+            **result,
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Avatar upload failed: {exc}")
 
 
 @router.get("/{emp_id}")

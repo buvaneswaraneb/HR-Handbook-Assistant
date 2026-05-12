@@ -4,15 +4,12 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getEmployees } from './api.js?v=20260509-5';
+import { getEmployees } from './api.js?v=20260512-3';
 import { escHtml, initials, avatarColor, avatarTextColor, emptyState } from '../utils/helpers.js?v=20260509-3';
 
 export function initTree() {
   State.on('view:tree', loadTree);
   State.on('data:employees:refresh', () => {
-    if (State.currentView === 'tree') loadTree();
-  });
-  State.on('data:projects:refresh', () => {
     if (State.currentView === 'tree') loadTree();
   });
 }

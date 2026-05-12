@@ -123,6 +123,7 @@ async function request(path, opts = {}) {
     cacheTtl = DEFAULT_GET_CACHE_TTL,
     clearAuthOnUnauthorized = true,
     invalidate = null,
+    dedupe = true,
     headers = {},
     ...fetchOpts
   } = opts;
@@ -132,14 +133,17 @@ async function request(path, opts = {}) {
 
   ensureValidAuthFor(path);
 
-  if (method === 'GET' && useCache !== false) {
-    const cached = cache.get(key);
-    if (cached && Date.now() - cached.time < cacheTtl) return cloneData(cached.data);
-
+  if (method === 'GET') {
+    if (useCache !== false) {
+      const cached = cache.get(key);
+      if (cached && Date.now() - cached.time < cacheTtl) return cloneData(cached.data);
+    }
     if (pendingGets.has(key)) return cloneData(await pendingGets.get(key));
+  }
 
+  if (method === 'GET' && useCache !== false) {
     const version = cacheVersion;
-    const pending = request(path, { ...fetchOpts, headers, clearAuthOnUnauthorized, cache: false });
+    const pending = request(path, { ...fetchOpts, headers, clearAuthOnUnauthorized, cache: false, dedupe: false });
     pendingGets.set(key, pending);
     try {
       const data = await pending;
@@ -147,6 +151,16 @@ async function request(path, opts = {}) {
         cache.set(key, { data: cloneData(data), time: Date.now() });
       }
       return cloneData(data);
+    } finally {
+      pendingGets.delete(key);
+    }
+  }
+
+  if (method === 'GET' && dedupe) {
+    const pending = request(path, { ...fetchOpts, headers, clearAuthOnUnauthorized, cache: false, dedupe: false });
+    pendingGets.set(key, pending);
+    try {
+      return cloneData(await pending);
     } finally {
       pendingGets.delete(key);
     }
@@ -244,8 +258,17 @@ export async function deleteEmployee(id) {
   return request(`/employees/${id}`, { method: 'DELETE' });
 }
 
-export async function resolveLinkedInAvatar(url) {
-  return request(`/employees/linkedin-avatar?url=${encodeURIComponent(url)}`);
+export async function uploadEmployeeAvatar(formData) {
+  const res = await fetch(apiUrl('/employees/avatar-upload'), {
+    method: 'POST',
+    headers: { ...tunnelHeaders(), ...authHeaders() },
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
 }
 
 export async function patchAvailability(id, available) {

@@ -8,7 +8,7 @@ import { State } from '../utils/state.js';
 import { uid, clamp, snap, throttle } from '../utils/helpers.js?v=20260509-3';
 import { showContextMenu, showToast } from './ui.js';
 import { escHtml, initials, avatarColor, avatarTextColor } from '../utils/helpers.js?v=20260509-3';
-import { getEmployees, getProjects, assignToProject, unassignFromProject } from './api.js?v=20260510-4';
+import { getEmployees, getProjects, assignToProject, unassignFromProject } from './api.js?v=20260512-3';
 
 let world, svgLayer, bgEl, zoomLabel, selBox;
 let isPanning = false, isSpaceDown = false;

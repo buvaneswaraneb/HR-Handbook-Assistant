@@ -4,7 +4,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { queryRAG, getFiles, deleteFile, uploadFile } from './api.js?v=20260511-2';
+import { queryRAG, getFiles, deleteFile, uploadFile } from './api.js?v=20260512-3';
 import { escHtml, fmtBytes, fmtDate } from '../utils/helpers.js?v=20260509-3';
 import { showToast } from './ui.js';
 

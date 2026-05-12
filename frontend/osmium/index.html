@@ -412,18 +412,15 @@
                 style="padding:16px 20px;border-bottom:1px solid var(--gl-outline);display:flex;align-items:center;justify-content:space-between">
                 <div style="display:flex;align-items:center;gap:10px">
                   <span class="material-symbols-outlined" style="color:#4285f4;font-size:20px">calendar_month</span>
-                  <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface)">Google Calendar</div>
+                  <div style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface)">Google Calendar Sync</div>
                 </div>
                 <div style="display:flex;align-items:center;gap:10px">
-                  <span id="calendar-date-header" style="font-size:0.75rem;color:var(--gl-on-surface-4)"></span>
-                  <button class="btn btn-secondary btn-sm" onclick="window._syncGoogleCalendar?.()">
-                    <span class="material-symbols-outlined" style="font-size:14px">sync</span> Sync
-                  </button>
+                  <span id="calendar-date-header" style="font-size:0.75rem;color:var(--gl-on-surface-4)">Feature turned off</span>
                 </div>
               </div>
               <div id="calendar-widget" style="padding:0;min-height:160px">
-                <div style="display:flex;align-items:center;gap:10px;color:var(--gl-on-surface-4);padding:20px 0">
-                  <span class="spinner-sm spinner"></span> Loading calendar…
+                <div style="display:flex;align-items:center;justify-content:center;min-height:160px;color:var(--gl-on-surface-4);text-align:center;padding:20px">
+                  Google Calendar sync feature turned off. It will be added in a future update.
                 </div>
               </div>
             </div>
@@ -1019,12 +1016,13 @@
         </div>
         <div style="margin-top:12px">
           <div class="label" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-            <span>Profile Photo URL</span>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="window._fillAvatarFromLinkedIn?.()">
-              <span class="material-symbols-outlined" style="font-size:14px">image_search</span> Fetch Profile Photo
+            <span>Profile Photo</span>
+            <button type="button" class="btn btn-secondary btn-sm" id="new-emp-avatar-upload-btn" onclick="document.getElementById('new-emp-avatar-file')?.click()">
+              <span class="material-symbols-outlined" style="font-size:14px">cloud_upload</span> Upload Photo
             </button>
           </div>
-          <input id="new-emp-linkedin" class="input" placeholder="https://linkedin.com/in/... or https://i.imgur.com/..." />
+          <input id="new-emp-linkedin" class="input" placeholder="Cloudinary link appears after upload" readonly />
+          <input id="new-emp-avatar-file" type="file" accept="image/*" style="display:none" />
           <input id="new-emp-avatar" type="hidden" />
           <div id="new-emp-avatar-preview" style="display:none;align-items:center;gap:10px;margin-top:10px">
             <div id="new-emp-avatar-preview-shell" style="width:44px;height:44px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:var(--gl-surface-high);border:1px solid var(--gl-outline-2);color:var(--gl-on-surface-2);font-size:0.95rem;font-weight:700;flex-shrink:0">
@@ -1240,8 +1238,8 @@
     import { initModalOverlays, switchView, initApiStatus, initKeyboardShortcuts, showToast, openModal, closeModal, applyTheme } from './modules/ui.js';
     import { initCanvas, addEmployeeToCanvas, renderNodes } from './modules/canvas.js?v=20260511-2';
     import { initInspector } from './modules/inspector.js?v=20260511-1';
-    import { initDashboard, loadDashboard } from './modules/dashboard.js?v=20260510-3';
-    import { initEmployees, loadEmployees } from './modules/employees.js?v=20260512-1';
+    import { initDashboard, loadDashboard } from './modules/dashboard.js?v=20260512-3';
+    import { initEmployees, loadEmployees } from './modules/employees.js?v=20260512-4';
     import { initProjects } from './modules/projects.js?v=20260511-1';
     import { initFiles } from './modules/files.js';
     import { initTree } from './modules/tree.js?v=20260511-4';
@@ -1289,7 +1287,7 @@
     // ── Global search ───────────────────────────────
     const searchDebounced = debounce(async q => {
       if (!q.trim() || q.length < 2) return;
-      const { searchEmployees } = await import('./modules/api.js?v=20260509-5');
+      const { searchEmployees } = await import('./modules/api.js?v=20260512-3');
       try {
         const results = await searchEmployees({ skill: q });
         if (results.length) { switchView('employees'); State.set('employees', results); State.emit('view:employees'); }
@@ -1301,7 +1299,7 @@
 
     // ── Populate canvas helper ───────────────────────
     window._populateCanvas = async function () {
-      const emps = State.employees.length ? State.employees : await (await import('./modules/api.js?v=20260509-5')).getEmployees();
+      const emps = State.employees.length ? State.employees : await (await import('./modules/api.js?v=20260512-3')).getEmployees();
       emps.slice(0, 16).forEach(e => addEmployeeToCanvas(e));
       renderNodes();
       showToast(`${Math.min(emps.length, 16)} employees added to canvas`);

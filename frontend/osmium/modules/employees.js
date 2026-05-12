@@ -5,8 +5,8 @@
 import { State } from '../utils/state.js';
 import {
   getEmployees, getEmployee, searchEmployees, createEmployee, updateEmployee, deleteEmployee,
-  getProjects, assignToProject, unassignFromProject, resolveLinkedInAvatar
-} from './api.js?v=20260509-5';
+  getProjects, assignToProject, unassignFromProject, uploadEmployeeAvatar
+} from './api.js?v=20260512-3';
 import { escHtml, ratingStars, avatarMarkup, initials, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js?v=20260509-3';
 import { showToast, openModal, closeModal } from './ui.js';
 import { addEmployeeToCanvas } from './canvas.js?v=20260511-2';
@@ -34,16 +34,8 @@ export function initEmployees() {
   document.getElementById('emp-search-avail')?.addEventListener('change', doSearch);
   document.getElementById('add-emp-form')?.addEventListener('submit', e => { e.preventDefault(); submitEmployee(); });
   document.getElementById('new-emp-avatar')?.addEventListener('input', e => updateAvatarPreview(e.target.value));
+  document.getElementById('new-emp-avatar-file')?.addEventListener('change', uploadSelectedEmployeePhoto);
   document.getElementById('new-emp-role')?.addEventListener('change', () => renderProjectAssignmentSection());
-  document.getElementById('new-emp-linkedin')?.addEventListener('input', e => {
-    if (_looksLikeDirectImageUrl(e.target.value)) {
-      const avatarInput = document.getElementById('new-emp-avatar');
-      if (avatarInput && !avatarInput.value.trim()) {
-        avatarInput.value = e.target.value.trim();
-        updateAvatarPreview(avatarInput.value);
-      }
-    }
-  });
 
   renderEmpSkillRows();
 }
@@ -128,17 +120,8 @@ function updateAvatarPreview(url) {
     img.style.display = 'none';
     shell.textContent = fallback;
     text.textContent = 'Could not preview this image here';
-    subtext.textContent = 'You can still use Fetch Profile Photo to copy it into Cloudinary.';
+    subtext.textContent = 'Upload another image to replace this link.';
   };
-}
-
-function _looksLikeDirectImageUrl(value) {
-  try {
-    const url = new URL(value.trim());
-    return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(url.pathname);
-  } catch {
-    return false;
-  }
 }
 
 function hasEmployeeDraftChanges() {
@@ -336,7 +319,7 @@ async function submitEmployee() {
     rating: parseFloat(get('new-emp-rating') || '0') || null,
     total_experience_years: parseFloat(get('new-emp-exp') || '0') || null,
     availability: document.getElementById('new-emp-avail')?.checked ?? true,
-    linkedin_url: get('new-emp-linkedin'),
+    linkedin_url: null,
     work_start_time: get('new-emp-start') || null,
     work_end_time:   get('new-emp-end') || null,
     skills: empSkillRows
@@ -477,22 +460,44 @@ window._addToCanvasById = function(empId) {
   if (emp) { addEmployeeToCanvas(emp); showToast('Added to canvas'); }
 };
 
-window._fillAvatarFromLinkedIn = async function() {
-  const linkedinUrl = document.getElementById('new-emp-linkedin')?.value.trim();
-  if (!linkedinUrl) {
-    showToast('Add a profile photo URL first.', 'error');
+async function uploadSelectedEmployeePhoto(e) {
+  const input = e.target;
+  const file = input.files?.[0];
+  if (!file) return;
+
+  if (!file.type?.startsWith('image/')) {
+    showToast('Upload an image file.', 'error');
+    input.value = '';
     return;
   }
+
+  const btn = document.getElementById('new-emp-avatar-upload-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-sm spinner"></span> Uploading';
+  }
+
   try {
-    const result = await resolveLinkedInAvatar(linkedinUrl);
+    const form = new FormData();
+    form.append('file', file);
+    const result = await uploadEmployeeAvatar(form);
+    const avatarUrl = result.avatar_url || result.secure_url || result.url || '';
     const avatarInput = document.getElementById('new-emp-avatar');
-    if (avatarInput) avatarInput.value = result.avatar_url || '';
-    updateAvatarPreview(result.avatar_url || '');
-    showToast('Profile image applied.');
+    const linkInput = document.getElementById('new-emp-linkedin');
+    if (avatarInput) avatarInput.value = avatarUrl;
+    if (linkInput) linkInput.value = avatarUrl;
+    updateAvatarPreview(avatarUrl);
+    showToast('Profile photo uploaded.');
   } catch (e) {
     showToast(e.message, 'error');
+  } finally {
+    input.value = '';
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px">cloud_upload</span> Upload Photo';
+    }
   }
-};
+}
 
 window._assignEditingEmployeeToProject = async function() {
   if (!editingEmployeeId) return;

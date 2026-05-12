@@ -3,7 +3,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getEmployees, getProjects, getProject, createProject, updateProject, deleteProject, suggestProjectRequirements, suggestProjectSummary } from './api.js?v=20260510-4';
+import { getEmployees, getProjects, getProject, createProject, updateProject, deleteProject, suggestProjectRequirements, suggestProjectSummary } from './api.js?v=20260512-3';
 import { escHtml, fmtDate, statusBadge, initials, avatarColor, avatarTextColor, emptyState, skeletonRows } from '../utils/helpers.js?v=20260509-3';
 import { showToast, openModal, closeModal } from './ui.js';
 import { addProjectTreeToCanvas } from './canvas.js?v=20260511-2';
