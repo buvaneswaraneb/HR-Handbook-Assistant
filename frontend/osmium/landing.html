@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Osmium — AI Employee Management Workspace</title>
+  <link rel="stylesheet" href="styles/landing.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+    rel="stylesheet" />
+  <link rel="icon" href="icon/osmium_logo.svg" type="image/svg+xml" />
+</head>
+
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top" aria-label="Osmium home">
+      <span class="brand-mark">
+        <img src="icon/osmium_logo.svg" alt="" />
+      </span>
+      <span>
+        <strong>Osmium</strong>
+        <small>Team Workspace</small>
+      </span>
+    </a>
+    <nav class="nav-links" aria-label="Primary navigation">
+      <a href="#features">Features</a>
+      <a href="#workspace">Workspace</a>
+      <a href="#ai">AI</a>
+      <a href="#planning">Planning</a>
+    </nav>
+    <a class="btn btn-secondary" href="index.html">Sign in</a>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-scene" aria-hidden="true">
+        <div class="scene-shell">
+          <div class="scene-topbar">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          <div class="scene-sidebar">
+            <div class="scene-pill active"></div>
+            <div class="scene-pill"></div>
+            <div class="scene-pill"></div>
+            <div class="scene-pill short"></div>
+          </div>
+          <div class="scene-main">
+            <div class="scene-title-row">
+              <div>
+                <div class="scene-eyebrow"></div>
+                <div class="scene-title"></div>
+              </div>
+              <div class="scene-action"></div>
+            </div>
+            <div class="scene-metrics">
+              <div><strong>42</strong><span>Employees</span></div>
+              <div><strong>8</strong><span>Projects</span></div>
+              <div><strong>31</strong><span>Available</span></div>
+              <div><strong>4</strong><span>On leave</span></div>
+            </div>
+            <div class="scene-grid">
+              <div class="scene-panel scene-calendar">
+                <div class="panel-label">Leave heatmap</div>
+                <div class="heatmap">
+                  <span></span><span></span><span class="hot"></span><span></span><span></span><span class="warm"></span>
+                  <span></span><span></span><span></span><span class="hot"></span><span></span><span></span>
+                  <span></span><span class="warm"></span><span></span><span></span><span></span><span></span>
+                </div>
+              </div>
+              <div class="scene-panel scene-project">
+                <div class="panel-label">Critical project</div>
+                <strong>Client Portal</strong>
+                <div class="progress"><span></span></div>
+                <p>Team staffed · deadline soon</p>
+              </div>
+              <div class="scene-panel scene-ai">
+                <div class="ai-head">
+                  <img src="icon/ai_input_dark.svg" alt="" />
+                  <strong>Workspace AI</strong>
+                </div>
+                <p>Who is available for the next project?</p>
+                <div class="ai-reply">6 people match the needed skills.</div>
+              </div>
+              <div class="scene-panel scene-nodes">
+                <div class="node node-project">Project</div>
+                <div class="node node-person one">Lead</div>
+                <div class="node node-person two">Dev</div>
+                <div class="node-line a"></div>
+                <div class="node-line b"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-content">
+        <p class="kicker">AI focused employee management</p>
+        <h1>Osmium</h1>
+        <p class="hero-copy">Keep employee records, team structure, projects, leave, documents, and AI-assisted HR
+          knowledge in one calm workspace.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="index.html">
+            <span class="material-symbols-outlined">arrow_forward</span>
+            Open workspace
+          </a>
+          <a class="btn btn-secondary" href="#features">Explore features</a>
+        </div>
+        <div class="hero-proof">
+          <span>Employee records</span>
+          <span>Project staffing</span>
+          <span>Leave visibility</span>
+          <span>Workspace AI</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="features" class="section feature-band">
+      <div class="section-heading">
+        <p class="kicker">Built for daily HR work</p>
+        <h2>Everything your team needs to understand people, projects, and availability.</h2>
+      </div>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <span class="material-symbols-outlined">verified_user</span>
+          <h3>Private workspace</h3>
+          <p>A trusted place for employee records, leave details, team documents, and workplace updates.</p>
+        </article>
+        <article class="feature-card">
+          <span class="material-symbols-outlined">hub</span>
+          <h3>Organized teams</h3>
+          <p>See teams, roles, project ownership, deadlines, and responsibilities from one clean workspace.</p>
+        </article>
+        <article class="feature-card">
+          <span class="material-symbols-outlined">smart_toy</span>
+          <h3>Helpful AI</h3>
+          <p>Ask about availability, absences, skills, documents, and project updates in plain language.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="workspace" class="section split-section">
+      <div>
+        <p class="kicker">Workspace overview</p>
+        <h2>Start with the right signals.</h2>
+        <p>See team health, project movement, absences, priority deadlines, and active assignments from the dashboard.
+          Quick actions keep everyday work close at hand.</p>
+      </div>
+      <div class="stat-grid" aria-label="Workspace signals">
+        <div><strong>Live projects</strong><span>Track progress, owners, deadlines, and staffing.</span></div>
+        <div><strong>Team capacity</strong><span>See who is available, busy, or away today.</span></div>
+        <div><strong>Recent activity</strong><span>Keep movement visible without chasing updates.</span></div>
+        <div><strong>Calendar view</strong><span>Bring upcoming events and leave into planning.</span></div>
+      </div>
+    </section>
+
+    <section id="ai" class="section ai-section">
+      <div class="section-heading">
+        <p class="kicker">Ask the workspace</p>
+        <h2>Use AI where the work is already happening.</h2>
+        <p>The full AI assistant supports longer conversations and document questions. The mini assistant floats across
+          the app for quick answers about availability, absences, skills, deadlines, and dashboard summaries.</p>
+      </div>
+      <div class="prompt-row">
+        <span>Who is available right now?</span>
+        <span>Which projects are due soon?</span>
+        <span>Who is absent today?</span>
+        <span>What skills do we have?</span>
+      </div>
+    </section>
+
+    <section id="planning" class="section planning-section">
+      <div class="planning-copy">
+        <p class="kicker">Visual planning</p>
+        <h2>Connect people to the work they own.</h2>
+        <p>Use the canvas and org tree to understand reporting lines, project staffing, team shape, and ownership gaps.
+          Managers can inspect people and projects without leaving the visual workspace.</p>
+      </div>
+      <div class="planning-list">
+        <div>
+          <span class="material-symbols-outlined">account_tree</span>
+          <strong>Org tree</strong>
+          <p>Explore reporting structure, roots, assignments, and staffing risks.</p>
+        </div>
+        <div>
+          <span class="material-symbols-outlined">conversion_path</span>
+          <strong>Canvas</strong>
+          <p>Place employees and projects, connect roles, and plan teams visually.</p>
+        </div>
+        <div>
+          <span class="material-symbols-outlined">event_busy</span>
+          <strong>Leave planning</strong>
+          <p>Use absence records and heatmaps to plan around real availability.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="cta-section">
+      <p class="kicker">Ready to work</p>
+      <h2>Bring employees, projects, leave, documents, and AI into one workspace.</h2>
+      <a class="btn btn-primary" href="index.html">
+        <span class="material-symbols-outlined">login</span>
+        Continue to Osmium
+      </a>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <span>© 2026 Osmium Systems</span>
+    <a href="index.html">Open workspace</a>
+  </footer>
+</body>
+
+</html>

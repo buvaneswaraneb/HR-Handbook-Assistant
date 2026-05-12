@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Osmium — Enterprise Resource Management</title>
+  <title>Osmium — Employee Management Workspace</title>
   <link rel="stylesheet" href="styles/glacier.css?v=20260511-9" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
     rel="stylesheet" />
@@ -108,30 +108,31 @@
             style="font-size:18px;color:#fff">token</span></div>
         <div class="sidebar-logo-text">
           <div class="sidebar-logo-name">Osmium</div>
-          <div class="sidebar-logo-sub">Enterprise RM</div>
+          <div class="sidebar-logo-sub">Team Workspace</div>
         </div>
       </div>
-      <div style="max-width:540px">
+      <div style="max-width:760px">
         <div
           style="font-size:0.75rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#3dd68c;margin-bottom:10px">
           Welcome to Osmium</div>
         <h1
           style="font-size:2.6rem;line-height:1.08;letter-spacing:-0.04em;color:var(--gl-on-surface);margin-bottom:16px">
           AI focused employee management workspace.</h1>
-        <p style="font-size:0.96rem;line-height:1.7;color:var(--gl-son-surface-3);max-width:500px">Osmium helps teams
-          manage employees, project hierarchy, leave visibility, documents, and <span style="color: #3dd68c";>AI-assisted HR knowledge</span> in one secure
-          operational dashboard.</p>
+        <p style="font-size:0.96rem;line-height:1.7;color:var(--gl-son-surface-3);max-width:650px">Osmium helps teams
+          keep employee records, team structure, projects, leave, and documents in one clear place. With <span style="color: #3dd68c";>AI-assisted HR knowledge</span>,
+          you can quickly understand availability, absences, responsibilities, and project progress without switching
+          between tools.</p>
         <div
-          style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:28px;max-width:520px">
+          style="display:grid;grid-template-columns:repeat(3,minmax(170px,1fr));gap:12px;margin-top:28px;max-width:720px">
           <div class="auth-feature-card"><span
-              class="material-symbols-outlined">verified_user</span><strong>Protected</strong><span>JWT-backed
-              access</span></div>
+              class="material-symbols-outlined">verified_user</span><strong>Private</strong><span>A trusted place for
+              employee records, leave details, and team documents.</span></div>
           <div class="auth-feature-card"><span
-              class="material-symbols-outlined">hub</span><strong>Organized</strong><span>Project hierarchy and
-              teams</span></div>
+              class="material-symbols-outlined">hub</span><strong>Organized</strong><span>See teams, roles, project
+              ownership, and deadlines from one clean workspace.</span></div>
           <div class="auth-feature-card"><span
-              class="material-symbols-outlined">smart_toy</span><strong>Contextual</strong><span>File-aware AI
-              assistant</span></div>
+              class="material-symbols-outlined">smart_toy</span><strong>Helpful</strong><span>Ask about availability,
+              absences, skills, and project updates in plain language.</span></div>
         </div>
       </div>
     </div>
@@ -165,7 +166,7 @@
             <div class="label">Password</div>
             <input id="auth-password" class="input" type="password" autocomplete="current-password" placeholder="Password" />
           </div>
-          <div id="auth-email-helper" style="font-size:0.74rem;color:var(--gl-on-surface-4);margin-top:8px">We will email a sign-in link. New users are created after verification.</div>
+          <div id="auth-email-helper" style="font-size:0.74rem;color:var(--gl-on-surface-4);margin-top:8px">Enter your email to continue. New teammates can join after approval.</div>
           <button id="auth-email-btn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px"
             type="submit">Sign in</button>
         </form>
@@ -186,7 +187,7 @@
         </div>
         <div class="sidebar-logo-text">
           <div class="sidebar-logo-name">Osmium</div>
-          <div class="sidebar-logo-sub">Enterprise RM</div>
+          <div class="sidebar-logo-sub">Team Workspace</div>
         </div>
       </div>
 
@@ -249,7 +250,7 @@
         </div>
         <div class="api-status" style="padding:10px 10px 4px">
           <div id="api-dot" class="api-dot pulse"></div>
-          <span id="api-text">Connecting…</span>
+          <span id="api-text">Syncing…</span>
         </div>
       </div>
     </aside>
@@ -277,7 +278,7 @@
             Not signed in</div>
           <div id="auth-user-email"
             style="font-size:0.62rem;color:var(--gl-on-surface-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-            Protected workspace</div>
+            Team workspace</div>
         </div>
         <button id="logout-btn" class="btn btn-ghost btn-icon btn-sm" title="Logout" type="button"><span
             class="material-symbols-outlined" style="font-size:16px">logout</span></button>
@@ -753,7 +754,7 @@
             <span class="material-symbols-outlined" style="color:var(--gl-tertiary);font-size:24px">smart_toy</span>
             <div>
               <div style="font-size:0.9rem;font-weight:700;color:var(--gl-on-surface)">Osmium Intelligence</div>
-              <div style="font-size:0.7rem;color:var(--gl-on-surface-4)">Enterprise RAG Assistant</div>
+              <div style="font-size:0.7rem;color:var(--gl-on-surface-4)">Workspace assistant</div>
             </div>
             <div style="flex:1"></div>
             <button type="button" class="btn btn-ghost btn-sm" id="ai-history-toggle" title="Show chat history">
@@ -768,8 +769,7 @@
           <div id="ai-messages">
             <div class="ai-msg ai-msg-bot">
               <div style="margin-bottom:8px">Hello! I am the Osmium AI Assistant.</div>
-              <div>I have full context of your enterprise data. You can ask me questions about employees, projects, or
-                attach documents to query against them.</div>
+              <div>I can help with employees, projects, and any documents you add to this chat.</div>
             </div>
           </div>
           <div id="ai-input-area">
@@ -799,8 +799,8 @@
 
         <div id="ai-files-sidebar">
           <div id="ai-files-header">
-            <div style="font-size:0.8rem;font-weight:700;color:var(--gl-on-surface)">Injected Context</div>
-            <span id="ai-context-badge" style="font-size:0.65rem;color:var(--gl-on-surface-4);font-weight:600">No files in context</span>
+            <div style="font-size:0.8rem;font-weight:700;color:var(--gl-on-surface)">Files for This Chat</div>
+            <span id="ai-context-badge" style="font-size:0.65rem;color:var(--gl-on-surface-4);font-weight:600">No files added</span>
           </div>
           <div id="ai-files-panel">
             <div style="padding:24px;text-align:center;color:var(--gl-on-surface-4)">
@@ -828,9 +828,9 @@
       </div>
       <div style="min-width:0;flex:1">
         <div style="font-size:0.84rem;font-weight:800;color:var(--gl-on-surface)">Mini Workspace AI</div>
-        <div id="mini-ai-context-state" style="font-size:0.66rem;color:var(--gl-on-surface-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Workspace context</div>
+        <div id="mini-ai-context-state" style="font-size:0.66rem;color:var(--gl-on-surface-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Ready to help</div>
       </div>
-      <button type="button" class="btn btn-ghost btn-icon btn-sm" id="mini-ai-refresh" title="Refresh context">
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" id="mini-ai-refresh" title="Refresh workspace info">
         <span class="material-symbols-outlined" style="font-size:16px">sync</span>
       </button>
       <button type="button" class="btn btn-ghost btn-icon btn-sm" id="mini-ai-close" title="Close mini AI">
@@ -842,7 +842,7 @@
       <button type="button" class="mini-ai-chip" data-q="Who is available right now for a project?">Available team</button>
       <button type="button" class="mini-ai-chip" data-q="Who is absent or on leave today?">Absentees today</button>
       <button type="button" class="mini-ai-chip" data-q="Which projects are critical or due soon?">Critical projects</button>
-      <button type="button" class="mini-ai-chip" data-q="Summarize this dashboard context.">Dashboard summary</button>
+      <button type="button" class="mini-ai-chip" data-q="Summarize the dashboard.">Dashboard summary</button>
     </div>
     <div class="mini-ai-input-row">
       <textarea id="mini-ai-input" placeholder="Ask about employees, projects, or this page..."></textarea>
