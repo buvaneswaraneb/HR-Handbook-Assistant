@@ -290,7 +290,7 @@
         <span class="material-symbols-outlined">create_new_folder</span>
       </button>
       <div class="sep"></div>
-      <button class="topbar-btn" title="AI Assistant (⌘/)" onclick="window.toggleAIWindow?.()">
+      <button class="topbar-btn" id="mini-ai-toggle" title="Mini AI Assistant" onclick="window.toggleAIWindow?.()">
         <span class="material-symbols-outlined">smart_toy</span>
       </button>
       <button class="topbar-btn" title="Settings" data-settings-toggle onclick="window.openSettings?.()">
@@ -735,6 +735,18 @@
 
       <!-- ── AI ASSISTANT (FULL PAGE) ───────────────────── -->
       <div id="view-ai" class="view-panel">
+        <aside id="ai-history-sidebar">
+          <div id="ai-history-header">
+            <div>
+              <div style="font-size:0.8rem;font-weight:700;color:var(--gl-on-surface)">Chat History</div>
+              <div id="ai-history-count" style="font-size:0.68rem;color:var(--gl-on-surface-4);margin-top:2px">No conversations</div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-icon" id="ai-history-close" title="Hide history">
+              <span class="material-symbols-outlined" style="font-size:18px">chevron_left</span>
+            </button>
+          </div>
+          <div id="ai-history-list"></div>
+        </aside>
         <div id="ai-chat-panel">
           <div id="ai-chat-header">
             <span class="material-symbols-outlined" style="color:var(--gl-tertiary);font-size:24px">smart_toy</span>
@@ -743,6 +755,10 @@
               <div style="font-size:0.7rem;color:var(--gl-on-surface-4)">Enterprise RAG Assistant</div>
             </div>
             <div style="flex:1"></div>
+            <button type="button" class="btn btn-ghost btn-sm" id="ai-history-toggle" title="Show chat history">
+              <span class="material-symbols-outlined" style="font-size:16px">history</span>
+              History
+            </button>
             <button type="button" class="btn btn-ghost btn-sm" id="ai-new-chat" title="Start new chat">
               <span class="material-symbols-outlined" style="font-size:16px">add_comment</span>
               New chat
@@ -795,18 +811,39 @@
 
     </main>
 
-    <!-- ══════════════════════════════════════════════
-     FOOTER
-══════════════════════════════════════════════ -->
-    <footer id="footer">
-      <div>© 2026 Osmium Systems</div>
-      <div style="display:flex;gap:16px">
-        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem">Created by BuvaneswaranE </span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:0.68rem"></span>
-      </div>
-    </footer>
-
   </div><!-- #app -->
+
+  <!-- Mini Workspace AI -->
+  <div id="mini-ai-window" aria-label="Mini workspace AI">
+    <div class="mini-ai-titlebar">
+      <div class="mini-ai-icon">
+        <span class="material-symbols-outlined">smart_toy</span>
+      </div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:0.84rem;font-weight:800;color:var(--gl-on-surface)">Mini Workspace AI</div>
+        <div id="mini-ai-context-state" style="font-size:0.66rem;color:var(--gl-on-surface-4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Workspace context</div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" id="mini-ai-refresh" title="Refresh context">
+        <span class="material-symbols-outlined" style="font-size:16px">sync</span>
+      </button>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" id="mini-ai-close" title="Close mini AI">
+        <span class="material-symbols-outlined" style="font-size:16px">close</span>
+      </button>
+    </div>
+    <div id="mini-ai-messages"></div>
+    <div class="mini-ai-chips">
+      <button type="button" class="mini-ai-chip" data-q="Who is available right now for a project?">Available team</button>
+      <button type="button" class="mini-ai-chip" data-q="Who is absent or on leave today?">Absentees today</button>
+      <button type="button" class="mini-ai-chip" data-q="Which projects are critical or due soon?">Critical projects</button>
+      <button type="button" class="mini-ai-chip" data-q="Summarize this dashboard context.">Dashboard summary</button>
+    </div>
+    <div class="mini-ai-input-row">
+      <textarea id="mini-ai-input" placeholder="Ask about employees, projects, or this page..."></textarea>
+      <button type="button" class="btn btn-primary btn-icon" id="mini-ai-send" title="Ask Mini AI">
+        <span class="material-symbols-outlined" style="font-size:17px">send</span>
+      </button>
+    </div>
+  </div>
 
   <!-- ══════════════════════════════════════════════
      SETTINGS PANEL
@@ -820,17 +857,6 @@
       </button>
     </div>
     <div style="flex:1;overflow-y:auto">
-
-      <!-- API -->
-      <div class="settings-section">
-        <div class="settings-section-title">API Configuration</div>
-        <div class="label">Base URL</div>
-        <div style="display:flex;gap:8px;margin-top:4px">
-          <input id="setting-api-url" class="input"
-            style="flex:1;font-family:'JetBrains Mono',monospace;font-size:0.78rem" value="https://nonsignificantly-bilgier-particia.ngrok-free.dev" />
-          <button class="btn btn-primary btn-sm" onclick="window._saveApiUrl?.()">Save</button>
-        </div>
-      </div>
 
       <!-- Theme -->
       <div class="settings-section">
@@ -1208,11 +1234,12 @@
     import { initCanvas, addEmployeeToCanvas, renderNodes } from './modules/canvas.js?v=20260511-2';
     import { initInspector } from './modules/inspector.js?v=20260511-1';
     import { initDashboard, loadDashboard } from './modules/dashboard.js?v=20260510-3';
-    import { initEmployees, loadEmployees } from './modules/employees.js?v=20260511-1';
+    import { initEmployees, loadEmployees } from './modules/employees.js?v=20260512-1';
     import { initProjects } from './modules/projects.js?v=20260511-1';
     import { initFiles } from './modules/files.js';
     import { initTree } from './modules/tree.js?v=20260511-4';
-    import { initAI } from './modules/ai.js?v=20260511-2';
+    import { initAI } from './modules/ai.js?v=20260512-1';
+    import { initMiniAI } from './modules/mini_ai.js?v=20260512-1';
     import { initSettings } from './modules/settings.js';
     import { initLeave } from './modules/leave.js?v=20260509-3';
     import { debounce } from './utils/helpers.js?v=20260509-3';
@@ -1234,6 +1261,7 @@
     initFiles();
     initTree();
     initAI();
+    initMiniAI();
     initSettings();
     initLeave();
 

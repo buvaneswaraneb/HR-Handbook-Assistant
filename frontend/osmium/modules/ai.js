@@ -8,16 +8,19 @@ import { queryRAG, getFiles, deleteFile, uploadFile } from './api.js?v=20260511-
 import { escHtml, fmtBytes, fmtDate } from '../utils/helpers.js?v=20260509-3';
 import { showToast } from './ui.js';
 
-let messagesEl, inputEl, filesPanelEl;
+let messagesEl, inputEl, filesPanelEl, historySidebarEl, historyListEl, historyCountEl;
 let injectedFiles = [];   // files currently "active" in context
 let pendingAttach = null; // file staged for upload
 let isSending = false;
 let chatHistory = [];
+let conversations = [];
+let currentConversationId = null;
 let aiFilesCache = [];
 let loadedMemoryKey = null;
 
 const CHAT_HISTORY_LIMIT = 40;
 const API_HISTORY_LIMIT = 10;
+const MAX_CONVERSATIONS = 30;
 const WELCOME_HTML = `
   <div style="margin-bottom:8px">Hello! I am the Osmium AI Assistant.</div>
   <div>I have full context of your enterprise data. You can ask me questions about employees, projects, or
@@ -27,6 +30,9 @@ export function initAI() {
   messagesEl   = document.getElementById('ai-messages');
   inputEl      = document.getElementById('ai-input');
   filesPanelEl = document.getElementById('ai-files-panel');
+  historySidebarEl = document.getElementById('ai-history-sidebar');
+  historyListEl = document.getElementById('ai-history-list');
+  historyCountEl = document.getElementById('ai-history-count');
 
   if (!messagesEl) return;
 
@@ -39,6 +45,16 @@ export function initAI() {
   document.getElementById('ai-new-chat')?.addEventListener('click', e => {
     e.preventDefault();
     startNewConversation();
+  });
+
+  document.getElementById('ai-history-toggle')?.addEventListener('click', e => {
+    e.preventDefault();
+    toggleHistorySidebar();
+  });
+
+  document.getElementById('ai-history-close')?.addEventListener('click', e => {
+    e.preventDefault();
+    setHistorySidebar(false);
   });
 
   // Textarea: Enter sends (Shift+Enter = newline)
@@ -94,33 +110,218 @@ function memoryKey() {
   return `osmium_ai_memory_${id}`;
 }
 
+function conversationsKey() {
+  return `${memoryKey()}_conversations`;
+}
+
 function loadConversationMemory(force = false) {
   if (!messagesEl) return;
   const key = memoryKey();
   if (!force && loadedMemoryKey === key) return;
   loadedMemoryKey = key;
 
+  const storeKey = conversationsKey();
   try {
-    const saved = JSON.parse(localStorage.getItem(key) || '{}');
-    chatHistory = Array.isArray(saved.messages) ? saved.messages.slice(-CHAT_HISTORY_LIMIT) : [];
-    injectedFiles = Array.isArray(saved.injectedFiles) ? saved.injectedFiles : [];
+    const savedStore = JSON.parse(localStorage.getItem(storeKey) || '{}');
+    conversations = Array.isArray(savedStore.conversations)
+      ? savedStore.conversations.map(normalizeConversation).filter(Boolean).slice(0, MAX_CONVERSATIONS)
+      : [];
+    currentConversationId = savedStore.currentConversationId || null;
+
+    if (!conversations.length) {
+      const legacy = JSON.parse(localStorage.getItem(key) || '{}');
+      if (Array.isArray(legacy.messages) && legacy.messages.length) {
+        const migrated = normalizeConversation({
+          id: newConversationId(),
+          messages: legacy.messages,
+          injectedFiles: legacy.injectedFiles,
+          updatedAt: Date.now(),
+        });
+        conversations = migrated ? [migrated] : [];
+        currentConversationId = migrated?.id || null;
+        persistConversationStore();
+      }
+    }
   } catch {
+    conversations = [];
+    currentConversationId = null;
+  }
+
+  const active = getActiveConversation();
+  if (active) {
+    chatHistory = active.messages.slice(-CHAT_HISTORY_LIMIT);
+    injectedFiles = Array.isArray(active.injectedFiles) ? [...active.injectedFiles] : [];
+    currentConversationId = active.id;
+  } else {
     chatHistory = [];
     injectedFiles = [];
   }
 
   renderConversation();
+  renderHistoryList();
   updateContextBadge();
 }
 
-function persistConversation() {
+function persistConversationStore() {
+  conversations.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  conversations = conversations.slice(0, MAX_CONVERSATIONS);
   try {
-    localStorage.setItem(memoryKey(), JSON.stringify({
-      messages: chatHistory.slice(-CHAT_HISTORY_LIMIT),
-      injectedFiles,
+    localStorage.setItem(conversationsKey(), JSON.stringify({
+      currentConversationId,
+      conversations,
     }));
   } catch {}
 }
+
+function persistConversation() {
+  if (!currentConversationId && (chatHistory.length || injectedFiles.length)) {
+    currentConversationId = newConversationId();
+    conversations.unshift({
+      id: currentConversationId,
+      title: 'New conversation',
+      messages: [],
+      injectedFiles: [],
+      updatedAt: Date.now(),
+    });
+  }
+
+  const active = getActiveConversation();
+  if (active) {
+    active.messages = chatHistory.slice(-CHAT_HISTORY_LIMIT);
+    active.injectedFiles = [...injectedFiles];
+    active.title = conversationTitle(active.messages);
+    active.updatedAt = Date.now();
+  }
+
+  persistConversationStore();
+  renderHistoryList();
+}
+
+function newConversationId() {
+  return `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeConversation(item) {
+  if (!item || typeof item !== 'object') return null;
+  const messages = Array.isArray(item.messages) ? item.messages.slice(-CHAT_HISTORY_LIMIT) : [];
+  return {
+    id: item.id || newConversationId(),
+    title: item.title || conversationTitle(messages),
+    messages,
+    injectedFiles: Array.isArray(item.injectedFiles) ? item.injectedFiles : [],
+    updatedAt: Number(item.updatedAt) || Date.now(),
+  };
+}
+
+function getActiveConversation() {
+  return conversations.find(item => item.id === currentConversationId) || conversations[0] || null;
+}
+
+function conversationTitle(messages) {
+  const firstUser = (messages || []).find(item => item.role === 'user' && (item.content || item.attachmentName));
+  const seed = firstUser?.content || firstUser?.attachmentName || 'New conversation';
+  return seed.length > 48 ? `${seed.slice(0, 45)}...` : seed;
+}
+
+function conversationPreview(conv) {
+  const last = [...(conv.messages || [])].reverse().find(item => item.content || item.attachmentName);
+  if (!last) return 'No messages yet';
+  const text = last.content || last.attachmentName || '';
+  return text.length > 64 ? `${text.slice(0, 61)}...` : text;
+}
+
+function formatHistoryTime(ts) {
+  if (!ts) return '';
+  const date = new Date(ts);
+  const today = new Date();
+  const sameDay = date.toDateString() === today.toDateString();
+  return sameDay
+    ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+}
+
+function renderHistoryList() {
+  if (!historyListEl) return;
+  const count = conversations.length;
+  if (historyCountEl) {
+    historyCountEl.textContent = count ? `${count} conversation${count === 1 ? '' : 's'}` : 'No conversations';
+  }
+
+  if (!count) {
+    historyListEl.innerHTML = `
+      <div class="ai-history-empty">
+        <span class="material-symbols-outlined">history</span>
+        <div>No previous conversations yet.</div>
+      </div>`;
+    return;
+  }
+
+  historyListEl.innerHTML = conversations.map(conv => `
+    <div class="ai-history-item ${conv.id === currentConversationId ? 'active' : ''}" onclick="window._openAIConversation('${conv.id}')">
+      <div class="ai-history-item-main">
+        <div class="ai-history-title">${escHtml(conv.title || 'New conversation')}</div>
+        <div class="ai-history-preview">${escHtml(conversationPreview(conv))}</div>
+      </div>
+      <div class="ai-history-meta">
+        <span>${escHtml(formatHistoryTime(conv.updatedAt))}</span>
+        <button type="button" class="ai-history-delete" title="Delete conversation" onclick="event.stopPropagation();window._deleteAIConversation('${conv.id}')">
+          <span class="material-symbols-outlined">delete</span>
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+function setHistorySidebar(open) {
+  historySidebarEl?.classList.toggle('collapsed', !open);
+  historySidebarEl?.classList.toggle('open', open);
+}
+
+function toggleHistorySidebar() {
+  const isCollapsed = historySidebarEl?.classList.contains('collapsed');
+  const isOpen = historySidebarEl?.classList.contains('open');
+  const compactLayout = window.matchMedia('(max-width: 1120px)').matches;
+  if (isCollapsed) {
+    setHistorySidebar(true);
+    return;
+  }
+  setHistorySidebar(compactLayout ? !isOpen : false);
+}
+
+window._openAIConversation = function(id) {
+  const conv = conversations.find(item => item.id === id);
+  if (!conv) return;
+  currentConversationId = id;
+  chatHistory = conv.messages.slice(-CHAT_HISTORY_LIMIT);
+  injectedFiles = Array.isArray(conv.injectedFiles) ? [...conv.injectedFiles] : [];
+  pendingAttach = null;
+  renderPendingAttachment();
+  persistConversationStore();
+  renderConversation();
+  renderHistoryList();
+  loadAIFiles();
+  updateContextBadge();
+  inputEl?.focus();
+};
+
+window._deleteAIConversation = function(id) {
+  const conv = conversations.find(item => item.id === id);
+  if (!conv) return;
+  if (!confirm(`Delete "${conv.title || 'this conversation'}"?`)) return;
+  conversations = conversations.filter(item => item.id !== id);
+  if (currentConversationId === id) {
+    const next = conversations[0] || null;
+    currentConversationId = next?.id || null;
+    chatHistory = next?.messages?.slice(-CHAT_HISTORY_LIMIT) || [];
+    injectedFiles = next?.injectedFiles ? [...next.injectedFiles] : [];
+    renderConversation();
+    updateContextBadge();
+    loadAIFiles();
+  }
+  try {
+    persistConversationStore();
+    renderHistoryList();
+  } catch {}
+};
 
 function renderConversation() {
   if (!messagesEl) return;
@@ -160,9 +361,11 @@ function apiHistory() {
 function startNewConversation() {
   chatHistory = [];
   injectedFiles = [];
+  currentConversationId = null;
   pendingAttach = null;
   renderPendingAttachment();
-  persistConversation();
+  persistConversationStore();
+  renderHistoryList();
   renderConversation();
   loadAIFiles();
   updateContextBadge();

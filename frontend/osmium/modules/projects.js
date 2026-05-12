@@ -118,7 +118,11 @@ function dismissProjectClosePrompt() {
   document.getElementById('project-close-confirm')?.remove();
 }
 
-function showProjectClosePrompt() {
+function showProjectClosePrompt({
+  title = 'Close project draft?',
+  copy = 'Your project details are still in progress.',
+  onClose = null,
+} = {}) {
   if (document.getElementById('project-close-confirm')) return;
   const prompt = document.createElement('div');
   prompt.id = 'project-close-confirm';
@@ -128,8 +132,8 @@ function showProjectClosePrompt() {
       <div class="project-close-icon">
         <span class="material-symbols-outlined">draft</span>
       </div>
-      <div id="project-close-title" class="project-close-title">Close project draft?</div>
-      <div class="project-close-copy">Your project details are still in progress.</div>
+      <div id="project-close-title" class="project-close-title">${escHtml(title)}</div>
+      <div class="project-close-copy">${escHtml(copy)}</div>
       <div class="project-close-actions">
         <button type="button" class="btn btn-ghost" id="project-close-resume">Resume</button>
         <button type="button" class="btn btn-primary" id="project-close-discard">Close</button>
@@ -140,6 +144,10 @@ function showProjectClosePrompt() {
   document.getElementById('project-close-resume')?.addEventListener('click', dismissProjectClosePrompt);
   document.getElementById('project-close-discard')?.addEventListener('click', () => {
     dismissProjectClosePrompt();
+    if (onClose) {
+      onClose();
+      return;
+    }
     allowProjectModalClose = true;
     closeModal('add-project-modal');
     allowProjectModalClose = false;
@@ -147,6 +155,8 @@ function showProjectClosePrompt() {
     resetProjectForm();
   });
 }
+
+window._showProjectClosePrompt = showProjectClosePrompt;
 
 window._onAddProjectModalCloseRequest = function() {
   if (allowProjectModalClose || !projectFormHasDraft()) {

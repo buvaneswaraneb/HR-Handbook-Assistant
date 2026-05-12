@@ -59,7 +59,7 @@ from app.services.e_r_s.repositories.file_repo import FileRepository       # noq
 from app.services.rag import RAGQueryEngine                                # noqa: E402
 from app.api.auth_context import get_workplace_id                          # noqa: E402
 
-from app.api.routes import employees, projects, teams, activity, analytics, files, leave, auth, calendar, supabase_auth, google_calendar  # noqa: E402
+from app.api.routes import employees, projects, teams, activity, analytics, files, leave, auth, calendar, supabase_auth, google_calendar, workspace_ai  # noqa: E402
 
 # upload-downloader has a hyphen in its directory name, which is not a valid
 # Python identifier, so we load it dynamically via importlib.
@@ -126,6 +126,7 @@ app.include_router(activity.router)
 app.include_router(analytics.router)
 app.include_router(files.router)
 app.include_router(leave.router)
+app.include_router(workspace_ai.router)
 
 
 # ── request / response models ─────────────────────────────────────────────────

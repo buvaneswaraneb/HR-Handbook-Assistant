@@ -15,6 +15,7 @@ import { addEmployeeToCanvas } from './canvas.js?v=20260511-2';
 let empSkillRows = [{ skill_name: '', skill_level: 3, experience_years_with_skill: null }];
 let editingEmployeeId = null;
 let suppressEmployeeModalReset = false;
+let suppressEmployeeClosePrompt = false;
 let availableProjects = [];
 let editingEmployeeProjects = [];
 
@@ -138,6 +139,34 @@ function _looksLikeDirectImageUrl(value) {
   } catch {
     return false;
   }
+}
+
+function hasEmployeeDraftChanges() {
+  if (!document.getElementById('add-employee-modal')?.classList.contains('open')) return false;
+  if (editingEmployeeId) return true;
+
+  const fieldIds = [
+    'new-emp-name',
+    'new-emp-email',
+    'new-emp-role',
+    'new-emp-team',
+    'new-emp-rating',
+    'new-emp-exp',
+    'new-emp-linkedin',
+    'new-emp-avatar',
+  ];
+  const hasFieldValue = fieldIds.some(id => document.getElementById(id)?.value?.trim());
+  const hasCustomTime =
+    document.getElementById('new-emp-start')?.value !== '09:00' ||
+    document.getElementById('new-emp-end')?.value !== '18:00';
+  const availabilityChanged = document.getElementById('new-emp-avail')?.checked === false;
+  const hasSkills = empSkillRows.some(row =>
+    row.skill_name?.trim() ||
+    Number(row.skill_level) !== 3 ||
+    row.experience_years_with_skill !== null
+  );
+
+  return hasFieldValue || hasCustomTime || availabilityChanged || hasSkills;
 }
 
 function renderProjectAssignmentSection() {
@@ -334,6 +363,7 @@ async function submitEmployee() {
       showToast('Employee created!');
     }
     await getEmployees({ cache: false }).catch(() => null);
+    suppressEmployeeClosePrompt = true;
     closeModal('add-employee-modal');
     resetEmployeeForm();
     State.emit('data:employees:refresh');
@@ -523,4 +553,22 @@ window._onAddEmployeeModalOpen = function() {
   }
   resetEmployeeForm();
   populateProjectOptions();
+};
+
+window._onAddEmployeeModalCloseRequest = function() {
+  if (suppressEmployeeClosePrompt) {
+    suppressEmployeeClosePrompt = false;
+    return true;
+  }
+  if (!hasEmployeeDraftChanges()) return true;
+  window._showProjectClosePrompt?.({
+    title: 'Close employee draft?',
+    copy: 'Your employee details are still in progress.',
+    onClose: () => {
+      suppressEmployeeClosePrompt = true;
+      closeModal('add-employee-modal');
+      resetEmployeeForm();
+    },
+  });
+  return false;
 };

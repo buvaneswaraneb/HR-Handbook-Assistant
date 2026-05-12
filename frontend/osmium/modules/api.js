@@ -382,6 +382,14 @@ export async function queryRAG(question, fileIds = [], history = []) {
   });
 }
 
+export async function askWorkspaceAI(question, context, history = []) {
+  return request('/workspace-ai/ask', {
+    method: 'POST',
+    body: JSON.stringify({ question, context, history }),
+    invalidate: false,
+  });
+}
+
 // ─── LEAVE MANAGEMENT ─────────────────────────────────────────
 export async function getLeaveRecords(options = {}) {
   const data = await request('/leave', options);

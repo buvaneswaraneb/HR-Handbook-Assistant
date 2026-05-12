@@ -1,11 +1,11 @@
 // ============================================================
 // settings.js — Settings Panel
-// Theme · API URL · Canvas · Notifications
+// Theme · Canvas · Notifications
 // ============================================================
 
 import { State } from '../utils/state.js';
 import { applyTheme } from './ui.js';
-import { checkHealth, invalidateApiCache } from './api.js?v=20260509-5';
+import { invalidateApiCache } from './api.js?v=20260509-5';
 import { showToast } from './ui.js';
 
 export function initSettings() {
@@ -29,10 +29,6 @@ export function initSettings() {
 
 function syncUI() {
   const s = State.settings;
-
-  // API URL
-  const apiInput = document.getElementById('setting-api-url');
-  if (apiInput) apiInput.value = s.apiBase;
 
   // Theme
   document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -58,17 +54,6 @@ export function openSettings() {
 export function closeSettings() {
   document.getElementById('settings-panel')?.classList.remove('open');
 }
-
-// ─── SAVE HANDLERS (called from HTML) ─────────────────────────
-window._saveApiUrl = function() {
-  const val = document.getElementById('setting-api-url')?.value.trim().replace(/\/+$/, '');
-  if (!val) return;
-  State.apiBase = val;
-  State.setSettings({ apiBase: val });
-  invalidateApiCache();
-  checkHealth();
-  showToast('API URL updated');
-};
 
 window._setTheme = function(theme) {
   applyTheme(theme);
