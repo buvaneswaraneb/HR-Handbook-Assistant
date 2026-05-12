@@ -2872,6 +2872,25 @@ body.mini-ai-thinking #main::after {
   background: var(--gl-surface-lowest);
 }
 
+#ai-upload-required {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--gl-warning);
+  border-radius: var(--r-md);
+  background: var(--gl-warning-muted);
+  color: var(--gl-on-surface-2);
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+#ai-upload-required .material-symbols-outlined {
+  color: var(--gl-warning);
+  font-size: 17px;
+}
+
 #ai-input {
   width: 100%;
   resize: none;
@@ -2891,6 +2910,11 @@ body.mini-ai-thinking #main::after {
 
 #ai-input:focus {
   border-color: var(--gl-tertiary);
+}
+
+#ai-input:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
 }
 
 #ai-input-actions {
@@ -3018,6 +3042,17 @@ body.mini-ai-thinking #main::after {
   background: var(--gl-tertiary-muted);
   color: var(--gl-on-surface);
   border-color: rgba(13, 111, 253, 0.28);
+}
+
+.ai-chip.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ai-chip.disabled:hover {
+  background: var(--gl-surface);
+  color: var(--gl-on-surface-3);
+  border-color: var(--gl-outline-2);
 }
 
 @media (max-width: 1120px) {

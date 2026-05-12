@@ -22,9 +22,8 @@ const CHAT_HISTORY_LIMIT = 40;
 const API_HISTORY_LIMIT = 10;
 const MAX_CONVERSATIONS = 30;
 const WELCOME_HTML = `
-  <div style="margin-bottom:8px">Hello! I am the Osmium AI Assistant.</div>
-  <div>I have full context of your enterprise data. You can ask me questions about employees, projects, or
-    attach documents to query against them.</div>`;
+  <div style="margin-bottom:8px">Hello! I am the Osmium HR HandBook.</div>
+  <div>Please upload a PDF first, then ask questions from your HR handbook.</div>`;
 
 export function initAI() {
   messagesEl   = document.getElementById('ai-messages');
@@ -77,6 +76,10 @@ export function initAI() {
   // Quick chips
   document.querySelectorAll('.ai-chip[data-q]').forEach(chip => {
     chip.addEventListener('click', () => {
+      if (!canSendMainAIMessage()) {
+        showUploadRequired();
+        return;
+      }
       if (inputEl) { inputEl.value = chip.dataset.q; inputEl.focus(); }
     });
   });
@@ -341,6 +344,43 @@ function renderConversation() {
   scrollToBottom();
 }
 
+function hasUploadedPdf() {
+  return aiFilesCache.some(isPdfFile);
+}
+
+function hasPendingPdf() {
+  return Boolean(pendingAttach && isPdfFile(pendingAttach));
+}
+
+function canSendMainAIMessage() {
+  return hasUploadedPdf() || hasPendingPdf();
+}
+
+function updateMessageGate() {
+  const blocked = !canSendMainAIMessage();
+  const sendBtn = document.getElementById('ai-send');
+  const notice = document.getElementById('ai-upload-required');
+  const chips = document.querySelectorAll('.ai-chip[data-q]');
+
+  if (inputEl) {
+    inputEl.disabled = blocked;
+    inputEl.placeholder = blocked
+      ? 'Upload a PDF handbook first...'
+      : 'Ask the HR HandBook a question... (Shift+Enter for new line)';
+  }
+  if (sendBtn) sendBtn.disabled = blocked || isSending;
+  if (notice) notice.style.display = blocked ? 'flex' : 'none';
+  chips.forEach(chip => {
+    chip.classList.toggle('disabled', blocked);
+    chip.setAttribute('aria-disabled', blocked ? 'true' : 'false');
+  });
+}
+
+function showUploadRequired() {
+  updateMessageGate();
+  showToast('Upload or attach one PDF before sending messages in the HR HandBook.', 'error');
+}
+
 function pushHistory(item) {
   chatHistory.push(item);
   if (chatHistory.length > CHAT_HISTORY_LIMIT) {
@@ -377,6 +417,8 @@ export async function loadAIFiles() {
   if (!filesPanelEl) return;
   if (!State.authProfile) {
     filesPanelEl.innerHTML = `<div style="padding:16px;color:var(--gl-on-surface-4);font-size:0.8rem">Sign in to load files.</div>`;
+    aiFilesCache = [];
+    updateMessageGate();
     return;
   }
   try {
@@ -384,6 +426,8 @@ export async function loadAIFiles() {
     renderAIFilePanel(files);
   } catch {
     if (filesPanelEl) filesPanelEl.innerHTML = `<div style="padding:16px;color:var(--gl-on-surface-4);font-size:0.8rem">Could not load files.</div>`;
+    aiFilesCache = [];
+    updateMessageGate();
   }
 }
 
@@ -397,6 +441,7 @@ function renderAIFilePanel(files) {
   updateContextBadge();
 
   if (!pdfFiles.length) {
+    updateMessageGate();
     filesPanelEl.innerHTML = `
       <div style="padding:24px;text-align:center;color:var(--gl-on-surface-4)">
         <span class="material-symbols-outlined" style="font-size:36px;display:block;margin-bottom:8px;opacity:0.4">folder_open</span>
@@ -405,6 +450,8 @@ function renderAIFilePanel(files) {
       </div>`;
     return;
   }
+
+  updateMessageGate();
 
   const extIcon = { PDF:'picture_as_pdf' };
   const extColor = { PDF:'#f5574a' };
@@ -487,8 +534,18 @@ window._downloadAIFile = function(url, filename) {
 function updateContextBadge() {
   const badge = document.getElementById('ai-context-badge');
   if (!badge) return;
-  badge.textContent = injectedFiles.length ? `${injectedFiles.length} file${injectedFiles.length > 1 ? 's' : ''} in context` : 'No files in context';
-  badge.style.color = injectedFiles.length ? '#3dd68c' : 'var(--gl-on-surface-4)';
+  if (injectedFiles.length) {
+    badge.textContent = `${injectedFiles.length} file${injectedFiles.length > 1 ? 's' : ''} in context`;
+    badge.style.color = '#3dd68c';
+    return;
+  }
+  if (aiFilesCache.length) {
+    badge.textContent = `${aiFilesCache.length} PDF${aiFilesCache.length > 1 ? 's' : ''} available`;
+    badge.style.color = '#3dd68c';
+    return;
+  }
+  badge.textContent = 'No PDFs uploaded';
+  badge.style.color = 'var(--gl-on-surface-4)';
 }
 
 function injectedFileNames() {
@@ -507,6 +564,7 @@ function stageAttachment(file) {
   }
   pendingAttach = file;
   renderPendingAttachment();
+  updateMessageGate();
 }
 
 function renderPendingAttachment() {
@@ -516,6 +574,7 @@ function renderPendingAttachment() {
   if (!pendingAttach) {
     indicator.innerHTML = '';
     indicator.style.display = 'none';
+    updateMessageGate();
     return;
   }
 
@@ -526,6 +585,7 @@ function renderPendingAttachment() {
     <button type="button" class="ai-attach-clear" title="Remove attachment" onclick="window._clearAttach()">
       <span class="material-symbols-outlined" style="font-size:13px">close</span>
     </button>`;
+  updateMessageGate();
 }
 
 window._clearAttach = function() {
@@ -536,6 +596,11 @@ window._clearAttach = function() {
 // ─── SEND MESSAGE ─────────────────────────────────────────────
 async function sendMessage() {
   if (isSending) return;
+  if (!canSendMainAIMessage()) {
+    showUploadRequired();
+    return;
+  }
+
   const q = inputEl?.value.trim();
   if (!q && !pendingAttach) return;
 
@@ -546,7 +611,7 @@ async function sendMessage() {
   try {
     const attachment = pendingAttach;
     const attachedName = attachment?.name || '';
-    const activeFileIds = [...injectedFiles];
+    const activeFileIds = injectedFiles.length ? [...injectedFiles] : aiFilesCache.map(file => file.id).filter(Boolean);
     const previousHistory = apiHistory();
     const activeNamesBeforeSend = injectedFileNames();
 
@@ -629,7 +694,7 @@ async function sendMessage() {
     scrollToBottom();
   } finally {
     isSending = false;
-    if (sendBtn) sendBtn.disabled = false;
+    updateMessageGate();
   }
 }
 

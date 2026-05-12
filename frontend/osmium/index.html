@@ -238,7 +238,7 @@
       <div class="nav-section-label" style="margin-top:8px">Tools</div>
       <div class="nav-item" data-view="ai" onclick="switchViewGlobal('ai')">
         <span class="material-symbols-outlined nav-icon">smart_toy</span>
-        <span>AI Assistant</span>
+        <span>Osmium HR HandBook</span>
         <span class="nav-badge">AI</span>
       </div>
       <div class="nav-item" data-view="leave" onclick="switchViewGlobal('leave')">
@@ -373,10 +373,10 @@
             <div class="card metric-card" style="padding:18px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                 <div
-                  style="width:36px;height:36px;border-radius:var(--r-md);background:var(--gl-primary-muted);display:flex;align-items:center;justify-content:center;color:var(--gl-primary)">
+                  style="width:36px;height:36px;border-radius:var(--r-md);background:var(--gl-tertiary-muted);display:flex;align-items:center;justify-content:center;color:var(--gl-tertiary)">
                   <span class="material-symbols-outlined">assignment_ind</span>
                 </div>
-                <span style="font-size:0.72rem;color:var(--gl-primary)">Active</span>
+                <span style="font-size:0.72rem;font-weight:600;color:var(--gl-tertiary)">Active</span>
               </div>
               <div id="metric-assignments"
                 style="font-size:2rem;font-weight:800;color:var(--gl-on-surface);letter-spacing:-0.03em"><span
@@ -473,7 +473,7 @@
                 <button class="btn btn-secondary" style="justify-content:flex-start;gap:10px"
                   onclick="switchViewGlobal('ai')">
                   <span class="material-symbols-outlined" style="color:#5abfe8">smart_toy</span>
-                  <span style="font-size:0.82rem">AI Assistant</span>
+                  <span style="font-size:0.82rem">Osmium HR HandBook</span>
                 </button>
               </div>
             </div>
@@ -758,8 +758,8 @@
           <div id="ai-chat-header">
             <span class="material-symbols-outlined" style="color:var(--gl-tertiary);font-size:24px">smart_toy</span>
             <div>
-              <div style="font-size:0.9rem;font-weight:700;color:var(--gl-on-surface)">Osmium Intelligence</div>
-              <div style="font-size:0.7rem;color:var(--gl-on-surface-4)">Workspace assistant</div>
+              <div style="font-size:0.9rem;font-weight:700;color:var(--gl-on-surface)">Osmium HR HandBook</div>
+              <div style="font-size:0.7rem;color:var(--gl-on-surface-4)">PDF handbook assistant</div>
             </div>
             <div style="flex:1"></div>
             <button type="button" class="btn btn-ghost btn-sm" id="ai-history-toggle" title="Show chat history">
@@ -773,20 +773,23 @@
           </div>
           <div id="ai-messages">
             <div class="ai-msg ai-msg-bot">
-              <div style="margin-bottom:8px">Hello! I am the Osmium AI Assistant.</div>
-              <div>I can help with employees, projects, and any documents you add to this chat.</div>
+              <div style="margin-bottom:8px">Hello! I am the Osmium HR HandBook.</div>
+              <div>Please upload a PDF first, then ask questions from your HR handbook.</div>
             </div>
           </div>
           <div id="ai-input-area">
             <div class="ai-chips">
-              <div class="ai-chip" data-q="Who is available for a new React project?">Available React devs?</div>
-              <div class="ai-chip" data-q="List all active projects in the Engineering department">Active engineering
-                projects</div>
-              <div class="ai-chip" data-q="What are the critical deadlines this week?">Critical deadlines</div>
+              <div class="ai-chip" data-q="Summarize the leave policy from the handbook.">Summarize leave policy</div>
+              <div class="ai-chip" data-q="What are the employee onboarding rules?">Onboarding rules</div>
+              <div class="ai-chip" data-q="List the reimbursement policy highlights.">Reimbursement highlights</div>
+            </div>
+            <div id="ai-upload-required" role="status">
+              <span class="material-symbols-outlined">picture_as_pdf</span>
+              <span>Upload or attach one PDF before sending messages in the HR HandBook.</span>
             </div>
             <div style="position:relative">
               <textarea id="ai-input"
-                placeholder="Ask a question or request analysis... (Shift+Enter for new line)"></textarea>
+                placeholder="Upload a PDF handbook first..."></textarea>
               <div id="ai-input-actions">
                 <button type="button" class="btn btn-ghost btn-sm" id="ai-attach-btn" style="color:var(--gl-on-surface-3)">
                   <span class="material-symbols-outlined" style="font-size:18px">attach_file</span> Attach
@@ -804,7 +807,7 @@
 
         <div id="ai-files-sidebar">
           <div id="ai-files-header">
-            <div style="font-size:0.8rem;font-weight:700;color:var(--gl-on-surface)">Files for This Chat</div>
+            <div style="font-size:0.8rem;font-weight:700;color:var(--gl-on-surface)">HandBook PDFs</div>
             <span id="ai-context-badge" style="font-size:0.65rem;color:var(--gl-on-surface-4);font-weight:600">No files added</span>
           </div>
           <div id="ai-files-panel">
@@ -1251,7 +1254,7 @@
     import { initProjects } from './modules/projects.js?v=20260511-1';
     import { initFiles } from './modules/files.js';
     import { initTree } from './modules/tree.js?v=20260511-4';
-    import { initAI } from './modules/ai.js?v=20260512-1';
+    import { initAI } from './modules/ai.js?v=20260512-5';
     import { initMiniAI } from './modules/mini_ai.js?v=20260512-1';
     import { initSettings } from './modules/settings.js';
     import { initLeave } from './modules/leave.js?v=20260509-3';
