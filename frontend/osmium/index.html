@@ -146,13 +146,21 @@
           <div style="font-size:0.82rem;color:var(--gl-on-surface-3);margin-top:4px">Use Google or your employee email.</div>
         </div>
 
+        <div id="auth-mobile-notice" role="status" aria-live="polite">
+          <span class="material-symbols-outlined">devices</span>
+          <div>
+            <strong>Please use a laptop or tablet</strong>
+            <span>Osmium is optimized for larger screens. Sorry for the inconvenience.</span>
+          </div>
+        </div>
+
         <button id="auth-google-btn" class="btn btn-secondary"
           style="width:100%;justify-content:center;margin-bottom:14px" type="button">
           <span class="material-symbols-outlined" style="font-size:18px;color:#3dd68c">account_circle</span> Continue
           with Google
         </button>
 
-        <div
+        <div id="auth-divider"
           style="display:flex;align-items:center;gap:10px;margin:14px 0;color:var(--gl-on-surface-4);font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em">
           <div style="height:1px;background:var(--gl-outline);flex:1"></div>or<div
             style="height:1px;background:var(--gl-outline);flex:1"></div>
@@ -1248,7 +1256,7 @@
     import { initSettings } from './modules/settings.js';
     import { initLeave } from './modules/leave.js?v=20260509-3';
     import { debounce } from './utils/helpers.js?v=20260509-3';
-    import { initAuth } from './modules/auth.js?v=20260510-1';
+    import { initAuth } from './modules/auth.js?v=20260512-4';
 
     // ── Load settings first ─────────────────────────
     State.loadSettings();

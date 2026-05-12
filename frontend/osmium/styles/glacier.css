@@ -3902,6 +3902,50 @@ body:not(.auth-required) #auth-screen {
   padding: 24px;
 }
 
+#auth-mobile-notice {
+  display: none;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 14px;
+  border: 1px solid var(--gl-warning);
+  border-radius: var(--r-lg);
+  background: var(--gl-warning-muted);
+  color: var(--gl-on-surface);
+}
+
+#auth-mobile-notice .material-symbols-outlined {
+  color: var(--gl-warning);
+  margin-top: 1px;
+}
+
+#auth-mobile-notice strong,
+#auth-mobile-notice span:last-child {
+  display: block;
+}
+
+#auth-mobile-notice strong {
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+#auth-mobile-notice span:last-child {
+  color: var(--gl-on-surface-3);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin-top: 2px;
+}
+
+body.auth-mobile-blocked #auth-mobile-notice {
+  display: flex;
+}
+
+body.auth-mobile-blocked #auth-email-form,
+body.auth-mobile-blocked #auth-google-btn,
+body.auth-mobile-blocked #auth-divider {
+  opacity: 0.5;
+}
+
 .auth-feature-card {
   border: 1px solid var(--gl-outline);
   background: var(--gl-surface);

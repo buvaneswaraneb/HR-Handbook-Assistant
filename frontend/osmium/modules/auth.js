@@ -12,6 +12,7 @@ let authPopup = null;
 let authReady = false;
 let signInResetTimer = null;
 let authEmailMode = 'email';
+const phoneSignInQuery = window.matchMedia?.('(max-width: 767px) and (pointer: coarse)');
 
 function frontendAuthUrl() {
   const url = new URL(window.location.href);
@@ -40,6 +41,7 @@ export async function initAuth() {
   bindAuthForm();
   bindOAuthMessageHandler();
   bindUnauthorizedHandler();
+  bindMobileAuthGuard();
 
   if (await handleOAuthReturn()) return Boolean(State.auth?.accessToken);
 
@@ -84,6 +86,32 @@ function bindUnauthorizedHandler() {
   });
 }
 
+function bindMobileAuthGuard() {
+  if (!phoneSignInQuery) return;
+  const update = () => updateMobileAuthLock();
+  phoneSignInQuery.addEventListener?.('change', update);
+  phoneSignInQuery.addListener?.(update);
+  update();
+}
+
+function isPhoneSignInBlocked() {
+  return Boolean(phoneSignInQuery?.matches && !State.auth?.accessToken);
+}
+
+function updateMobileAuthLock() {
+  const blocked = isPhoneSignInBlocked();
+  document.body.classList.toggle('auth-mobile-blocked', blocked);
+  document.getElementById('auth-google-btn')?.toggleAttribute('disabled', blocked);
+  document.getElementById('auth-email-btn')?.toggleAttribute('disabled', blocked);
+  document.getElementById('auth-email')?.toggleAttribute('disabled', blocked);
+  document.getElementById('auth-password')?.toggleAttribute('disabled', blocked);
+}
+
+function showMobileAuthRestriction() {
+  updateMobileAuthLock();
+  showToast('Please use a laptop or tablet. Sorry for the inconvenience.', 'error');
+}
+
 async function handleOAuthReturn() {
   const params = new URLSearchParams(window.location.hash.replace(/^#/, '') || window.location.search.replace(/^\?/, ''));
   const accessToken = params.get('access_token');
@@ -92,6 +120,12 @@ async function handleOAuthReturn() {
   const error = params.get('error_description') || params.get('error');
 
   if (!accessToken && !error) return false;
+
+  if (isPhoneSignInBlocked()) {
+    showMobileAuthRestriction();
+    window.history.replaceState({}, document.title, window.location.pathname);
+    return true;
+  }
 
   if (window.opener) {
     window.opener.postMessage({
@@ -121,6 +155,11 @@ async function handleOAuthReturn() {
 }
 
 async function applyOAuthSession(session, provider = 'google') {
+  if (isPhoneSignInBlocked()) {
+    showMobileAuthRestriction();
+    return;
+  }
+
   // ── 1. Decode the JWT immediately to get Google identity ──────────────────
   const claims = decodeJwt(session.accessToken);
   // Supabase Google tokens carry user_metadata with name/picture/email
@@ -230,6 +269,11 @@ function persistSession(auth) {
 }
 
 async function signInEmail() {
+  if (isPhoneSignInBlocked()) {
+    showMobileAuthRestriction();
+    return;
+  }
+
   const email = document.getElementById('auth-email')?.value.trim();
   const password = document.getElementById('auth-password')?.value || '';
   const btn = document.getElementById('auth-email-btn');
@@ -395,6 +439,11 @@ function showPasswordSetupDialog() {
 }
 
 function signInGoogle() {
+  if (isPhoneSignInBlocked()) {
+    showMobileAuthRestriction();
+    return;
+  }
+
   const redirectTo = frontendAuthUrl();
   const url = `${(State.apiBase || '').replace(/\/+$/, '')}/auth/google/login?redirect_to=${encodeURIComponent(redirectTo)}`;
   const width = 520;
@@ -489,4 +538,6 @@ export function renderAuthShell() {
       googleBtn.style.cursor  = 'default';
     }
   }
+
+  updateMobileAuthLock();
 }
