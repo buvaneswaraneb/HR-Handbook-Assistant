@@ -87,13 +87,40 @@ _running: bool = False
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global _store, _engine
-    _store  = VectorStore()                        # loads existing FAISS index
-    app.state.vector_store = _store
-    _engine = RAGQueryEngine(store=_store)         # caches embedding model
-    logger.info("VectorStore loaded — %d vectors", _store.total_vectors)
+    global _store
+    try:
+        _store = VectorStore()                     # loads existing FAISS index
+        app.state.vector_store = _store
+        logger.info("VectorStore loaded — %d vectors", _store.total_vectors)
+    except Exception as exc:
+        _store = None
+        app.state.vector_store = None
+        logger.exception("VectorStore failed to initialise: %s", exc)
     yield
     # (shutdown hook — nothing to clean up for FAISS/sentence-transformers)
+
+
+def _get_query_engine() -> RAGQueryEngine:
+    """
+    Lazily initialise the RAG engine so missing AI config does not prevent
+    the rest of the HR API from starting in Docker/Render.
+    """
+    global _engine
+
+    if _store is None:
+        raise HTTPException(status_code=503, detail="Vector store not initialised")
+
+    if _engine is None:
+        try:
+            _engine = RAGQueryEngine(store=_store)
+        except ValueError as exc:
+            logger.warning("Query engine is not configured: %s", exc)
+            raise HTTPException(status_code=503, detail=str(exc))
+        except Exception as exc:
+            logger.exception("Query engine failed to initialise: %s", exc)
+            raise HTTPException(status_code=503, detail="Query engine failed to initialise")
+
+    return _engine
 
 
 # ── app ───────────────────────────────────────────────────────────────────────
@@ -375,8 +402,7 @@ async def store_status():
 @app.post("/query", response_model=QueryResponse)
 async def query_endpoint(body: QueryRequest, authorization: str | None = Header(None)):
     """Ask a natural-language question; returns an LLM answer with citations."""
-    if _engine is None:
-        raise HTTPException(status_code=503, detail="Query engine not initialised")
+    engine = _get_query_engine()
 
     workplace_id = get_workplace_id(authorization)
     source_names = _resolve_file_sources(body.file_ids, workplace_id)
@@ -384,7 +410,7 @@ async def query_endpoint(body: QueryRequest, authorization: str | None = Header(
         raise HTTPException(status_code=400, detail="Selected PDF context is no longer available.")
 
     try:
-        result = _engine.query(
+        result = engine.query(
             body.question,
             workplace_id=workplace_id,
             source_names=source_names,
