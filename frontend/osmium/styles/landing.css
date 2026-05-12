@@ -131,6 +131,43 @@ a {
   justify-self: end;
 }
 
+.landing-auth-link {
+  max-width: min(260px, 32vw);
+}
+
+.landing-auth-link.is-signed-in {
+  justify-content: flex-start;
+  overflow: hidden;
+}
+
+.landing-auth-link.is-signed-in span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.landing-auth-avatar,
+.landing-auth-avatar-fallback {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.landing-auth-avatar {
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+}
+
+.landing-auth-avatar-fallback {
+  display: grid;
+  place-items: center;
+  background: rgba(61, 214, 140, 0.14);
+  color: var(--green);
+  border: 1px solid rgba(61, 214, 140, 0.3);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
 .btn {
   min-height: 42px;
   display: inline-flex;
@@ -702,6 +739,10 @@ h3 {
 
   .brand small {
     display: none;
+  }
+
+  .landing-auth-link {
+    max-width: 152px;
   }
 
   .btn {

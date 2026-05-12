@@ -1,6 +1,8 @@
-import os
+from pathlib import Path
 from functools import lru_cache
 from pydantic_settings import BaseSettings
+
+ROOT_ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
 
 
 class Settings(BaseSettings):
@@ -17,7 +19,7 @@ class Settings(BaseSettings):
     cloudinary_folder: str = "hr-assistant"
 
     class Config:
-        env_file = os.path.join(os.path.dirname(__file__), "..", ".env")
+        env_file = str(ROOT_ENV_FILE)
         env_file_encoding = "utf-8"
         extra = "ignore"
 

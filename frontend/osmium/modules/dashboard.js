@@ -8,10 +8,15 @@ import { getAnalytics, getProjects, getLeaveRecords, getGoogleCalendarStatus, ge
 import { showToast } from './ui.js';
 import { dateKey, escHtml, fmtDate, parseLocalDate, todayLocalDate } from '../utils/helpers.js?v=20260509-3';
 
-const FRONTEND_AUTH_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
-
 function hasCalendarAuthToken() {
   return Boolean(State.auth?.accessToken);
+}
+
+function frontendAuthUrl() {
+  const url = new URL(window.location.href);
+  url.hash = '';
+  url.search = '';
+  return url.toString();
 }
 
 // ─── INIT ─────────────────────────────────────────────────────
@@ -402,7 +407,7 @@ window._connectGoogleCalendar = async function () {
     return;
   }
   try {
-    const callbackUrl = FRONTEND_AUTH_URL;
+    const callbackUrl = frontendAuthUrl();
     const response = await getGoogleCalendarAuthUrl(callbackUrl);
     const popup = window.open(response.authorization_url, 'google-calendar-auth', 'width=600,height=600');
     

@@ -49,7 +49,7 @@ def _env_value(name: str) -> str:
     if value:
         return value
 
-    env_file = Path(__file__).resolve().parents[2] / "services" / ".env"
+    env_file = Path(__file__).resolve().parents[4] / ".env"
     try:
         for line in env_file.read_text(encoding="utf-8").splitlines():
             raw = line.strip()

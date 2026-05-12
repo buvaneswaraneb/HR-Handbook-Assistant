@@ -24,7 +24,7 @@ from app.services.e_r_s.schemas import (
 
 logger = logging.getLogger(__name__)
 
-_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+_ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 DEFAULT_GROQ_MODEL = "llama-3.1-8b-instant"
 

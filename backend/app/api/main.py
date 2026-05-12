@@ -31,8 +31,9 @@ from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, field_validator
 
-# Load environment variables from .env file
-load_dotenv()
+# Load the repo-root .env file so local and hosted runs share one source.
+ROOT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(ROOT_ENV_FILE)
 
 
 

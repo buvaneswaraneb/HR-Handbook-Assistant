@@ -28,7 +28,7 @@
       <a href="#ai">AI</a>
       <a href="#planning">Planning</a>
     </nav>
-    <a class="btn btn-secondary" href="index.html">Sign in</a>
+    <a class="btn btn-secondary landing-auth-link" id="landing-auth-link" href="index.html">Sign in</a>
   </header>
 
   <main id="top">
@@ -210,6 +210,44 @@
     <span>© 2026 Osmium Systems</span>
     <a href="index.html">Open workspace</a>
   </footer>
+
+  <script>
+    (() => {
+      const link = document.getElementById('landing-auth-link');
+      if (!link) return;
+
+      function isExpired(session) {
+        if (!session?.expiresAt) return false;
+        const value = typeof session.expiresAt === 'number'
+          ? session.expiresAt
+          : Math.floor(new Date(session.expiresAt).getTime() / 1000);
+        return Number.isFinite(value) && value <= Math.floor(Date.now() / 1000) + 30;
+      }
+
+      function initials(nameOrEmail) {
+        const value = String(nameOrEmail || 'User').trim();
+        const parts = value.includes('@')
+          ? value.split('@')[0].split(/[._-]+/)
+          : value.split(/\s+/);
+        return parts.filter(Boolean).slice(0, 2).map(part => part[0]?.toUpperCase()).join('') || 'U';
+      }
+
+      try {
+        const session = JSON.parse(localStorage.getItem('osmium_auth_session') || 'null');
+        if (!session?.accessToken || isExpired(session)) return;
+
+        const user = session.user || {};
+        const label = user.name || user.email || 'Account';
+        const avatar = user.avatar
+          ? `<img src="${user.avatar}" alt="" class="landing-auth-avatar">`
+          : `<span class="landing-auth-avatar-fallback">${initials(label)}</span>`;
+
+        link.classList.add('is-signed-in');
+        link.innerHTML = `${avatar}<span>${label}</span>`;
+        link.title = `Continue as ${label}`;
+      } catch {}
+    })();
+  </script>
 </body>
 
 </html>

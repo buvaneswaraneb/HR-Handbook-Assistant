@@ -12,7 +12,13 @@ let authPopup = null;
 let authReady = false;
 let signInResetTimer = null;
 let authEmailMode = 'email';
-const FRONTEND_AUTH_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
+
+function frontendAuthUrl() {
+  const url = new URL(window.location.href);
+  url.hash = '';
+  url.search = '';
+  return url.toString();
+}
 
 /**
  * Decode a JWT payload (base64url) without verifying the signature.
@@ -247,7 +253,7 @@ async function signInEmail() {
       return;
     }
 
-    const redirectTo = FRONTEND_AUTH_URL;
+    const redirectTo = frontendAuthUrl();
     await startEmailOtp(email, redirectTo);
     showToast('Check your inbox for the sign-in link.');
     if (btn) {
@@ -321,7 +327,7 @@ function resetEmailAuthForm() {
   const helper = document.getElementById('auth-email-helper');
   if (wrap) wrap.style.display = 'none';
   if (input) input.value = '';
-  if (helper) helper.textContent = 'We will email a sign-in link. New users are created after verification.';
+  if (helper) helper.textContent = 'Enter your email to continue. New teammates can join after approval.';
   if (btn) {
     btn.disabled = false;
     btn.textContent = 'Sign in';
@@ -389,7 +395,7 @@ function showPasswordSetupDialog() {
 }
 
 function signInGoogle() {
-  const redirectTo = FRONTEND_AUTH_URL;
+  const redirectTo = frontendAuthUrl();
   const url = `${(State.apiBase || '').replace(/\/+$/, '')}/auth/google/login?redirect_to=${encodeURIComponent(redirectTo)}`;
   const width = 520;
   const height = 680;

@@ -228,7 +228,7 @@ def _configure_cloudinary(cloudinary_module) -> object:
     if missing:
         raise RuntimeError(
             "Cloudinary credentials are not configured. Set "
-            f"{', '.join(missing)} in backend/app/services/.env, or set CLOUDINARY_URL."
+            f"{', '.join(missing)} in the repo-root .env, or set CLOUDINARY_URL."
         )
 
     cloudinary_module.config(

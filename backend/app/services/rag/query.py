@@ -121,11 +121,8 @@ console_formatter = logging.Formatter('%(levelname)s - %(message)s')
 console_handler.setFormatter(console_formatter)
 logger.addHandler(console_handler)
 
-# ── load .env anchored to its real location ───────────────────────────────────
-# __file__ == backend/app/services/rag/query.py
-# .parent        == backend/app/services/rag/
-# .parent.parent == backend/app/services/          ← where .env lives
-_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+# ── load the repo-root .env file ─────────────────────────────────────────────
+_ENV_FILE = Path(__file__).resolve().parents[4] / ".env"
 _env_vars = dotenv_values(_ENV_FILE)   # returns {} if file not found (no crash)
 
 import httpx
