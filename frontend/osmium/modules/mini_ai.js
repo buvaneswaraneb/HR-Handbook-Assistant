@@ -18,7 +18,7 @@ import { showToast } from './ui.js';
 const CONTEXT_TTL = 5 * 60 * 1000;
 const MINI_HISTORY_LIMIT = 10;
 
-let miniWindowEl, miniMessagesEl, miniInputEl, miniContextEl, miniToggleEl;
+let miniWindowEl, miniMessagesEl, miniInputEl, miniContextEl, miniToggleEl, miniFabEl;
 let miniMessages = [];
 let workspaceContextCache = null;
 let isMiniSending = false;
@@ -29,9 +29,11 @@ export function initMiniAI() {
   miniInputEl = document.getElementById('mini-ai-input');
   miniContextEl = document.getElementById('mini-ai-context-state');
   miniToggleEl = document.getElementById('mini-ai-toggle');
+  miniFabEl = document.getElementById('mini-ai-fab');
 
   if (!miniWindowEl || !miniMessagesEl || !miniInputEl) return;
 
+  miniFabEl?.addEventListener('click', toggleMiniAI);
   document.getElementById('mini-ai-close')?.addEventListener('click', closeMiniAI);
   document.getElementById('mini-ai-send')?.addEventListener('click', e => {
     e.preventDefault();
@@ -347,12 +349,14 @@ function updateContextState(value, fromCache) {
 function syncMiniVisibility(view = State.currentView) {
   const hide = view === 'ai';
   miniToggleEl?.classList.toggle('mini-ai-page-hidden', hide);
+  miniFabEl?.classList.toggle('mini-ai-page-hidden', hide);
   if (hide) closeMiniAI();
 }
 
 function openMiniAI() {
   if (State.currentView === 'ai') return;
   miniWindowEl?.classList.add('open');
+  miniFabEl?.classList.add('is-open');
   renderMiniMessages();
   setTimeout(() => miniInputEl?.focus(), 50);
   getWorkspaceContext().catch(() => updateContextState('Context unavailable', false));
@@ -360,6 +364,7 @@ function openMiniAI() {
 
 function closeMiniAI() {
   miniWindowEl?.classList.remove('open');
+  miniFabEl?.classList.remove('is-open');
 }
 
 function toggleMiniAI() {

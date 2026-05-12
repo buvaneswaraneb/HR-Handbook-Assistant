@@ -291,7 +291,8 @@
       </button>
       <div class="sep"></div>
       <button class="topbar-btn" id="mini-ai-toggle" title="Mini AI Assistant" onclick="window.toggleAIWindow?.()">
-        <span class="material-symbols-outlined">smart_toy</span>
+        <img class="ai-input-icon-dark mini-ai-svg-icon" src="icon/ai_input_dark.svg" alt="">
+        <img class="ai-input-icon-light mini-ai-svg-icon" src="icon/ai_input_light.svg" alt="">
       </button>
       <button class="topbar-btn" title="Settings" data-settings-toggle onclick="window.openSettings?.()">
         <span class="material-symbols-outlined">tune</span>
@@ -813,11 +814,17 @@
 
   </div><!-- #app -->
 
+  <button type="button" id="mini-ai-fab" class="mini-ai-fab" title="Mini AI Assistant" aria-label="Open Mini AI Assistant">
+    <img class="ai-input-icon-dark mini-ai-svg-icon" src="icon/ai_input_dark.svg" alt="">
+    <img class="ai-input-icon-light mini-ai-svg-icon" src="icon/ai_input_light.svg" alt="">
+  </button>
+
   <!-- Mini Workspace AI -->
   <div id="mini-ai-window" aria-label="Mini workspace AI">
     <div class="mini-ai-titlebar">
       <div class="mini-ai-icon">
-        <span class="material-symbols-outlined">smart_toy</span>
+        <img class="ai-input-icon-dark mini-ai-svg-icon" src="icon/ai_input_dark.svg" alt="">
+        <img class="ai-input-icon-light mini-ai-svg-icon" src="icon/ai_input_light.svg" alt="">
       </div>
       <div style="min-width:0;flex:1">
         <div style="font-size:0.84rem;font-weight:800;color:var(--gl-on-surface)">Mini Workspace AI</div>
