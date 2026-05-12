@@ -5,6 +5,12 @@
 
 const LEGACY_API_BASE = 'https://hr-handbook-assistant-production.up.railway.app';
 const FRONTEND_PAGES_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
+const OLD_API_BASES = [
+  'https://nonsignificantly-bilgier-particia.ngrok-free.dev',
+  'http://localhost:8000',
+  'http://127.0.0.1:8000',
+  FRONTEND_PAGES_URL,
+];
 
 function defaultApiBase() {
   if (window.location.hostname.endsWith('vercel.app')) {
@@ -129,9 +135,7 @@ export const State = {
       const saved = JSON.parse(localStorage.getItem('osmium_settings') || '{}');
       const savedApiBase = (saved.apiBase || '').replace(/\/+$/, '');
       if (
-        savedApiBase === FRONTEND_PAGES_URL ||
-        savedApiBase === 'http://localhost:8000' ||
-        savedApiBase === 'http://127.0.0.1:8000' ||
+        OLD_API_BASES.includes(savedApiBase) ||
         (DEFAULT_API_BASE !== LEGACY_API_BASE && savedApiBase === LEGACY_API_BASE)
       ) {
         saved.apiBase = DEFAULT_API_BASE;

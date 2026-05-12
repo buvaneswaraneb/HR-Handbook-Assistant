@@ -20,7 +20,7 @@ function apiUrl(path) {
 }
 
 function tunnelHeaders() {
-  return normalizedApiBase().includes('.ngrok-free.dev') ? { 'ngrok-skip-browser-warning': 'true' } : {};
+  return {};
 }
 
 function cloneData(data) {
