@@ -6,7 +6,7 @@
 import { State } from '../utils/state.js';
 import { showToast } from './ui.js';
 import { escHtml } from '../utils/helpers.js?v=20260509-3';
-import { getAuthProfile, getEmailAuthStatus, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260512-3';
+import { getAuthProfile, getEmailAuthStatus, invalidateApiCache, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260512-3';
 
 let authPopup = null;
 let authReady = false;
@@ -423,6 +423,7 @@ export async function logout() {
 
 function clearSession(options = {}) {
   localStorage.removeItem('osmium_auth_session');
+  invalidateApiCache();
   State.set('auth', null);
   State.set('authProfile', null);
   State.resetWorkspaceData?.();
@@ -434,6 +435,7 @@ function setAuthenticatedSession(auth) {
   const previousWorkplace = State.auth?.workplaceId || State.auth?.user?.id || null;
   const nextWorkplace = auth?.workplaceId || auth?.user?.id || null;
   if (previousWorkplace && nextWorkplace && previousWorkplace !== nextWorkplace) {
+    invalidateApiCache();
     State.resetWorkspaceData?.();
   }
   State.set('auth', auth);

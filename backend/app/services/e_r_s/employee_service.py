@@ -82,7 +82,7 @@ def update_employee(emp_id: str, data: EmployeeUpdate, workplace_id: str | None 
     if not emp:
         raise ValueError(f"Employee {emp_id} not found")
     cache_clear("list_employees")
-    cache_delete(f"get_employee:{emp_id}")
+    cache_clear(f"get_employee:{emp_id}")
     for skill in skills:
         add_skill(emp_id, EmployeeSkillCreate(**skill), workplace_id)
     return _enrich(emp, emp_repo)
@@ -92,7 +92,7 @@ def patch_availability(emp_id: str, data: AvailabilityUpdate, workplace_id: str 
     emp_repo, _ = _repos()
     emp = emp_repo.update(emp_id, {"availability": data.availability}, workplace_id)
     cache_clear("list_employees")
-    cache_delete(f"get_employee:{emp_id}")
+    cache_clear(f"get_employee:{emp_id}")
     return _enrich(emp, emp_repo)
 
 
@@ -103,7 +103,7 @@ def delete_employee(emp_id: str, workplace_id: str | None = None) -> None:
         raise ValueError(f"Employee {emp_id} not found")
     emp_repo.delete(emp_id, workplace_id)
     cache_clear("list_employees")
-    cache_delete(f"get_employee:{emp_id}")
+    cache_clear(f"get_employee:{emp_id}")
 
 
 def add_skill(emp_id: str, data: EmployeeSkillCreate, workplace_id: str | None = None) -> dict:
@@ -119,14 +119,14 @@ def add_skill(emp_id: str, data: EmployeeSkillCreate, workplace_id: str | None =
         "notes": data.notes,
     }
     emp_repo.upsert_skill({k: v for k, v in payload.items() if v is not None})
-    cache_delete(f"get_employee:{emp_id}")
+    cache_clear(f"get_employee:{emp_id}")
     return get_employee(emp_id, workplace_id)
 
 
 def update_skill(emp_id: str, skill_id: str, data: EmployeeSkillUpdate, workplace_id: str | None = None) -> dict:
     emp_repo, _ = _repos()
     emp_repo.update_skill(emp_id, skill_id, data.model_dump(exclude_none=True))
-    cache_delete(f"get_employee:{emp_id}")
+    cache_clear(f"get_employee:{emp_id}")
     return get_employee(emp_id, workplace_id)
 
 
@@ -137,7 +137,7 @@ def add_experience(emp_id: str, data: ExperienceCreate, workplace_id: str | None
     payload = data.model_dump(exclude_none=True, mode="json")
     payload["employee_id"] = emp_id
     emp_repo.add_experience(payload)
-    cache_delete(f"get_employee:{emp_id}")
+    cache_clear(f"get_employee:{emp_id}")
     return get_employee(emp_id, workplace_id)
 
 

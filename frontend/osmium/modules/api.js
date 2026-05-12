@@ -92,6 +92,7 @@ function authExpiresAt() {
 
 function clearAuthSession() {
   localStorage.removeItem('osmium_auth_session');
+  invalidateApiCache();
   State.set('auth', null);
   State.set('authProfile', null);
   State.resetWorkspaceData?.();
