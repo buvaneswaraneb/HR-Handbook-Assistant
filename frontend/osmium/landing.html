@@ -9,6 +9,32 @@
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
     rel="stylesheet" />
   <link rel="icon" href="icon/osmium_logo.svg" type="image/svg+xml" />
+  <script>
+    (() => {
+      const rawParams = window.location.hash.replace(/^#/, '') || window.location.search.replace(/^\?/, '');
+      const params = new URLSearchParams(rawParams);
+      const accessToken = params.get('access_token');
+      const error = params.get('error_description') || params.get('error');
+      if (!accessToken && !error) return;
+
+      const expiresIn = params.get('expires_in');
+      const message = {
+        type: 'osmium:supabase-oauth',
+        accessToken,
+        refreshToken: params.get('refresh_token'),
+        expiresAt: expiresIn ? Math.floor(Date.now() / 1000) + Number(expiresIn) : null,
+        error,
+      };
+
+      if (window.opener) {
+        window.opener.postMessage(message, window.location.origin);
+        window.close();
+        return;
+      }
+
+      window.location.replace(`app.html${window.location.hash || window.location.search || ''}`);
+    })();
+  </script>
 </head>
 
 <body>
