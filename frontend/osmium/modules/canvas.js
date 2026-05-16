@@ -1378,7 +1378,6 @@ async function aiAssignProjectTeam(nodeId) {
     renderNodes();
     renderEdges();
     initSidePanel();
-    fitToScreenIfVisible();
     State.emit('data:projects:refresh');
     State.emit('data:employees:refresh');
 
@@ -1729,7 +1728,6 @@ async function toggleProjectChildren(projectNode, project = null) {
     await syncProjectTeamToCanvas(latest, projectNode);
     renderNodes();
     renderEdges();
-    fitToScreenIfVisible();
     showToast('Project children shown.', 'info', 1800);
     return;
   }
@@ -1865,7 +1863,6 @@ export async function addProjectTreeToCanvas(proj) {
     const latest = await syncProjectTeamToCanvas(proj, existingRoot);
     notifyMissingProjectRoles([latest || proj], { force: true });
     State.selectNode(existingRoot.id);
-    fitToScreenIfVisible();
     return;
   }
 
@@ -1896,7 +1893,6 @@ export async function addProjectTreeToCanvas(proj) {
 
   renderNodes();
   renderEdges();
-  fitToScreenIfVisible();
 }
 
 async function syncProjectTeamToCanvas(proj, projectNode) {
@@ -2028,13 +2024,6 @@ function normalizeProjectConnectionRoles() {
     if (edge) node.projectRole = normalizeProjectRole(edge.type || 'pending');
     else delete node.projectRole;
   });
-}
-
-function fitToScreenIfVisible() {
-  const container = document.getElementById('canvas-view');
-  const rect = container?.getBoundingClientRect();
-  if (!rect?.width || !rect?.height) return;
-  fitToScreen();
 }
 
 function nodeFromTeamMember(member, x, y, projectRole, projectId) {
