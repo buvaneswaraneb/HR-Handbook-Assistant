@@ -4,7 +4,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getAnalytics, getProjects, getLeaveRecords } from './api.js?v=20260512-3';
+import { getAnalytics, getProjects, getLeaveRecords } from './api.js?v=20260516-railway';
 import { dateKey, escHtml, parseLocalDate, todayLocalDate } from '../utils/helpers.js?v=20260509-3';
 
 let dashboardLoadPromise = null;

@@ -3,7 +3,7 @@
 // Osmium ERM · ERS API v1 + v2
 // ============================================================
 
-import { State } from '../utils/state.js';
+import { State, normalizeApiBase } from '../utils/state.js';
 
 const DEFAULT_GET_CACHE_TTL = 2 * 60 * 1000;
 const cache = new Map();
@@ -11,7 +11,7 @@ const pendingGets = new Map();
 let cacheVersion = 0;
 
 function normalizedApiBase() {
-  return (State.apiBase || '').trim().replace(/\/+$/, '');
+  return normalizeApiBase(State.apiBase);
 }
 
 function apiUrl(path) {

@@ -1267,7 +1267,7 @@
     import { initSettings } from './modules/settings.js';
     import { initLeave } from './modules/leave.js?v=20260509-3';
     import { debounce } from './utils/helpers.js?v=20260509-3';
-    import { initAuth } from './modules/auth.js?v=20260512-4';
+    import { initAuth } from './modules/auth.js?v=20260516-railway';
 
     // ── Load settings first ─────────────────────────
     State.loadSettings();
@@ -1306,7 +1306,7 @@
     // ── Global search ───────────────────────────────
     const searchDebounced = debounce(async q => {
       if (!q.trim() || q.length < 2) return;
-      const { searchEmployees } = await import('./modules/api.js?v=20260512-3');
+      const { searchEmployees } = await import('./modules/api.js?v=20260516-railway');
       try {
         const results = await searchEmployees({ skill: q });
         if (results.length) { switchView('employees'); State.set('employees', results); State.emit('view:employees'); }
@@ -1318,7 +1318,7 @@
 
     // ── Populate canvas helper ───────────────────────
     window._populateCanvas = async function () {
-      const emps = State.employees.length ? State.employees : await (await import('./modules/api.js?v=20260512-3')).getEmployees();
+      const emps = State.employees.length ? State.employees : await (await import('./modules/api.js?v=20260516-railway')).getEmployees();
       emps.slice(0, 16).forEach(e => addEmployeeToCanvas(e));
       renderNodes();
       showToast(`${Math.min(emps.length, 16)} employees added to canvas`);

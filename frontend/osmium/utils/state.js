@@ -21,6 +21,12 @@ function defaultApiBase() {
 
 export const DEFAULT_API_BASE = defaultApiBase();
 
+export function normalizeApiBase(value) {
+  const base = String(value || '').trim().replace(/\/+$/, '');
+  if (!base || OLD_API_BASES.includes(base)) return DEFAULT_API_BASE;
+  return base;
+}
+
 export const State = {
   // API
   apiBase: DEFAULT_API_BASE,
@@ -101,7 +107,11 @@ export const State = {
   },
 
   setSettings(partial) {
+    if (Object.prototype.hasOwnProperty.call(partial, 'apiBase')) {
+      partial = { ...partial, apiBase: normalizeApiBase(partial.apiBase) };
+    }
     Object.assign(this.settings, partial);
+    this.apiBase = normalizeApiBase(this.settings.apiBase);
     this.emit('settings:change', this.settings);
     this._persistSettings();
   },
@@ -133,16 +143,12 @@ export const State = {
   loadSettings() {
     try {
       const saved = JSON.parse(localStorage.getItem('osmium_settings') || '{}');
-      const savedApiBase = (saved.apiBase || '').replace(/\/+$/, '');
-      if (
-        OLD_API_BASES.includes(savedApiBase) ||
-        (DEFAULT_API_BASE !== LEGACY_API_BASE && savedApiBase === LEGACY_API_BASE)
-      ) {
-        saved.apiBase = DEFAULT_API_BASE;
-      }
+      saved.apiBase = normalizeApiBase(saved.apiBase);
       Object.assign(this.settings, saved);
-      this.apiBase = this.settings.apiBase || DEFAULT_API_BASE;
+      this.apiBase = normalizeApiBase(this.settings.apiBase);
+      this.settings.apiBase = this.apiBase;
       this.theme = this.settings.theme || 'dark';
+      this._persistSettings();
     } catch {}
   },
 

@@ -3,10 +3,10 @@
 // Osmium ERM · protected shell integration
 // ============================================================
 
-import { State } from '../utils/state.js';
+import { State, normalizeApiBase } from '../utils/state.js';
 import { showToast } from './ui.js';
 import { escHtml } from '../utils/helpers.js?v=20260509-3';
-import { getAuthProfile, getEmailAuthStatus, invalidateApiCache, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260512-3';
+import { getAuthProfile, getEmailAuthStatus, invalidateApiCache, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260516-railway';
 
 let authPopup = null;
 let authReady = false;
@@ -445,7 +445,7 @@ function signInGoogle() {
   }
 
   const redirectTo = frontendAuthUrl();
-  const url = `${(State.apiBase || '').replace(/\/+$/, '')}/auth/google/login?redirect_to=${encodeURIComponent(redirectTo)}`;
+  const url = `${normalizeApiBase(State.apiBase)}/auth/google/login?redirect_to=${encodeURIComponent(redirectTo)}`;
   const width = 520;
   const height = 680;
   const left = Math.max(0, window.screenX + (window.outerWidth - width) / 2);
