@@ -46,6 +46,15 @@ const EDGE_DELETE_SIZE = 18;
 const CONNECT_SNAP_RADIUS = 44;
 
 // ─── INIT ─────────────────────────────────────────────────────
+function ensureCanvasRefs() {
+  bgEl ||= document.getElementById('canvas-bg');
+  world ||= document.getElementById('canvas-world');
+  svgLayer ||= document.getElementById('canvas-svg-layer');
+  zoomLabel ||= document.getElementById('canvas-zoom-label');
+  selBox ||= document.getElementById('selection-box');
+  return Boolean(world && svgLayer);
+}
+
 export function initCanvas() {
   const container = document.getElementById('canvas-view');
   bgEl = document.getElementById('canvas-bg');
@@ -53,6 +62,7 @@ export function initCanvas() {
   svgLayer = document.getElementById('canvas-svg-layer');
   zoomLabel = document.getElementById('canvas-zoom-label');
   selBox = document.getElementById('selection-box');
+  if (!container || !ensureCanvasRefs()) return;
 
   // Setup SVG arrowhead marker
   svgLayer.innerHTML = `
@@ -338,6 +348,7 @@ function updateConnectionPreview(e) {
 }
 
 function getConnectionSnapTarget(clientX, clientY, fromId) {
+  if (!ensureCanvasRefs()) return null;
   let best = null;
   let bestDistance = Infinity;
 
@@ -608,6 +619,7 @@ function toggleSnapGrid() {
 
 // ─── RENDER NODES ─────────────────────────────────────────────
 export function renderNodes() {
+  if (!ensureCanvasRefs()) return;
   // Remove nodes no longer in state
   const existingIds = new Set(State.canvas.nodes.map(n => n.id));
   world.querySelectorAll('.canvas-node').forEach(el => {
@@ -845,6 +857,7 @@ function getEmployeeForNode(node) {
 }
 
 function syncNodeEl(id) {
+  if (!ensureCanvasRefs()) return;
   const node = State.canvas.nodes.find(n => n.id === id);
   if (!node) return;
   const el = world.querySelector(`.canvas-node[data-id="${id}"]`);
@@ -852,6 +865,7 @@ function syncNodeEl(id) {
 }
 
 function updateSelectionStyles(selectedIds) {
+  if (!ensureCanvasRefs()) return;
   world.querySelectorAll('.canvas-node').forEach(el => {
     el.classList.toggle('selected', selectedIds.includes(el.dataset.id));
   });
@@ -952,6 +966,7 @@ function normalizeProjectRole(role) {
 
 // ─── RENDER EDGES ─────────────────────────────────────────────
 export function renderEdges() {
+  if (!ensureCanvasRefs()) return;
   // Remove old edge elements
   svgLayer.querySelectorAll('.canvas-edge-group').forEach(e => e.remove());
   const visibleEdgeIds = new Set(State.canvas.edges.map(edge => edge.id));
@@ -1256,7 +1271,7 @@ function showRoleMenuAt(x, y, employeeNode, emp, projectLink) {
 }
 
 function getNodeMenuPoint(node) {
-  const el = world.querySelector(`.canvas-node[data-id="${node.id}"]`);
+  const el = ensureCanvasRefs() ? world.querySelector(`.canvas-node[data-id="${node.id}"]`) : null;
   const rect = el?.getBoundingClientRect();
   if (!rect) return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   return {
@@ -1385,7 +1400,7 @@ async function aiAssignProjectTeam(nodeId) {
 function setProjectAiAssigning(nodeId, busy) {
   if (busy) aiAssigningProjectNodeIds.add(nodeId);
   else aiAssigningProjectNodeIds.delete(nodeId);
-  const el = world?.querySelector(`.canvas-node[data-id="${nodeId}"]`);
+  const el = ensureCanvasRefs() ? world.querySelector(`.canvas-node[data-id="${nodeId}"]`) : null;
   el?.classList.toggle('ai-generating', busy);
   const btn = el?.querySelector('.canvas-ai-assign-btn');
   if (btn) {
@@ -1646,7 +1661,7 @@ function revertOptimisticAssignment(edge, previousEdge, employeeNode, previousRo
     Object.assign(edge, previousEdge);
   } else {
     State.canvas.edges = State.canvas.edges.filter(item => item.id !== edge.id);
-    world.querySelector(`.canvas-edge-delete[data-edge-id="${edge.id}"]`)?.remove();
+    world?.querySelector(`.canvas-edge-delete[data-edge-id="${edge.id}"]`)?.remove();
   }
 
   if (previousRole === undefined) delete employeeNode.projectRole;
@@ -1680,7 +1695,7 @@ async function deleteCanvasConnection(edgeId) {
     }
 
     State.removeCanvasEdge(edgeId);
-    world.querySelector(`.canvas-edge-delete[data-edge-id="${edgeId}"]`)?.remove();
+    world?.querySelector(`.canvas-edge-delete[data-edge-id="${edgeId}"]`)?.remove();
 
     if (employeeNode && !hasProjectConnection(employeeNode.id, edgeId)) {
       delete employeeNode.projectRole;
@@ -1975,7 +1990,7 @@ function resetProjectConnectionEdges(projectNode, projectId, teamEmployeeIds) {
     }
 
     if (seenAssigned.has(employeeId)) {
-      world.querySelector(`.canvas-edge-delete[data-edge-id="${edge.id}"]`)?.remove();
+      world?.querySelector(`.canvas-edge-delete[data-edge-id="${edge.id}"]`)?.remove();
       return false;
     }
 
