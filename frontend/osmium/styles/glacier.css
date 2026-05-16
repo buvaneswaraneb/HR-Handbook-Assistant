@@ -4179,6 +4179,45 @@ body:not(.auth-required) #auth-screen {
   padding: 24px;
 }
 
+.auth-password-field {
+  position: relative;
+}
+
+.auth-password-field .input {
+  padding-right: 42px;
+}
+
+.auth-password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--gl-on-surface-4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.auth-password-toggle:hover,
+.auth-password-toggle:focus-visible {
+  background: var(--gl-surface-high);
+  color: var(--gl-on-surface);
+  border-color: var(--gl-outline);
+  outline: none;
+}
+
+.auth-password-toggle .material-symbols-outlined {
+  font-size: 18px;
+}
+
 #auth-mobile-notice {
   display: none;
   align-items: flex-start;

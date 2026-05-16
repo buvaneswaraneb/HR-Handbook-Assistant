@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Osmium — Employee Management Workspace</title>
-  <link rel="stylesheet" href="styles/glacier.css?v=20260516-node-warning" />
+  <link rel="stylesheet" href="styles/glacier.css?v=20260516-password-eye" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
     rel="stylesheet" />
   <link rel="icon" href="icon/osmium_logo.svg" type="image/svg+xml" />
@@ -180,7 +180,12 @@
             required />
           <div id="auth-password-wrap" style="display:none;margin-top:12px">
             <div class="label">Password</div>
-            <input id="auth-password" class="input" type="password" autocomplete="current-password" placeholder="Password" />
+            <div class="auth-password-field">
+              <input id="auth-password" class="input" type="password" autocomplete="current-password" placeholder="Password" />
+              <button class="auth-password-toggle" type="button" data-password-toggle="auth-password" aria-label="Show password" title="Show password">
+                <span class="material-symbols-outlined">visibility</span>
+              </button>
+            </div>
           </div>
           <div id="auth-email-helper" style="font-size:0.74rem;color:var(--gl-on-surface-4);margin-top:8px">Enter your email to continue. New teammates can join after approval.</div>
           <button id="auth-email-btn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px"
@@ -1267,7 +1272,7 @@
     import { initSettings } from './modules/settings.js';
     import { initLeave } from './modules/leave.js?v=20260509-3';
     import { debounce } from './utils/helpers.js?v=20260509-3';
-    import { initAuth } from './modules/auth.js?v=20260516-railway';
+    import { initAuth } from './modules/auth.js?v=20260516-password-eye';
 
     // ── Load settings first ─────────────────────────
     State.loadSettings();

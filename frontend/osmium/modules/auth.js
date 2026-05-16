@@ -38,6 +38,7 @@ function decodeJwt(token) {
 }
 
 export async function initAuth() {
+  bindPasswordToggles();
   bindAuthForm();
   bindOAuthMessageHandler();
   bindUnauthorizedHandler();
@@ -49,6 +50,24 @@ export async function initAuth() {
   authReady = true;
   renderAuthShell();
   return Boolean(State.auth?.accessToken);
+}
+
+function bindPasswordToggles(root = document) {
+  root.querySelectorAll('[data-password-toggle]').forEach(button => {
+    if (button.dataset.bound === 'true') return;
+    button.dataset.bound = 'true';
+    button.addEventListener('click', () => {
+      const input = document.getElementById(button.dataset.passwordToggle);
+      if (!input) return;
+      const show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      button.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+      button.setAttribute('title', show ? 'Hide password' : 'Show password');
+      const icon = button.querySelector('.material-symbols-outlined');
+      if (icon) icon.textContent = show ? 'visibility_off' : 'visibility';
+      input.focus();
+    });
+  });
 }
 
 function bindAuthForm() {
@@ -395,19 +414,39 @@ function showPasswordSetupDialog() {
           <div style="font-size:1rem;font-weight:800;color:var(--gl-on-surface);margin-bottom:6px">Create your password</div>
           <div style="font-size:0.8rem;color:var(--gl-on-surface-3);line-height:1.45;margin-bottom:16px">Use this password for future sign-ins. Magic links will still be available for accounts without a password.</div>
           <div class="label">Password</div>
-          <input id="setup-password" class="input" type="password" autocomplete="new-password" minlength="8" required>
+          <div class="auth-password-field">
+            <input id="setup-password" class="input" type="password" autocomplete="new-password" minlength="8" required>
+            <button class="auth-password-toggle" type="button" data-password-toggle="setup-password" aria-label="Show password" title="Show password">
+              <span class="material-symbols-outlined">visibility</span>
+            </button>
+          </div>
           <div class="label" style="margin-top:12px">Confirm Password</div>
-          <input id="setup-password-confirm" class="input" type="password" autocomplete="new-password" minlength="8" required>
+          <div class="auth-password-field">
+            <input id="setup-password-confirm" class="input" type="password" autocomplete="new-password" minlength="8" required>
+            <button class="auth-password-toggle" type="button" data-password-toggle="setup-password-confirm" aria-label="Show password" title="Show password">
+              <span class="material-symbols-outlined">visibility</span>
+            </button>
+          </div>
           <button id="setup-password-btn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px" type="submit">Save password</button>
         </form>`;
       document.body.appendChild(overlay);
     }
     overlay.style.display = 'flex';
+    bindPasswordToggles(overlay);
 
     const form = document.getElementById('auth-password-setup-form');
     const btn = document.getElementById('setup-password-btn');
     const passwordInput = document.getElementById('setup-password');
     const confirmInput = document.getElementById('setup-password-confirm');
+    [passwordInput, confirmInput].forEach(input => {
+      if (input) input.type = 'password';
+    });
+    overlay.querySelectorAll('[data-password-toggle]').forEach(button => {
+      button.setAttribute('aria-label', 'Show password');
+      button.setAttribute('title', 'Show password');
+      const icon = button.querySelector('.material-symbols-outlined');
+      if (icon) icon.textContent = 'visibility';
+    });
     passwordInput?.focus();
     form.onsubmit = async e => {
       e.preventDefault();
