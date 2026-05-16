@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Osmium — Employee Management Workspace</title>
-  <link rel="stylesheet" href="styles/glacier.css?v=20260511-9" />
+  <link rel="stylesheet" href="styles/glacier.css?v=20260516-node-warning" />
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
     rel="stylesheet" />
   <link rel="icon" href="icon/osmium_logo.svg" type="image/svg+xml" />
@@ -93,6 +93,14 @@
     #canvas-view,
     #canvas-world {
       position: absolute;
+    }
+
+    /* Quick actions button text truncation */
+    .btn span:not(.material-symbols-outlined) {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
     }
   </style>
 </head>
@@ -1247,11 +1255,11 @@
   <script type="module">
     import { State } from './utils/state.js';
     import { initModalOverlays, switchView, initApiStatus, initKeyboardShortcuts, showToast, openModal, closeModal, applyTheme } from './modules/ui.js';
-    import { initCanvas, addEmployeeToCanvas, renderNodes } from './modules/canvas.js?v=20260511-2';
-    import { initInspector } from './modules/inspector.js?v=20260511-1';
+    import { initCanvas, addEmployeeToCanvas, renderNodes } from './modules/canvas.js?v=20260516-node-warning';
+    import { initInspector } from './modules/inspector.js?v=20260516-reqs';
     import { initDashboard, loadDashboard } from './modules/dashboard.js?v=20260512-3';
-    import { initEmployees, loadEmployees } from './modules/employees.js?v=20260512-4';
-    import { initProjects } from './modules/projects.js?v=20260511-1';
+    import { initEmployees, loadEmployees } from './modules/employees.js?v=20260516-roles';
+    import { initProjects } from './modules/projects.js?v=20260516-roles';
     import { initFiles } from './modules/files.js';
     import { initTree } from './modules/tree.js?v=20260511-4';
     import { initAI } from './modules/ai.js?v=20260512-5';

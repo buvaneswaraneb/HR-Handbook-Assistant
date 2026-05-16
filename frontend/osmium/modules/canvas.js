@@ -5,9 +5,21 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { uid, clamp, snap, throttle } from '../utils/helpers.js?v=20260509-3';
 import { showContextMenu, showToast } from './ui.js';
-import { escHtml, initials, avatarColor, avatarTextColor } from '../utils/helpers.js?v=20260509-3';
+import {
+  uid,
+  clamp,
+  snap,
+  throttle,
+  escHtml,
+  initials,
+  avatarColor,
+  avatarTextColor,
+  projectRoleCoverage,
+  projectRoleRequirementKind,
+  projectRoleTextMatches,
+  projectRoleTokens,
+} from '../utils/helpers.js?v=20260516-roles';
 import { getEmployees, getProjects, assignToProject, unassignFromProject } from './api.js?v=20260512-3';
 
 let world, svgLayer, bgEl, zoomLabel, selBox;
@@ -18,6 +30,7 @@ let panStartX = 0, panStartY = 0, panOriginX = 0, panOriginY = 0;
 let isConnecting = false, connectFromId = null, connectSnapTargetId = null, connectPreviewPath = null;
 let hoveredEmployeeNodeId = null, hoveredEdgeDeleteEmployeeId = null;
 const aiAssigningProjectNodeIds = new Set();
+let lastMissingRoleNoticeKey = '';
 let lastProjectTapNodeId = null;
 let lastProjectTapAt = 0;
 
@@ -517,6 +530,8 @@ async function initSidePanel() {
       State.projects.length ? State.projects : getProjects(),
     ]);
 
+    notifyMissingProjectRoles(projs);
+
     if (projList) {
       projList.innerHTML = projs.length
         ? projs.map(p => `
@@ -547,6 +562,37 @@ async function initSidePanel() {
         : `<div style="padding:12px;font-size:0.75rem;color:var(--gl-on-surface-4)">No employees</div>`;
     }
   } catch { }
+}
+
+function notifyMissingProjectRoles(projects, { force = false } = {}) {
+  if (!State.settings?.notifyOnActivity && !force) return;
+  const gaps = (projects || [])
+    .map(project => ({ project, coverage: projectRoleCoverage(project) }))
+    .filter(item => item.coverage.hasMissing);
+
+  if (!gaps.length) {
+    if (!force) lastMissingRoleNoticeKey = '';
+    return;
+  }
+
+  const noticeKey = gaps
+    .map(({ project, coverage }) => `${project.id || project.project_name}:${coverage.missing.join(',')}`)
+    .sort()
+    .join('|');
+  if (!force && lastMissingRoleNoticeKey === noticeKey) return;
+  lastMissingRoleNoticeKey = noticeKey;
+
+  if (gaps.length === 1) {
+    const { project, coverage } = gaps[0];
+    showToast(`${project.project_name || 'Project'} is missing roles: ${coverage.summary}.`, 'warning', 7000);
+    return;
+  }
+
+  const preview = gaps.slice(0, 2)
+    .map(({ project, coverage }) => `${project.project_name || 'Project'} (${coverage.summary})`)
+    .join('; ');
+  const more = gaps.length > 2 ? ` and ${gaps.length - 2} more` : '';
+  showToast(`${gaps.length} projects have missing roles: ${preview}${more}.`, 'warning', 8000);
 }
 
 window._canvasDragStart = function (e, type, id) {
@@ -592,7 +638,8 @@ function canvasNodeRenderKey(node) {
   if (node.type === 'project') {
     const proj = State.projects.find(p => sameId(p.id, node.projectId)) || {};
     const connectedCount = State.canvas.edges.filter(edge => edge.fromId === node.id || edge.toId === node.id).length;
-    return ['project', node.projectId, proj.project_name, proj.client_name, proj.status, proj.percent_complete, connectedCount, node.childrenHidden].join('|');
+    const roleGap = projectRoleCoverage(proj).missing.join(',');
+    return ['project', node.projectId, proj.project_name, proj.client_name, proj.status, proj.percent_complete, connectedCount, node.childrenHidden, roleGap].join('|');
   }
   const emp = getEmployeeForNode(node);
   return ['employee', node.empId, emp.name, emp.role, emp.availability, node.projectRole].join('|');
@@ -683,6 +730,16 @@ function createProjectNodeElement(node) {
   const el = document.createElement('div');
   const isAiAssigning = aiAssigningProjectNodeIds.has(node.id);
   const childrenHidden = node.childrenHidden === true;
+  const roleCoverage = projectRoleCoverage(proj);
+  const roleWarningAction = roleCoverage.hasMissing ? `
+      <span class="node-mini-action project-role-warning" data-canvas-control tabindex="0" aria-label="${escHtml(roleCoverage.detail)}" title="${escHtml(roleCoverage.detail)}" onmousedown="event.stopPropagation()" onclick="event.preventDefault(); event.stopPropagation();">
+        <span class="material-symbols-outlined">warning</span>
+        <span class="project-role-warning-tooltip">
+          <strong>Missing roles</strong>
+          <span>${escHtml(roleCoverage.summary)}</span>
+          <em>${escHtml(roleCoverage.detail)}</em>
+        </span>
+      </span>` : '';
   el.className = `canvas-node canvas-node-project${isAiAssigning ? ' ai-generating' : ''}${childrenHidden ? ' children-hidden' : ''}`;
   el.dataset.id = node.id;
 
@@ -718,6 +775,7 @@ function createProjectNodeElement(node) {
     <div class="project-node-footer">
       <span>${escHtml(proj.status || 'active')}</span>
       <div class="project-node-actions">
+        ${roleWarningAction}
         <button class="node-mini-action canvas-ai-assign-btn${isAiAssigning ? ' is-loading' : ''}" data-canvas-control title="AI assign available team" onmousedown="event.stopPropagation()" onclick="event.preventDefault(); event.stopPropagation(); window._aiAssignProjectNode('${node.id}')" ${isAiAssigning ? 'disabled' : ''}>
           <img class="ai-input-icon-dark" src="icon/ai_input_dark.svg" alt="">
           <img class="ai-input-icon-light" src="icon/ai_input_light.svg" alt="">
@@ -1236,6 +1294,7 @@ async function assignConnectedEmployeeRole(projectLink, employeeNode, emp, role)
     renderNodes();
     renderEdges();
     initSidePanel();
+    notifyMissingProjectRoles([updatedProject], { force: true });
     State.emit('data:projects:refresh');
     State.emit('data:employees:refresh');
     showToast(`${emp.name || 'Employee'} assigned as ${canvasRoleLabel(normalized)}.`);
@@ -1267,7 +1326,7 @@ async function aiAssignProjectTeam(nodeId) {
 
     const plan = buildAiProjectAssignmentPlan(project, employees);
     if (!plan.length) {
-      showToast('No available matching employees found for this project.', 'warning');
+      showToast("No suitable available employees found for this project's missing roles.", 'warning');
       return;
     }
 
@@ -1292,6 +1351,7 @@ async function aiAssignProjectTeam(nodeId) {
     const refreshedProjects = await getProjects({ cache: false }).catch(() => null);
     const finalProject = refreshedProjects?.find(item => sameId(item.id, projectNode.projectId)) || updatedProject;
     if (finalProject?.id) upsertStateProject(finalProject);
+    notifyMissingProjectRoles([finalProject], { force: true });
 
     if (!successful.length) {
       showToast(failed[0]?.message || 'AI could not assign this team.', 'error');
@@ -1307,9 +1367,11 @@ async function aiAssignProjectTeam(nodeId) {
     State.emit('data:projects:refresh');
     State.emit('data:employees:refresh');
 
-    const lead = successful.find(item => item.role === 'team_lead');
-    const leadText = lead ? ` Team Lead: ${lead.employee.name}.` : '';
-    showToast(`AI assigned ${successful.length} employee${successful.length === 1 ? '' : 's'}.${leadText}`);
+    const assignmentPreview = successful.slice(0, 3)
+      .map(item => `${item.roleLabel}: ${item.employee.name}`)
+      .join('; ');
+    const moreText = successful.length > 3 ? ` and ${successful.length - 3} more` : '';
+    showToast(`AI assigned ${successful.length} matching role${successful.length === 1 ? '' : 's'}: ${assignmentPreview}${moreText}.`);
     if (failed.length) {
       showToast(`${failed.length} recommendation${failed.length === 1 ? '' : 's'} could not be saved.`, 'warning');
     }
@@ -1336,53 +1398,109 @@ function buildAiProjectAssignmentPlan(project, employees) {
   const team = Array.isArray(project.team) ? project.team : [];
   const assignedIds = new Set(team.map(teamMemberEmployeeId).filter(Boolean));
   const selectedIds = new Set(assignedIds);
-  const roleTags = cleanAiTags(project.required_roles || []);
   const skillTags = cleanAiTags(project.required_skills || []);
-  const hasManager = team.some(member => normalizeProjectRole(member.role_in_project) === 'manager');
-  const hasTeamLead = team.some(member => normalizeProjectRole(member.role_in_project) === 'teamlead');
+  const missingRoles = projectRoleCoverage(project).missing;
   const pool = employees.filter(emp => isEmployeeAvailableForAiProject(emp, project.id, assignedIds));
+  const plannedTeam = [...team];
   const plan = [];
 
-  const addPick = (role, roleLabel, filter) => {
-    const candidate = pickBestAiCandidate(
+  const addPick = target => {
+    const pick = pickBestAiCandidate(
       pool,
       selectedIds,
-      emp => filter(emp),
-      emp => scoreAiCandidate(emp, roleLabel, skillTags, role),
+      emp => target.filter(emp),
+      emp => evaluateAiCandidateForRequirement(emp, target, skillTags),
     );
-    if (!candidate) return null;
-    selectedIds.add(normId(candidate.id));
-    plan.push({ employee: candidate, role, roleLabel });
-    return candidate;
+    if (!pick) return null;
+    selectedIds.add(normId(pick.emp.id));
+    plan.push({
+      employee: pick.emp,
+      role: target.assignmentRole,
+      roleLabel: target.roleLabel,
+      confidence: pick.confidence,
+    });
+    plannedTeam.push({
+      employee_id: pick.emp.id,
+      name: pick.emp.name,
+      role: pick.emp.role,
+      role_in_project: target.assignmentRole,
+      availability: pick.emp.availability,
+    });
+    return pick.emp;
   };
 
-  const managerNeeded = roleTags.some(isManagerRoleTag);
-  if (!hasManager && managerNeeded) {
-    addPick('manager', 'Project Manager', isManagerEmployee);
-  }
+  const targets = missingRoles.length
+    ? missingRoles.map(projectAssignmentTarget).filter(Boolean)
+    : fallbackUnstaffedProjectTargets(project, team, skillTags);
 
-  const memberRoleTags = roleTags.filter(tag => !isManagerRoleTag(tag) && !isLeadRoleTag(tag));
-  const leadNeeded = roleTags.some(isLeadRoleTag) || memberRoleTags.length > 0 || skillTags.length > 0 || !team.length;
-  if (!hasTeamLead && leadNeeded) {
-    addPick('team_lead', 'Team Lead', emp => !isManagerEmployee(emp));
-  }
-
-  const memberTargets = memberRoleTags.length
-    ? memberRoleTags.slice(0, 5)
-    : fallbackMemberTargets(skillTags);
-
-  memberTargets.forEach(roleLabel => {
-    addPick('member', roleLabel, emp => !isManagerEmployee(emp));
+  targets.forEach(target => {
+    const stillMissing = projectRoleCoverage({ ...project, team: plannedTeam }).missing;
+    if (!stillMissing.includes(target.roleLabel)) return;
+    addPick(target);
   });
 
   return plan;
 }
 
-function pickBestAiCandidate(pool, selectedIds, filter, score) {
+function projectAssignmentTarget(roleLabel) {
+  const kind = projectRoleRequirementKind(roleLabel);
+  if (kind === 'manager') {
+    return {
+      kind,
+      roleLabel,
+      assignmentRole: 'manager',
+      filter: emp => isManagerEmployee(emp),
+    };
+  }
+  if (kind === 'teamlead') {
+    return {
+      kind,
+      roleLabel,
+      assignmentRole: 'team_lead',
+      filter: emp => !isManagerEmployee(emp) && hasTeamLeadSignal(emp),
+    };
+  }
+  if (kind === 'hr') {
+    return {
+      kind,
+      roleLabel,
+      assignmentRole: 'hr',
+      filter: emp => !isManagerEmployee(emp),
+    };
+  }
+  if (kind === 'member') {
+    return {
+      kind,
+      roleLabel,
+      assignmentRole: 'member',
+      filter: emp => !isManagerEmployee(emp),
+    };
+  }
+  return {
+    kind,
+    roleLabel,
+    assignmentRole: 'member',
+    filter: emp => !isManagerEmployee(emp),
+  };
+}
+
+function fallbackUnstaffedProjectTargets(project, team, skillTags) {
+  const hasRoleRequirements = cleanAiTags(project.required_roles || []).length > 0;
+  if (hasRoleRequirements || team.length || !skillTags.length) return [];
+  return [{
+    kind: 'specialist',
+    roleLabel: skillTags[0],
+    assignmentRole: 'member',
+    filter: emp => !isManagerEmployee(emp),
+  }];
+}
+
+function pickBestAiCandidate(pool, selectedIds, filter, evaluate) {
   return pool
     .filter(emp => emp?.id && !selectedIds.has(normId(emp.id)) && filter(emp))
-    .map(emp => ({ emp, score: score(emp) }))
-    .sort((a, b) => b.score - a.score || String(a.emp.name || '').localeCompare(String(b.emp.name || '')))[0]?.emp || null;
+    .map(emp => ({ emp, ...evaluate(emp) }))
+    .filter(item => item.qualified)
+    .sort((a, b) => b.score - a.score || String(a.emp.name || '').localeCompare(String(b.emp.name || '')))[0] || null;
 }
 
 function isEmployeeAvailableForAiProject(emp, projectId, assignedIds) {
@@ -1392,7 +1510,7 @@ function isEmployeeAvailableForAiProject(emp, projectId, assignedIds) {
 }
 
 function isManagerEmployee(emp) {
-  return String(emp?.role || '').trim().toLowerCase().split(/\s+/).includes('manager');
+  return String(emp?.role || '').trim().toLowerCase().replace(/[_-]+/g, ' ').split(/\s+/).includes('manager');
 }
 
 function cleanAiTags(values) {
@@ -1408,18 +1526,58 @@ function cleanAiTags(values) {
   return tags;
 }
 
-function isManagerRoleTag(tag) {
-  return /\bmanager\b/i.test(tag);
+function evaluateAiCandidateForRequirement(emp, target, skillTags) {
+  const text = employeeAiText(emp);
+  const roleMatch = projectRoleTextMatches(target.roleLabel, emp.role);
+  const requirementSkillScore = directSkillScore(emp, target.roleLabel);
+  const requirementTokenHits = tokenHits(target.roleLabel, text);
+  const projectSkillScore = skillTags.reduce((sum, skill) => sum + directSkillScore(emp, skill), 0);
+  const projectSkillHits = skillTags.reduce((sum, skill) => sum + tokenHits(skill, text), 0);
+  const hasRelevantProjectSkill = projectSkillScore > 0 || projectSkillHits > 0;
+  const hasRequirementSkill = !roleRequiresExplicitLead(target.roleLabel) &&
+    (requirementSkillScore > 0 || requirementTokenHits >= requiredTokenThreshold(target.roleLabel));
+
+  let qualified = false;
+  if (target.assignmentRole === 'manager') {
+    qualified = isManagerEmployee(emp) && (roleMatch || target.kind === 'manager');
+  } else if (target.assignmentRole === 'team_lead') {
+    qualified = hasTeamLeadSignal(emp) && (roleMatch || target.kind === 'teamlead' || hasRelevantProjectSkill);
+  } else if (target.assignmentRole === 'hr') {
+    qualified = roleMatch || /\b(hr|human resources)\b/i.test(normalizedRoleText(emp.role));
+  } else if (target.kind === 'member') {
+    qualified = hasRelevantProjectSkill || roleMatch || requirementSkillScore > 0;
+  } else {
+    qualified = roleMatch || hasRequirementSkill;
+  }
+
+  const score = scoreAiCandidate(emp, target.roleLabel, skillTags, target.assignmentRole) +
+    (roleMatch ? 90 : 0) +
+    requirementSkillScore * 36 +
+    requirementTokenHits * 18 +
+    projectSkillScore * 12 +
+    (qualified ? 25 : 0);
+
+  return {
+    qualified,
+    score,
+    confidence: qualified ? Math.min(100, Math.round(score / 2)) : 0,
+  };
 }
 
-function isLeadRoleTag(tag) {
-  return /\b(team\s*)?lead(er)?\b/i.test(tag);
+function hasTeamLeadSignal(emp) {
+  return /\b(team\s*)?lead(er)?\b|\btech(nical)?\s*lead(er)?\b/i.test(normalizedRoleText(emp?.role));
 }
 
-function fallbackMemberTargets(skillTags) {
-  if (!skillTags.length) return ['Project Member'];
-  const slots = Math.min(3, Math.max(1, Math.ceil(skillTags.length / 2)));
-  return Array.from({ length: slots }, (_, idx) => skillTags[idx] || 'Project Member');
+function roleRequiresExplicitLead(roleLabel) {
+  return /\blead(er)?\b/i.test(normalizedRoleText(roleLabel));
+}
+
+function normalizedRoleText(value) {
+  return String(value || '').replace(/[_-]+/g, ' ');
+}
+
+function requiredTokenThreshold(roleLabel) {
+  return Math.min(2, Math.max(1, projectRoleTokens(roleLabel).filter(token => token.length > 1).length));
 }
 
 function scoreAiCandidate(emp, roleLabel, skillTags, projectRole) {
@@ -1467,11 +1625,7 @@ function directSkillScore(emp, requiredSkill) {
 }
 
 function meaningfulTokens(value) {
-  return String(value || '')
-    .toLowerCase()
-    .split(/[^a-z0-9+#.]+/)
-    .map(token => token.trim())
-    .filter(token => token.length > 1 && !['and', 'for', 'the', 'with', 'project'].includes(token));
+  return projectRoleTokens(value).filter(token => token.length > 1);
 }
 
 function upsertStateProject(project) {
@@ -1672,12 +1826,14 @@ async function addProjectNodeToCanvas(proj, x, y) {
     existing.y = y;
     syncNodeEl(existing.id);
     await syncProjectTeamToCanvas(proj, existing);
+    notifyMissingProjectRoles([State.projects.find(item => sameId(item.id, proj.id)) || proj], { force: true });
     State.selectNode(existing.id);
     return;
   }
   const node = { id: uid(), type: 'project', projectId: proj.id, x, y };
   State.addCanvasNode(node);
-  await syncProjectTeamToCanvas(proj, node);
+  const latest = await syncProjectTeamToCanvas(proj, node);
+  notifyMissingProjectRoles([latest || proj], { force: true });
   State.selectNode(node.id);
 }
 
@@ -1691,7 +1847,8 @@ export async function addProjectTreeToCanvas(proj) {
   const existingRoot = State.canvas.nodes.find(n => n.type === 'project' && sameId(n.projectId, proj.id));
   if (existingRoot) {
     existingRoot.childrenHidden = false;
-    await syncProjectTeamToCanvas(proj, existingRoot);
+    const latest = await syncProjectTeamToCanvas(proj, existingRoot);
+    notifyMissingProjectRoles([latest || proj], { force: true });
     State.selectNode(existingRoot.id);
     fitToScreenIfVisible();
     return;
@@ -1713,6 +1870,7 @@ export async function addProjectTreeToCanvas(proj) {
   State.addCanvasNode(projectNode);
 
   const latest = await syncProjectTeamToCanvas(proj, projectNode);
+  notifyMissingProjectRoles([latest || proj], { force: true });
   const team = Array.isArray(latest?.team) ? latest.team : [];
   if (!team.length) {
     showToast('Project node added. Drag employee nodes onto it to connect.');

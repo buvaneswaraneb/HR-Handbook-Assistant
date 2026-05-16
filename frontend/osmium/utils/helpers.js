@@ -88,6 +88,152 @@ export function statusBadge(s) {
     : 'badge-unavailable';
 }
 
+export function projectRoleCoverage(project) {
+  const required = uniqueClean(project?.required_roles || []);
+  const team = Array.isArray(project?.team) ? project.team : [];
+  const covered = [];
+  const missing = [];
+
+  required.forEach(role => {
+    if (projectHasRoleCoverage(role, team)) covered.push(role);
+    else missing.push(role);
+  });
+
+  return {
+    required,
+    covered,
+    missing,
+    hasMissing: missing.length > 0,
+    summary: missing.join(', '),
+    detail: missing.length
+      ? `Missing roles: ${missing.join(', ')}. Needed: assign ${missing.length === 1 ? 'an employee' : 'employees'} for ${missing.join(', ')}.`
+      : 'All required roles are covered.',
+  };
+}
+
+function uniqueClean(values) {
+  const seen = new Set();
+  const out = [];
+  values.forEach(value => {
+    const clean = String(value || '').trim();
+    const key = clean.toLowerCase();
+    if (!clean || seen.has(key)) return;
+    seen.add(key);
+    out.push(clean);
+  });
+  return out;
+}
+
+function projectHasRoleCoverage(requiredRole, team) {
+  const kind = projectRoleRequirementKind(requiredRole);
+  if (kind === 'manager') {
+    return team.some(member => normalizeAssignmentRole(member?.role_in_project) === 'manager');
+  }
+  if (kind === 'teamlead') {
+    return team.some(member => normalizeAssignmentRole(member?.role_in_project) === 'teamlead');
+  }
+  if (kind === 'hr') {
+    return team.some(member =>
+      normalizeAssignmentRole(member?.role_in_project) === 'hr' ||
+      projectRoleTextMatches(requiredRole, member?.role)
+    );
+  }
+  if (kind === 'member') {
+    return team.some(member => ['member', 'hr', 'teamlead'].includes(normalizeAssignmentRole(member?.role_in_project)));
+  }
+  return team.some(member => projectRoleTextMatches(requiredRole, member?.role));
+}
+
+export function projectRoleRequirementKind(role) {
+  const text = normalizeProjectRoleText(role);
+  if (/\bmanager\b|\bproject\s*manage(r|ment)?\b/.test(text)) return 'manager';
+  if (/\bteam\s*lead(er)?\b|\btech(nical)?\s*lead(er)?\b/.test(text)) return 'teamlead';
+  if (/\bhr\b|\bhuman resources\b/.test(text)) return 'hr';
+  if (/\bmember\b|\bcontributor\b/.test(text)) return 'member';
+  return 'specialist';
+}
+
+function normalizeAssignmentRole(role) {
+  const value = String(role || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (['team_lead', 'teamlead', 'lead', 'leader'].includes(value)) return 'teamlead';
+  if (['manager', 'member', 'hr', 'pending'].includes(value)) return value;
+  return value || 'pending';
+}
+
+export function projectRoleTextMatches(requiredRole, actualRole) {
+  const required = normalizeProjectRoleText(requiredRole);
+  const actual = normalizeProjectRoleText(actualRole);
+  if (!required || !actual) return false;
+  if (actual.includes(required) || required.includes(actual)) return true;
+
+  const requiredCore = coreRoleTokens(required);
+  const actualCore = coreRoleTokens(actual);
+  if (
+    requiredCore.some(token => ['lead', 'leader'].includes(token)) &&
+    !actualCore.some(token => ['lead', 'leader', 'teamlead'].includes(token))
+  ) {
+    return false;
+  }
+
+  const requiredTokens = projectRoleTokens(required);
+  const actualTokens = new Set(projectRoleTokens(actual));
+  if (!requiredTokens.length || !actualTokens.size) return false;
+
+  const hits = requiredTokens.filter(token => actualTokens.has(token)).length;
+  return requiredTokens.length <= 2
+    ? hits === requiredTokens.length
+    : hits / requiredTokens.length >= 0.7;
+}
+
+export function normalizeProjectRoleText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9+#.]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function projectRoleTokens(value) {
+  const stop = new Set(['and', 'for', 'the', 'with', 'role', 'roles', 'needed', 'project']);
+  const tokens = coreRoleTokens(value)
+    .filter(token => !stop.has(token));
+  return expandRoleTokens(tokens);
+}
+
+function coreRoleTokens(value) {
+  return normalizeProjectRoleText(value)
+    .split(' ')
+    .map(token => token.trim())
+    .filter(Boolean);
+}
+
+function expandRoleTokens(tokens) {
+  const out = new Set(tokens);
+  tokens.forEach(token => {
+    const aliases = {
+      qa: ['quality', 'assurance', 'test', 'testing'],
+      quality: ['qa'],
+      assurance: ['qa'],
+      frontend: ['front', 'end'],
+      front: ['frontend'],
+      backend: ['back', 'end'],
+      back: ['backend'],
+      fullstack: ['full', 'stack', 'frontend', 'backend'],
+      developer: ['dev', 'engineer'],
+      dev: ['developer', 'engineer'],
+      engineer: ['developer'],
+      manage: ['manager', 'management'],
+      management: ['manager', 'manage'],
+      manager: ['manage', 'management'],
+      hr: ['human', 'resources'],
+      human: ['hr'],
+      resources: ['hr'],
+    }[token] || [];
+    aliases.forEach(alias => out.add(alias));
+  });
+  return [...out];
+}
+
 export function eventIcon(type) {
   const icons = {
     employee_joined:    'person_add',

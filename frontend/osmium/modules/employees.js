@@ -9,7 +9,7 @@ import {
 } from './api.js?v=20260512-3';
 import { escHtml, ratingStars, avatarMarkup, initials, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js?v=20260509-3';
 import { showToast, openModal, closeModal } from './ui.js';
-import { addEmployeeToCanvas } from './canvas.js?v=20260511-2';
+import { addEmployeeToCanvas } from './canvas.js?v=20260516-roles';
 
 // Structured skill rows: name, level, optional years
 let empSkillRows = [{ skill_name: '', skill_level: 3, experience_years_with_skill: null }];

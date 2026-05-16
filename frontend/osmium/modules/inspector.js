@@ -4,7 +4,17 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { escHtml, fmtDate, ratingStars, avatarMarkup, statusBadge, initials, avatarColor, avatarTextColor } from '../utils/helpers.js?v=20260509-3';
+import {
+  escHtml,
+  fmtDate,
+  ratingStars,
+  avatarMarkup,
+  statusBadge,
+  initials,
+  avatarColor,
+  avatarTextColor,
+  projectRoleCoverage,
+} from '../utils/helpers.js?v=20260516-roles';
 import { showToast } from './ui.js';
 import { patchAvailability, addSkill, deleteEmployee, unassignFromProject } from './api.js?v=20260512-3';
 
@@ -140,6 +150,7 @@ function renderProject(proj) {
   const pct = proj.percent_complete || 0;
   const days = proj.days_remaining;
   const daysLabel = days === null ? '—' : days < 0 ? `Overdue ${Math.abs(days)}d` : days === 0 ? 'Due today' : `${days}d left`;
+  const roleCoverage = projectRoleCoverage(proj);
 
   body.innerHTML = `
     <div style="padding:8px 0 20px">
@@ -177,6 +188,11 @@ function renderProject(proj) {
       </div>
     </div>
 
+    <div class="inspector-section">
+      <div class="inspector-section-title">Requirements</div>
+      ${renderProjectRequirements(proj, roleCoverage)}
+    </div>
+
     ${(proj.team || []).length ? `
     <div class="inspector-section">
       <div class="inspector-section-title">Team (${proj.team.length})</div>
@@ -204,6 +220,83 @@ function renderProject(proj) {
 }
 
 // ─── HELPERS ──────────────────────────────────────────────────
+function renderProjectRequirements(proj, roleCoverage) {
+  const requiredSkills = cleanList(proj.required_skills || []);
+  const requiredRoles = roleCoverage.required;
+  const satisfiedRoles = roleCoverage.covered;
+  const missingRoles = roleCoverage.missing;
+  const roleTotal = requiredRoles.length;
+  const roleDone = satisfiedRoles.length;
+
+  return `
+    <div class="inspector-req-card">
+      <div class="inspector-req-head">
+        <span>Role coverage</span>
+        <strong>${roleTotal ? `${roleDone}/${roleTotal}` : '—'}</strong>
+      </div>
+      <div class="inspector-req-meter" aria-label="${roleDone} of ${roleTotal} roles satisfied">
+        <div style="width:${roleTotal ? Math.round((roleDone / roleTotal) * 100) : 0}%"></div>
+      </div>
+    </div>
+
+    <div class="inspector-req-group">
+      <div class="inspector-req-label">Required Skills</div>
+      ${requiredSkills.length
+        ? `<div class="inspector-req-chips">${requiredSkills.map(skill => reqChip(skill, 'skill')).join('')}</div>`
+        : `<div class="inspector-empty-line">No required skills listed.</div>`}
+    </div>
+
+    <div class="inspector-req-group">
+      <div class="inspector-req-label">Roles Needed</div>
+      ${requiredRoles.length
+        ? `<div class="inspector-req-chips">${requiredRoles.map(role => reqChip(role, missingRoles.includes(role) ? 'missing' : 'covered')).join('')}</div>`
+        : `<div class="inspector-empty-line">No roles needed listed.</div>`}
+    </div>
+
+    <div class="inspector-req-group">
+      <div class="inspector-req-label">Roles Satisfied</div>
+      ${satisfiedRoles.length
+        ? `<div class="inspector-req-chips">${satisfiedRoles.map(role => reqChip(role, 'covered')).join('')}</div>`
+        : `<div class="inspector-empty-line">No required roles satisfied yet.</div>`}
+    </div>
+
+    ${missingRoles.length ? `
+      <div class="inspector-req-alert">
+        <span class="material-symbols-outlined">warning</span>
+        <div>
+          <strong>Missing roles</strong>
+          <span>${escHtml(missingRoles.join(', '))}</span>
+        </div>
+      </div>` : ''}
+  `;
+}
+
+function reqChip(label, tone) {
+  const icons = {
+    skill: 'psychology',
+    covered: 'check_circle',
+    missing: 'warning',
+  };
+  return `
+    <span class="inspector-req-chip ${tone}">
+      <span class="material-symbols-outlined">${icons[tone] || 'circle'}</span>
+      ${escHtml(label)}
+    </span>`;
+}
+
+function cleanList(values) {
+  const seen = new Set();
+  const out = [];
+  values.forEach(value => {
+    const clean = String(value || '').trim();
+    const key = clean.toLowerCase();
+    if (!clean || seen.has(key)) return;
+    seen.add(key);
+    out.push(clean);
+  });
+  return out;
+}
+
 function infoCell(label, value) {
   return `<div>
     <div style="font-size:0.68rem;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--gl-on-surface-4);margin-bottom:2px">${label}</div>

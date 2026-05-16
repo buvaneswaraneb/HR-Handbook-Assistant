@@ -3,7 +3,7 @@
 // Osmium ERM · Glacier Design System
 // ============================================================
 
-const LEGACY_API_BASE = 'https://hr-handbook-assistant-production.up.railway.app';
+const LEGACY_API_BASE = 'http://localhost:8000';
 const FRONTEND_PAGES_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
 const OLD_API_BASES = [
   'https://nonsignificantly-bilgier-particia.ngrok-free.dev',
