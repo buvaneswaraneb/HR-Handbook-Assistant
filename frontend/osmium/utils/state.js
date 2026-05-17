@@ -4,11 +4,10 @@
 // ============================================================
 
 const LEGACY_API_BASE = 'https://hr-handbook-assistant-production.up.railway.app';
+export const LOCAL_API_BASE = 'http://localhost:8000';
 const FRONTEND_PAGES_URL = 'https://buvaneswaraneb.github.io/HR-Handbook-Assistant';
 const OLD_API_BASES = [
   'https://nonsignificantly-bilgier-particia.ngrok-free.dev',
-  'http://localhost:8000',
-  'http://127.0.0.1:8000',
   FRONTEND_PAGES_URL,
 ];
 
@@ -22,7 +21,15 @@ function defaultApiBase() {
 export const DEFAULT_API_BASE = defaultApiBase();
 
 export function normalizeApiBase(value) {
-  const base = String(value || '').trim().replace(/\/+$/, '');
+  let base = String(value || '').trim().replace(/\/+$/, '');
+  if (/^(localhost|127\.0\.0\.1)$/i.test(base)) {
+    base = LOCAL_API_BASE;
+  } else if (/^(localhost|127\.0\.0\.1):\d+$/i.test(base)) {
+    base = `http://${base}`;
+  }
+  if (/^(local|local_api|local-api)$/i.test(base)) {
+    base = LOCAL_API_BASE;
+  }
   if (!base || OLD_API_BASES.includes(base)) return DEFAULT_API_BASE;
   return base;
 }

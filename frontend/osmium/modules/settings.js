@@ -5,7 +5,7 @@
 
 import { State } from '../utils/state.js';
 import { applyTheme } from './ui.js';
-import { invalidateApiCache } from './api.js?v=20260516-railway';
+import { invalidateApiCache } from './api.js?v=20260517-local-api';
 import { showToast } from './ui.js';
 
 export function initSettings() {

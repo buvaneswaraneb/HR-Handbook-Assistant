@@ -16,7 +16,7 @@ import {
   projectRoleCoverage,
 } from '../utils/helpers.js?v=20260516-roles';
 import { showToast } from './ui.js';
-import { patchAvailability, addSkill, deleteEmployee, unassignFromProject } from './api.js?v=20260516-railway';
+import { patchAvailability, addSkill, deleteEmployee, unassignFromProject } from './api.js?v=20260517-local-api';
 
 let panel, body;
 

@@ -20,7 +20,7 @@ import {
   projectRoleTextMatches,
   projectRoleTokens,
 } from '../utils/helpers.js?v=20260516-roles';
-import { getEmployees, getProjects, assignToProject, unassignFromProject } from './api.js?v=20260516-railway';
+import { getEmployees, getProjects, assignToProject, unassignFromProject } from './api.js?v=20260517-local-api';
 
 let world, svgLayer, bgEl, zoomLabel, selBox;
 let isPanning = false, isSpaceDown = false;

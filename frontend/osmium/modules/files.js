@@ -3,7 +3,7 @@
 // ============================================================
 
 import { State } from '../utils/state.js';
-import { getFiles, uploadFile, deleteFile } from './api.js?v=20260516-railway';
+import { getFiles, uploadFile, deleteFile } from './api.js?v=20260517-local-api';
 import { escHtml, fmtBytes, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js?v=20260509-3';
 import { showToast } from './ui.js';
 

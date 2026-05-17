@@ -3,16 +3,21 @@
 // Osmium ERM · protected shell integration
 // ============================================================
 
-import { State, normalizeApiBase } from '../utils/state.js';
+import { LOCAL_API_BASE, State, normalizeApiBase } from '../utils/state.js';
 import { showToast } from './ui.js';
 import { escHtml } from '../utils/helpers.js?v=20260509-3';
-import { getAuthProfile, getEmailAuthStatus, invalidateApiCache, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260516-railway';
+import { checkHealth, getAuthProfile, getEmailAuthStatus, invalidateApiCache, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260517-local-api';
 
 let authPopup = null;
 let authReady = false;
 let signInResetTimer = null;
 let authEmailMode = 'email';
 const phoneSignInQuery = window.matchMedia?.('(max-width: 767px) and (pointer: coarse)');
+const LOCAL_TESTING_SHORTCUTS = new Set(['localhost', 'local', 'local_api', 'local-api', '127.0.0.1']);
+const SECRET_LOCAL_TESTING_SHORTCUTS = new Set([
+  atob('dGVzdEBvc21pdW0uY29t'),
+  atob('MzVlMzA5YzktMDEwMy00MzBmLWE3MWUtOTI0OTI3ZGM0ZTYw'),
+]);
 
 function frontendAuthUrl() {
   const url = new URL(window.location.href);
@@ -78,6 +83,53 @@ function bindAuthForm() {
   document.getElementById('auth-email')?.addEventListener('input', resetEmailAuthForm);
   document.getElementById('auth-google-btn')?.addEventListener('click', signInGoogle);
   document.getElementById('logout-btn')?.addEventListener('click', logout);
+}
+
+function isLocalTestingShortcut(value) {
+  const text = String(value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  return SECRET_LOCAL_TESTING_SHORTCUTS.has(text) ||
+    LOCAL_TESTING_SHORTCUTS.has(text) ||
+    /^localhost:\d+$/.test(text) ||
+    /^127\.0\.0\.1:\d+$/.test(text);
+}
+
+function isSecretLocalTestingEmail(value) {
+  const text = String(value || '').trim().toLowerCase();
+  return SECRET_LOCAL_TESTING_SHORTCUTS.has(text) && text.includes('@');
+}
+
+function localApiBaseForShortcut(value) {
+  const text = String(value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (/^(localhost|127\.0\.0\.1):\d+$/.test(text)) return normalizeApiBase(text);
+  return LOCAL_API_BASE;
+}
+
+async function activateLocalTestingMode(value, options = {}) {
+  const { showDebugHelper = true } = options;
+  const apiBase = localApiBaseForShortcut(value);
+  State.settings.apiBase = apiBase;
+  State.apiBase = apiBase;
+  localStorage.setItem('osmium_settings', JSON.stringify(State.settings));
+  localStorage.removeItem('osmium_auth_session');
+  invalidateApiCache();
+  State.set('auth', null);
+  State.set('authProfile', null);
+  State.resetWorkspaceData?.();
+
+  const helper = document.getElementById('auth-email-helper');
+  if (helper && showDebugHelper) {
+    const debugUrl = `${apiBase}/docs`;
+    helper.innerHTML = `Local API enabled at <strong>${escHtml(apiBase)}</strong>. Debug admin: <a href="${escHtml(debugUrl)}" target="_blank" rel="noopener" style="color:var(--gl-primary);font-weight:700;text-decoration:none">Open docs</a>.`;
+  }
+
+  const online = await checkHealth();
+  showToast(
+    online
+      ? `Testing API connected to ${apiBase}`
+      : `Testing API set to ${apiBase}, but /health is not responding yet.`,
+    online ? 'success' : 'warning',
+    5200,
+  );
 }
 
 function bindOAuthMessageHandler() {
@@ -297,6 +349,19 @@ async function signInEmail() {
   const password = document.getElementById('auth-password')?.value || '';
   const btn = document.getElementById('auth-email-btn');
   if (!email) return showToast('Email is required.', 'error');
+  if (isLocalTestingShortcut(email)) {
+    const isSecretEmail = isSecretLocalTestingEmail(email);
+    if (btn) { btn.disabled = true; btn.textContent = 'Switching...'; }
+    await activateLocalTestingMode(email, { showDebugHelper: !isSecretEmail });
+    if (!isSecretEmail) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Continue'; }
+      return;
+    }
+    if (authEmailMode !== 'password') {
+      showPasswordLoginStep();
+      return;
+    }
+  }
   if (btn) { btn.disabled = true; btn.textContent = authEmailMode === 'password' ? 'Signing in...' : 'Checking...'; }
 
   try {
@@ -324,20 +389,20 @@ async function signInEmail() {
       clearTimeout(signInResetTimer);
       signInResetTimer = setTimeout(() => {
         btn.disabled = false;
-        btn.textContent = 'Sign in';
+        btn.textContent = 'Continue';
       }, 60000);
     }
   } catch (e) {
     showToast(e.message || 'Could not send sign-in link.', 'error');
     if (btn) {
       btn.disabled = false;
-      btn.textContent = 'Sign in';
+      btn.textContent = 'Continue';
     }
     return;
   } finally {
     if (btn?.textContent !== 'Check your inbox') {
       btn.disabled = false;
-      btn.textContent = authEmailMode === 'password' ? 'Sign in with password' : 'Sign in';
+      btn.textContent = authEmailMode === 'password' ? 'Sign in with password' : 'Continue';
     }
   }
 }
@@ -390,10 +455,10 @@ function resetEmailAuthForm() {
   const helper = document.getElementById('auth-email-helper');
   if (wrap) wrap.style.display = 'none';
   if (input) input.value = '';
-  if (helper) helper.textContent = 'Enter your email to continue. New teammates can join after approval.';
+  if (helper) helper.textContent = 'Enter your email to continue.';
   if (btn) {
     btn.disabled = false;
-    btn.textContent = 'Sign in';
+    btn.textContent = 'Continue';
   }
 }
 

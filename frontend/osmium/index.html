@@ -176,7 +176,7 @@
 
         <form id="auth-email-form">
           <div class="label">Email</div>
-          <input id="auth-email" class="input" type="email" autocomplete="email" placeholder="you@company.com"
+          <input id="auth-email" class="input" type="text" inputmode="email" autocomplete="email" placeholder="you@company.com"
             required />
           <div id="auth-password-wrap" style="display:none;margin-top:12px">
             <div class="label">Password</div>
@@ -187,9 +187,9 @@
               </button>
             </div>
           </div>
-          <div id="auth-email-helper" style="font-size:0.74rem;color:var(--gl-on-surface-4);margin-top:8px">Enter your email to continue. New teammates can join after approval.</div>
+          <div id="auth-email-helper" style="font-size:0.74rem;color:var(--gl-on-surface-4);margin-top:8px">Enter your email to continue.</div>
           <button id="auth-email-btn" class="btn btn-primary" style="width:100%;justify-content:center;margin-top:16px"
-            type="submit">Sign in</button>
+            type="submit">Continue</button>
         </form>
       </div>
     </div>
@@ -1272,7 +1272,7 @@
     import { initSettings } from './modules/settings.js';
     import { initLeave } from './modules/leave.js?v=20260509-3';
     import { debounce } from './utils/helpers.js?v=20260509-3';
-    import { initAuth } from './modules/auth.js?v=20260516-password-eye';
+    import { initAuth } from './modules/auth.js?v=20260517-test-login';
 
     // ── Load settings first ─────────────────────────
     State.loadSettings();
@@ -1311,7 +1311,7 @@
     // ── Global search ───────────────────────────────
     const searchDebounced = debounce(async q => {
       if (!q.trim() || q.length < 2) return;
-      const { searchEmployees } = await import('./modules/api.js?v=20260516-railway');
+      const { searchEmployees } = await import('./modules/api.js?v=20260517-local-api');
       try {
         const results = await searchEmployees({ skill: q });
         if (results.length) { switchView('employees'); State.set('employees', results); State.emit('view:employees'); }
@@ -1323,7 +1323,7 @@
 
     // ── Populate canvas helper ───────────────────────
     window._populateCanvas = async function () {
-      const emps = State.employees.length ? State.employees : await (await import('./modules/api.js?v=20260516-railway')).getEmployees();
+      const emps = State.employees.length ? State.employees : await (await import('./modules/api.js?v=20260517-local-api')).getEmployees();
       emps.slice(0, 16).forEach(e => addEmployeeToCanvas(e));
       renderNodes();
       showToast(`${Math.min(emps.length, 16)} employees added to canvas`);

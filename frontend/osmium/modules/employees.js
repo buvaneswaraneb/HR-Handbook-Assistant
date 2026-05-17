@@ -6,7 +6,7 @@ import { State } from '../utils/state.js';
 import {
   getEmployees, getEmployee, searchEmployees, createEmployee, updateEmployee, deleteEmployee,
   getProjects, assignToProject, unassignFromProject, uploadEmployeeAvatar
-} from './api.js?v=20260516-railway';
+} from './api.js?v=20260517-local-api';
 import { escHtml, ratingStars, avatarMarkup, initials, fmtDate, emptyState, skeletonRows } from '../utils/helpers.js?v=20260509-3';
 import { showToast, openModal, closeModal } from './ui.js';
 import { addEmployeeToCanvas } from './canvas.js?v=20260516-no-auto-fit';
