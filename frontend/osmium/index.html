@@ -213,7 +213,7 @@
       </div>
 
       <!-- Add New button -->
-      <button class="btn btn-primary" style="width:100%;margin-bottom:16px;justify-content:center"
+      <button class="btn btn-primary" data-tour="add-employee" style="width:100%;margin-bottom:16px;justify-content:center"
         onclick="openModal('add-employee-modal')">
         <span class="material-symbols-outlined" style="font-size:18px">add</span>
         <span>Add New</span>
@@ -249,7 +249,7 @@
       </div>
 
       <div class="nav-section-label" style="margin-top:8px">Tools</div>
-      <div class="nav-item" data-view="ai" onclick="switchViewGlobal('ai')">
+      <div class="nav-item" data-view="ai" data-tour="hr-handbook-nav" onclick="switchViewGlobal('ai')">
         <span class="material-symbols-outlined nav-icon">smart_toy</span>
         <span>Osmium HR HandBook</span>
         <span class="nav-badge">AI</span>
@@ -265,7 +265,8 @@
           <span class="material-symbols-outlined nav-icon">settings</span>
           <span>Settings</span>
         </div>
-        <div class="nav-item">
+        <div class="nav-item" role="button" tabindex="0" onclick="window.restartOnboardingTour?.()"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.restartOnboardingTour?.()}">
           <span class="material-symbols-outlined nav-icon">help_outline</span>
           <span>Help</span>
         </div>
@@ -313,8 +314,8 @@
       </button>
       <div class="sep"></div>
       <button class="topbar-btn" id="mini-ai-toggle" title="Mini AI Assistant" onclick="window.toggleAIWindow?.()">
-        <img class="ai-input-icon-dark mini-ai-svg-icon" src="icon/ai_input_dark.svg" alt="">
-        <img class="ai-input-icon-light mini-ai-svg-icon" src="icon/ai_input_light.svg" alt="">
+        <img class="ai-input-icon-dark mini-ai-svg-icon" data-tour="mini-ai" src="icon/ai_input_dark.svg" alt="">
+        <img class="ai-input-icon-light mini-ai-svg-icon" data-tour="mini-ai" src="icon/ai_input_light.svg" alt="">
       </button>
       <button class="topbar-btn" title="Settings" data-settings-toggle onclick="window.openSettings?.()">
         <span class="material-symbols-outlined">tune</span>
@@ -343,7 +344,7 @@
           </div>
 
           <!-- Metric cards -->
-          <div class="grid-4" style="margin-bottom:24px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+          <div class="grid-4" data-tour="dashboard-summary" style="margin-bottom:24px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
             <div class="card metric-card" style="padding:18px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                 <div
@@ -542,7 +543,7 @@
         </div>
 
         <!-- Canvas surface -->
-        <div id="canvas-view" style="position:relative;width:100%;height:100%;overflow:hidden">
+        <div id="canvas-view" data-tour="canvas-workspace" style="position:relative;width:100%;height:100%;overflow:hidden">
           <div id="canvas-bg" style="position:absolute;inset:0"></div>
           <svg id="canvas-svg-layer"
             style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;z-index:5;transform-origin:0 0;will-change:transform"></svg>
@@ -604,7 +605,7 @@
           </div>
 
           <!-- Filters -->
-          <div class="card employee-filter-bar">
+          <div class="card employee-filter-bar" data-tour="employees-list">
             <input id="emp-search-skill" class="input" placeholder="Skill (e.g. Python)" />
             <input id="emp-search-team" class="input" placeholder="Team (e.g. Platform)" />
             <select id="emp-search-avail" class="select">
@@ -635,7 +636,7 @@
               <div style="font-size:0.8rem;color:var(--gl-on-surface-3);margin-top:2px">Track all active and upcoming
                 initiatives</div>
             </div>
-            <button class="btn btn-primary" onclick="openModal('add-project-modal')">
+            <button class="btn btn-primary" data-tour="add-project" onclick="openModal('add-project-modal')">
               <span class="material-symbols-outlined">add</span> New Project
             </button>
           </div>
@@ -713,12 +714,12 @@
 
       <!-- ── TREE VIEW ──────────────────────────────────── -->
       <div id="view-tree" class="view-panel">
-        <div id="tree-view-container" style="width:100%;height:100%;overflow:auto;padding:24px 28px"></div>
+        <div id="tree-view-container" data-tour="org-tree-view" style="width:100%;height:100%;overflow:auto;padding:24px 28px"></div>
       </div>
 
       <!-- ── LEAVE MANAGEMENT ───────────────────────────── -->
       <div id="view-leave" class="view-panel">
-        <div class="view-scroll" style="padding:24px 28px;max-width:1100px;margin:0 auto">
+        <div class="view-scroll" data-tour="leave-overview" style="padding:24px 28px;max-width:1100px;margin:0 auto">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px">
             <div>
               <div style="font-size:1.5rem;font-weight:700;letter-spacing:-0.025em;color:var(--gl-on-surface)">Leave
@@ -754,7 +755,7 @@
       </div>
 
       <!-- ── AI ASSISTANT (FULL PAGE) ───────────────────── -->
-      <div id="view-ai" class="view-panel">
+      <div id="view-ai" class="view-panel" data-tour="ai-view">
         <aside id="ai-history-sidebar">
           <div id="ai-history-header">
             <div>
@@ -767,7 +768,7 @@
           </div>
           <div id="ai-history-list"></div>
         </aside>
-        <div id="ai-chat-panel">
+        <div id="ai-chat-panel" data-tour="hr-handbook-view">
           <div id="ai-chat-header">
             <span class="material-symbols-outlined" style="color:var(--gl-tertiary);font-size:24px">smart_toy</span>
             <div>
@@ -957,6 +958,22 @@
         <div class="settings-section-title">Data</div>
         <button class="btn btn-secondary btn-sm" style="width:100%" onclick="window._clearCache?.()">
           <span class="material-symbols-outlined" style="font-size:15px">delete_sweep</span> Clear Data Cache
+        </button>
+        <button class="btn btn-secondary btn-sm" data-demo-seed style="width:100%;margin-top:8px"
+          onclick="window.seedDemoWorkspaceData?.()">
+          <span class="material-symbols-outlined" style="font-size:15px">dataset</span>
+          <span data-demo-label>Add Demo Members & Projects</span>
+        </button>
+      </div>
+
+      <!-- Help -->
+      <div class="settings-section">
+        <div class="settings-section-title">Help</div>
+        <button class="btn btn-secondary btn-sm" style="width:100%" onclick="window.restartOnboardingTour?.()">
+          <span class="material-symbols-outlined" style="font-size:15px">play_circle</span> Restart Tutorial
+        </button>
+        <button class="btn btn-secondary btn-sm" style="width:100%;margin-top:8px" onclick="window.simulateFirstTimeOnboarding?.()">
+          <span class="material-symbols-outlined" style="font-size:15px">science</span> Simulate First-Time Tour
         </button>
       </div>
 
@@ -1272,7 +1289,9 @@
     import { initSettings } from './modules/settings.js';
     import { initLeave } from './modules/leave.js?v=20260509-3';
     import { debounce } from './utils/helpers.js?v=20260509-3';
-    import { initAuth } from './modules/auth.js?v=20260517-test-login';
+    import { initAuth } from './modules/auth.js?v=20260517-email-prefetch';
+    import { initOnboarding } from './modules/onboarding.js?v=20260517-icon-align';
+    import { initDemoData } from './modules/demo_data.js?v=20260517-1';
 
     // ── Load settings first ─────────────────────────
     State.loadSettings();
@@ -1293,6 +1312,8 @@
     initMiniAI();
     initSettings();
     initLeave();
+    initOnboarding();
+    initDemoData();
 
     // ── Global functions exposed for onclick attrs ──
     window.switchViewGlobal = switchView;

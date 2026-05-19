@@ -277,13 +277,20 @@ def create_project(data: ProjectCreate, workplace_id: str | None = None) -> dict
 
     p = repo.create(payload)
 
-    if manager_id:
-        assign_employee(p["id"], AssignmentCreate(employee_id=manager_id, role_in_project="manager"), workplace_id)
-    if team_lead_id:
-        assign_employee(p["id"], AssignmentCreate(employee_id=team_lead_id, role_in_project="team_lead"), workplace_id)
-    for member_id in member_ids:
-        if member_id not in {manager_id, team_lead_id}:
-            assign_employee(p["id"], AssignmentCreate(employee_id=member_id, role_in_project="member"), workplace_id)
+    try:
+        if manager_id:
+            assign_employee(p["id"], AssignmentCreate(employee_id=manager_id, role_in_project="manager"), workplace_id)
+        if team_lead_id:
+            assign_employee(p["id"], AssignmentCreate(employee_id=team_lead_id, role_in_project="team_lead"), workplace_id)
+        for member_id in member_ids:
+            if member_id not in {manager_id, team_lead_id}:
+                assign_employee(p["id"], AssignmentCreate(employee_id=member_id, role_in_project="member"), workplace_id)
+    except Exception:
+        try:
+            delete_project(p["id"], workplace_id)
+        except Exception as cleanup_exc:
+            logger.warning("Could not clean up project %s after assignment failure: %s", p.get("id"), cleanup_exc)
+        raise
 
     return get_project(p["id"], workplace_id)
 

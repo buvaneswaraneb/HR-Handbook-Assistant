@@ -3,7 +3,7 @@
 // Osmium ERM · protected shell integration
 // ============================================================
 
-import { LOCAL_API_BASE, State, normalizeApiBase } from '../utils/state.js';
+import { DEFAULT_API_BASE, LOCAL_API_BASE, State, normalizeApiBase } from '../utils/state.js';
 import { showToast } from './ui.js';
 import { escHtml } from '../utils/helpers.js?v=20260509-3';
 import { checkHealth, getAuthProfile, getEmailAuthStatus, invalidateApiCache, loginWithEmail, logoutBackend, setAccountPassword, startEmailOtp } from './api.js?v=20260517-local-api';
@@ -12,6 +12,8 @@ let authPopup = null;
 let authReady = false;
 let signInResetTimer = null;
 let authEmailMode = 'email';
+let emailStatusPrefetchTimer = null;
+const emailStatusCache = new Map();
 const phoneSignInQuery = window.matchMedia?.('(max-width: 767px) and (pointer: coarse)');
 const LOCAL_TESTING_SHORTCUTS = new Set(['localhost', 'local', 'local_api', 'local-api', '127.0.0.1']);
 const SECRET_LOCAL_TESTING_SHORTCUTS = new Set([
@@ -80,7 +82,10 @@ function bindAuthForm() {
     e.preventDefault();
     await signInEmail();
   });
-  document.getElementById('auth-email')?.addEventListener('input', resetEmailAuthForm);
+  document.getElementById('auth-email')?.addEventListener('input', () => {
+    resetEmailAuthForm();
+    scheduleEmailStatusPrefetch();
+  });
   document.getElementById('auth-google-btn')?.addEventListener('click', signInGoogle);
   document.getElementById('logout-btn')?.addEventListener('click', logout);
 }
@@ -130,6 +135,46 @@ async function activateLocalTestingMode(value, options = {}) {
     online ? 'success' : 'warning',
     5200,
   );
+}
+
+function restoreDefaultApiForNormalLogin(email) {
+  if (isLocalTestingShortcut(email)) return;
+  if (normalizeApiBase(State.apiBase) !== LOCAL_API_BASE) return;
+  State.settings.apiBase = DEFAULT_API_BASE;
+  State.apiBase = DEFAULT_API_BASE;
+  localStorage.setItem('osmium_settings', JSON.stringify(State.settings));
+  invalidateApiCache();
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function looksLikeEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function scheduleEmailStatusPrefetch() {
+  clearTimeout(emailStatusPrefetchTimer);
+  const email = document.getElementById('auth-email')?.value.trim();
+  if (!looksLikeEmail(email) || isLocalTestingShortcut(email)) return;
+  emailStatusPrefetchTimer = setTimeout(() => {
+    prefetchEmailStatus(email, { silent: true });
+  }, 450);
+}
+
+function prefetchEmailStatus(email, options = {}) {
+  const key = normalizeEmail(email);
+  if (!key) return Promise.reject(new Error('Email is required.'));
+  if (emailStatusCache.has(key)) return emailStatusCache.get(key);
+  restoreDefaultApiForNormalLogin(email);
+  const promise = getEmailAuthStatus(email).catch(error => {
+    emailStatusCache.delete(key);
+    throw error;
+  });
+  emailStatusCache.set(key, promise);
+  if (options.silent) promise.catch(() => {});
+  return promise;
 }
 
 function bindOAuthMessageHandler() {
@@ -294,6 +339,7 @@ async function applyOAuthSession(session, provider = 'google') {
 
   showToast(`Welcome, ${State.auth.user.name || 'back'}!`);
   window.loadDashboardGlobal?.();
+  window.maybeStartOnboardingAfterLogin?.();
 }
 
 async function restoreStoredSession() {
@@ -333,6 +379,7 @@ async function restoreStoredSession() {
     // unless the API client already cleared it because of a real 401.
     if (!State.auth?.accessToken) clearSession({ silent: true });
   }
+  window.maybeStartOnboardingAfterLogin?.();
 }
 
 function persistSession(auth) {
@@ -349,6 +396,7 @@ async function signInEmail() {
   const password = document.getElementById('auth-password')?.value || '';
   const btn = document.getElementById('auth-email-btn');
   if (!email) return showToast('Email is required.', 'error');
+  restoreDefaultApiForNormalLogin(email);
   if (isLocalTestingShortcut(email)) {
     const isSecretEmail = isSecretLocalTestingEmail(email);
     if (btn) { btn.disabled = true; btn.textContent = 'Switching...'; }
@@ -375,7 +423,7 @@ async function signInEmail() {
       return;
     }
 
-    const status = await getEmailAuthStatus(email);
+    const status = await prefetchEmailStatus(email);
     if (status.password_configured) {
       showPasswordLoginStep();
       return;
@@ -426,6 +474,7 @@ function applyPasswordSession(data) {
   showToast('Signed in successfully.');
   renderAuthShell();
   window.loadDashboardGlobal?.();
+  window.maybeStartOnboardingAfterLogin?.();
 }
 
 function showPasswordLoginStep() {
