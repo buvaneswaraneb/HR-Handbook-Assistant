@@ -197,15 +197,14 @@ function renderDeadlines(projects) {
   if (criticalEl) criticalEl.textContent = `${criticalCount} Critical`;
 
   const sorted = openDeadlines
-    .sort((a, b) => a.days_remaining - b.days_remaining)
-    .slice(0, 5);
+    .sort((a, b) => a.days_remaining - b.days_remaining);
 
   if (!sorted.length) {
     el.innerHTML = `<div style="color:var(--gl-on-surface-4);font-size:0.82rem">No upcoming deadlines.</div>`;
     return;
   }
 
-  el.innerHTML = sorted.map(p => {
+  const renderProjectItem = (p) => {
     const days = p.days_remaining;
     const label = days < 0 ? `Overdue ${Math.abs(days)}d`
       : days === 0 ? 'Due today'
@@ -230,7 +229,9 @@ function renderDeadlines(projects) {
         </div>
         <div style="font-size:0.7rem;color:var(--gl-on-surface-4);margin-top:4px">${pct}% complete</div>
       </div>`;
-  }).join('');
+  };
+
+  el.innerHTML = sorted.map(renderProjectItem).join('');
 }
 
 function renderDeadlinesError() {

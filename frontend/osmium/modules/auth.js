@@ -54,6 +54,14 @@ export async function initAuth() {
   if (await handleOAuthReturn()) return Boolean(State.auth?.accessToken);
 
   await restoreStoredSession();
+
+  if (!State.auth?.accessToken && normalizeApiBase(State.apiBase) !== DEFAULT_API_BASE) {
+    State.settings.apiBase = DEFAULT_API_BASE;
+    State.apiBase = DEFAULT_API_BASE;
+    localStorage.setItem('osmium_settings', JSON.stringify(State.settings));
+    invalidateApiCache();
+  }
+
   authReady = true;
   renderAuthShell();
   return Boolean(State.auth?.accessToken);
@@ -629,6 +637,13 @@ function clearSession(options = {}) {
   State.set('auth', null);
   State.set('authProfile', null);
   State.resetWorkspaceData?.();
+
+  if (normalizeApiBase(State.apiBase) !== DEFAULT_API_BASE) {
+    State.settings.apiBase = DEFAULT_API_BASE;
+    State.apiBase = DEFAULT_API_BASE;
+    localStorage.setItem('osmium_settings', JSON.stringify(State.settings));
+  }
+
   renderAuthShell();
   if (!options.silent) window.switchViewGlobal?.('dashboard');
 }

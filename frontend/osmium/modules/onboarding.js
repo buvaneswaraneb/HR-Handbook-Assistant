@@ -23,6 +23,9 @@ let active = false;
 let pendingStart = null;
 let frame = 0;
 let rafQueued = false;
+let currentTarget = null;
+let currentTargetListener = null;
+let currentEventListener = null;
 
 const steps = [
   {
@@ -41,10 +44,45 @@ const steps = [
   {
     target: '[data-tour="add-employee"]',
     title: 'Add Employee',
-    body: 'Start by adding employees to your workspace. Add managers, team leads, skills, and experience details as your team grows.',
+    body: 'Start by adding employees to your workspace. Click the "+ Add New" button to open the form, or click Next to skip.',
     icon: 'person_add',
     preferredPlacement: 'right',
     spotlightPad: 2,
+    autoAdvanceOnClick: true,
+    closeModal: 'add-employee-modal',
+    nextIndexOnSkip: 8,
+  },
+  {
+    target: '#add-employee-modal .modal',
+    title: 'Employee Profile',
+    body: 'This is the employee profile card where you define all details for the new team member.',
+    icon: 'id_card',
+    spotlightPad: 5,
+  },
+  {
+    target: '#new-emp-name',
+    title: 'Full Name',
+    body: 'Enter the new employee\'s full name here.',
+    icon: 'badge',
+  },
+  {
+    target: '#new-emp-role',
+    title: 'Role',
+    body: 'Select the employee\'s role. This helps organize the team structure.',
+    icon: 'work',
+  },
+  {
+    target: '#new-emp-team',
+    title: 'Team',
+    body: 'Assign them to a team (e.g. Platform, Design, Marketing).',
+    icon: 'groups',
+  },
+  {
+    target: '#add-emp-btn',
+    title: 'Create Employee',
+    body: 'Click "Create Employee" to save the profile and continue.',
+    icon: 'save',
+    advanceOnEvent: 'data:employees:refresh',
   },
   {
     view: 'employees',
@@ -215,6 +253,11 @@ async function renderStep() {
     await wait(VIEW_DELAY);
   }
 
+  if (step.closeModal) {
+    window.closeModal?.(step.closeModal);
+    await wait(300); // let it animate out
+  }
+
   const isModal = step.kind === 'welcome' || step.kind === 'complete';
   root.classList.toggle('is-modal-step', isModal);
   root.classList.toggle('is-target-step', !isModal);
@@ -229,7 +272,9 @@ function renderModal(step) {
   hideTargetDimming();
   modal.innerHTML = `
     <div class="onboarding-modal-icon">
-      <span class="material-symbols-outlined">${step.icon || 'token'}</span>
+      ${(!step.icon || step.icon === 'token') 
+          ? '<img src="icon/osmium_logo.svg" alt="Osmium" style="width:24px;height:24px;display:block">' 
+          : `<span class="material-symbols-outlined">${step.icon}</span>`}
     </div>
     <h2>${escapeHtml(step.title)}</h2>
     <p>${escapeHtml(step.body)}</p>
@@ -261,7 +306,7 @@ function renderTooltip(step) {
       <button type="button" class="btn btn-ghost btn-sm" data-tour-action="skip">Skip Tutorial</button>
       <div class="onboarding-nav-actions">
         <button type="button" class="btn btn-secondary btn-sm" data-tour-action="back" ${currentIndex <= 1 ? 'disabled' : ''}>Back</button>
-        <button type="button" class="btn btn-primary btn-sm" data-tour-action="next">Next</button>
+        ${(step.advanceOnEvent || (step.autoAdvanceOnClick && !step.nextIndexOnSkip)) ? '' : `<button type="button" class="btn btn-primary btn-sm" data-tour-action="next">Next</button>`}
       </div>
     </div>
   `;
@@ -287,6 +332,18 @@ function bindActions(container) {
 }
 
 function nextStep() {
+  const current = steps[currentIndex];
+  if (current && current.nextIndexOnSkip !== undefined) {
+    if (current.closeModal) {
+      const modal = document.getElementById(current.closeModal);
+      if (!modal || !modal.classList.contains('open')) {
+        currentIndex = current.nextIndexOnSkip;
+        renderStep();
+        return;
+      }
+    }
+  }
+
   if (currentIndex >= steps.length - 1) return completeOnboarding('dashboard');
   currentIndex += 1;
   renderStep();
@@ -301,6 +358,16 @@ function previousStep() {
 function closeTour() {
   active = false;
   clearTimeout(pendingStart);
+  
+  if (currentTarget && currentTargetListener) {
+    currentTarget.removeEventListener('click', currentTargetListener);
+    currentTargetListener = null;
+  }
+  if (currentEventListener) {
+    State.off(currentEventListener.event, currentEventListener.handler);
+    currentEventListener = null;
+  }
+
   root?.classList.remove('active', 'is-modal-step', 'is-target-step');
   root?.setAttribute('aria-hidden', 'true');
   modal?.classList.remove('visible');
@@ -335,12 +402,40 @@ function schedulePosition() {
 
 function positionTargetStep(step) {
   const target = findVisibleTarget(step.target);
+  
+  if (currentTarget && currentTargetListener) {
+    currentTarget.removeEventListener('click', currentTargetListener);
+    currentTargetListener = null;
+  }
+  if (currentEventListener) {
+    State.off(currentEventListener.event, currentEventListener.handler);
+    currentEventListener = null;
+  }
+  
+  currentTarget = target;
+  
   if (!target) {
     spotlight.classList.remove('visible');
     hideTargetDimming();
     root.classList.add('has-fallback');
     positionTooltipFallback();
     return;
+  }
+
+  if (step.autoAdvanceOnClick) {
+    currentTargetListener = () => setTimeout(() => nextStep(), 300);
+    target.addEventListener('click', currentTargetListener, { once: true });
+  }
+  
+  if (step.advanceOnEvent) {
+    currentEventListener = {
+      event: step.advanceOnEvent,
+      handler: () => {
+        // Wait briefly so UI can update (e.g. modal closes)
+        setTimeout(() => nextStep(), 400);
+      }
+    };
+    State.on(currentEventListener.event, currentEventListener.handler);
   }
 
   root.classList.remove('has-fallback');
@@ -354,10 +449,10 @@ function updateTargetPosition(step, target) {
   const rect = target.getBoundingClientRect();
   const pad = Number.isFinite(step.spotlightPad) ? step.spotlightPad : SPOTLIGHT_PAD;
   const padded = {
-    top: Math.max(VIEWPORT_PAD, rect.top - pad),
-    left: Math.max(VIEWPORT_PAD, rect.left - pad),
-    width: Math.min(window.innerWidth - VIEWPORT_PAD * 2, rect.width + pad * 2),
-    height: Math.min(window.innerHeight - VIEWPORT_PAD * 2, rect.height + pad * 2),
+    top: rect.top - pad,
+    left: rect.left - pad,
+    width: rect.width + pad * 2,
+    height: rect.height + pad * 2,
   };
   spotlight.style.left = `${padded.left}px`;
   spotlight.style.top = `${padded.top}px`;

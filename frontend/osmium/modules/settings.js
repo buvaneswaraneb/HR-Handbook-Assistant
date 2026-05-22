@@ -29,6 +29,14 @@ export function initSettings() {
 
 function syncUI() {
   const s = State.settings;
+  const isTestUser = State.auth?.user?.email === 'test@osmium.com';
+
+  // Restrict demo/simulate buttons
+  const demoBtn = document.querySelector('[data-demo-seed]');
+  if (demoBtn) demoBtn.style.display = isTestUser ? '' : 'none';
+
+  const simulateBtn = document.querySelector('button[onclick="window.simulateFirstTimeOnboarding?.()"]');
+  if (simulateBtn) simulateBtn.style.display = isTestUser ? '' : 'none';
 
   // Theme
   document.querySelectorAll('.theme-btn').forEach(btn => {
@@ -48,6 +56,7 @@ function setToggle(id, val) {
 }
 
 export function openSettings() {
+  syncUI();
   document.getElementById('settings-panel')?.classList.add('open');
 }
 

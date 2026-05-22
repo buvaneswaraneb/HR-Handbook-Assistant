@@ -1,0 +1,194 @@
+{
+  "graph": {
+    "id": "tutorial_flow",
+    "title": "Tutorial Flow",
+    "start": "start_tutorial",
+    "nodes": [
+      {
+        "id": "start_tutorial",
+        "type": "step",
+        "label": "Start Tutorial",
+        "next": "dashboard"
+      },
+      {
+        "id": "dashboard",
+        "type": "step",
+        "label": "DashBoard",
+        "next": "add_employee_decision"
+      },
+      {
+        "id": "add_employee_decision",
+        "type": "decision",
+        "label": "add employee",
+        "yes": "selected_full_name_decision",
+        "no": "employee_management"
+      },
+      {
+        "id": "selected_full_name_decision",
+        "type": "decision",
+        "label": "selected the full name",
+        "yes": "play_textbox_tutorial",
+        "no": "selected_close_button_decision"
+      },
+      {
+        "id": "play_textbox_tutorial",
+        "type": "step",
+        "label": "Play textBox tutorial",
+        "next": "create_employee_btn_decision"
+      },
+      {
+        "id": "create_employee_btn_decision",
+        "type": "decision",
+        "label": "create employee btn clicked success",
+        "yes": "selected_full_name_decision",
+        "no": "ask_fill_or_skip"
+      },
+      {
+        "id": "ask_fill_or_skip",
+        "type": "step",
+        "label": "ask to fill it or skip",
+        "next": "selected_full_name_decision"
+      },
+      {
+        "id": "selected_close_button_decision",
+        "type": "decision",
+        "label": "selected close button",
+        "yes": "employee_management",
+        "no": "play_textbox_tutorial"
+      },
+      {
+        "id": "employee_management",
+        "type": "step",
+        "label": "Employee Management",
+        "next": "add_project"
+      },
+      {
+        "id": "add_project",
+        "type": "step",
+        "label": "add project",
+        "next": "highlight_whole_window"
+      },
+      {
+        "id": "highlight_whole_window",
+        "type": "step",
+        "label": "highlight the whole window",
+        "next": "any_textbox_clicked_decision"
+      },
+      {
+        "id": "any_textbox_clicked_decision",
+        "type": "decision",
+        "label": "any text box clicked",
+        "yes": "play_textbox_tutorial_project",
+        "no": "canvas"
+      },
+      {
+        "id": "play_textbox_tutorial_project",
+        "type": "step",
+        "label": "play the text box tutorial",
+        "next": "skipped_decision"
+      },
+      {
+        "id": "skipped_decision",
+        "type": "decision",
+        "label": "skipped",
+        "yes": "canvas",
+        "no": "create_project_completed"
+      },
+      {
+        "id": "create_project_completed",
+        "type": "step",
+        "label": "Create project completed / successful",
+        "next": "canvas"
+      },
+      {
+        "id": "canvas",
+        "type": "step",
+        "label": "canvas",
+        "next": "node_added_decision"
+      },
+      {
+        "id": "node_added_decision",
+        "type": "decision",
+        "label": "a Node is added to the canvas",
+        "yes": "employee_node_decision",
+        "no": "org_tree"
+      },
+      {
+        "id": "employee_node_decision",
+        "type": "decision",
+        "label": "employee node",
+        "yes": "suggest_add_project_node",
+        "no": "skip_decision"
+      },
+      {
+        "id": "suggest_add_project_node",
+        "type": "step",
+        "label": "suggest to add a project node",
+        "next": "play_project_node_tutorial"
+      },
+      {
+        "id": "play_project_node_tutorial",
+        "type": "step",
+        "label": "play the project node tutorial such as warning, AI, inspector",
+        "next": "org_tree"
+      },
+      {
+        "id": "skip_decision",
+        "type": "decision",
+        "label": "skip",
+        "yes": "org_tree",
+        "no": "play_project_node_tutorial"
+      },
+      {
+        "id": "org_tree",
+        "type": "step",
+        "label": "org tree",
+        "next": "osmium_hr_handbook"
+      },
+      {
+        "id": "osmium_hr_handbook",
+        "type": "step",
+        "label": "osmium Hr Handbook",
+        "next": "mini_ai_chatbot"
+      },
+      {
+        "id": "mini_ai_chatbot",
+        "type": "step",
+        "label": "mini ai chatbot",
+        "next": "clicked_decision"
+      },
+      {
+        "id": "clicked_decision",
+        "type": "decision",
+        "label": "clicked",
+        "yes": "open_mini_highlight_explain",
+        "no": "end"
+      },
+      {
+        "id": "open_mini_highlight_explain",
+        "type": "step",
+        "label": "open up the mini and highlight the window and explain",
+        "next": "clicked_textbox_send_decision"
+      },
+      {
+        "id": "clicked_textbox_send_decision",
+        "type": "decision",
+        "label": "clicked text box was gonna send it",
+        "yes": "close_button_skip",
+        "no": "end"
+      },
+      {
+        "id": "close_button_skip",
+        "type": "step",
+        "label": "close button / skip",
+        "next": "end"
+      },
+      {
+        "id": "end",
+        "type": "end",
+        "label": "end",
+        "next": null
+      }
+    ]
+  }
+}

@@ -821,12 +821,8 @@ function createProjectNodeElement(node) {
     }
 
     clearTimeout(clickTimer);
-    clickTimer = setTimeout(async () => {
+    clickTimer = setTimeout(() => {
       State.selectNode(node.id, e.shiftKey);
-      const latest = node.childrenHidden
-        ? (State.projects.find(p => sameId(p.id, node.projectId)) || proj)
-        : await syncProjectTeamToCanvas(proj, node).catch(() => proj);
-      State.emit('inspector:open', { type: 'project', data: latest || proj });
     }, DOUBLE_TAP_MS);
   });
 
@@ -2089,12 +2085,17 @@ function duplicateNode(id) {
 }
 
 // ─── EXPOSE GLOBAL ────────────────────────────────────────────
-window._inspectNode = function (nodeId) {
+window._inspectNode = async function (nodeId) {
   const node = State.canvas.nodes.find(n => n.id === nodeId);
   if (!node) return;
   if (node.type === 'project') {
     const proj = State.projects.find(p => sameId(p.id, node.projectId));
-    if (proj) State.emit('inspector:open', { type: 'project', data: proj });
+    if (proj) {
+      const latest = node.childrenHidden
+        ? proj
+        : await syncProjectTeamToCanvas(proj, node).catch(() => proj);
+      State.emit('inspector:open', { type: 'project', data: latest || proj });
+    }
     return;
   }
   State.emit('inspector:open', { type: 'employee', data: getEmployeeForNode(node) });

@@ -4256,6 +4256,20 @@ body:not(.auth-required) #auth-screen {
   visibility: visible;
 }
 
+#deadlines-list::-webkit-scrollbar {
+  width: 6px;
+}
+#deadlines-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+#deadlines-list::-webkit-scrollbar-thumb {
+  background: var(--gl-surface-bright);
+  border-radius: 4px;
+}
+#deadlines-list::-webkit-scrollbar-thumb:hover {
+  background: var(--gl-on-surface-4);
+}
+
 .onboarding-dim {
   left: 0;
   top: 0;
@@ -4267,6 +4281,7 @@ body:not(.auth-required) #auth-screen {
 
 .onboarding-spotlight {
   position: fixed;
+  box-sizing: border-box;
   border: 1.25px solid rgba(199, 210, 221, 0.72);
   border-radius: 14px;
   box-shadow:
@@ -4288,19 +4303,20 @@ body:not(.auth-required) #auth-screen {
 .onboarding-spotlight.visible {
   opacity: 1;
   transform: scale(1);
-  animation: onboardingPulse 1.8s ease-in-out infinite;
+  animation: onboardingPulse 2s cubic-bezier(0.2, 0, 0.2, 1) infinite;
 }
 
 .onboarding-tooltip,
 .onboarding-modal {
   position: fixed;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background:
-    linear-gradient(180deg, rgba(18, 23, 29, 0.985), rgba(8, 12, 17, 0.985));
-  color: #f8fafc;
-  box-shadow:
-    0 24px 78px rgba(0, 0, 0, 0.62),
-    inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--gl-outline);
+  background: var(--gl-surface);
+  color: var(--gl-on-surface);
+  box-shadow: var(--shadow-xl);
+  /* Make tutorial buttons green */
+  --gl-tertiary: var(--gl-success);
+  --gl-tertiary-dark: #218838;
+  --gl-tertiary-muted: var(--gl-success-muted);
   opacity: 0;
   visibility: hidden;
   transform: translateY(8px) scale(0.985);
@@ -4335,9 +4351,9 @@ body:not(.auth-required) #auth-screen {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--gl-primary);
-  background: rgba(90, 191, 232, 0.09);
-  border: 1px solid rgba(90, 191, 232, 0.22);
+  color: var(--gl-tertiary);
+  background: var(--gl-tertiary-muted);
+  border: 1px solid rgba(13, 111, 253, 0.22);
 }
 
 .onboarding-tooltip-icon {
@@ -4356,13 +4372,13 @@ body:not(.auth-required) #auth-screen {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(248, 250, 252, 0.58);
+  color: var(--gl-on-surface-4);
 }
 
 .onboarding-tooltip h3,
 .onboarding-modal h2 {
   margin: 0;
-  color: #ffffff;
+  color: var(--gl-on-surface);
   font-weight: 850;
   letter-spacing: -0.02em;
 }
@@ -4374,7 +4390,7 @@ body:not(.auth-required) #auth-screen {
 .onboarding-tooltip p,
 .onboarding-modal p {
   margin: 10px 0 0;
-  color: rgba(248, 250, 252, 0.72);
+  color: var(--gl-on-surface-3);
   line-height: 1.55;
 }
 
@@ -4399,7 +4415,7 @@ body:not(.auth-required) #auth-screen {
 
 .onboarding-tooltip .btn:focus-visible,
 .onboarding-modal .btn:focus-visible {
-  outline: 2px solid rgba(90, 191, 232, 0.85);
+  outline: 2px solid var(--gl-tertiary);
   outline-offset: 2px;
 }
 

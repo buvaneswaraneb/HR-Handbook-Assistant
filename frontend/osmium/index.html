@@ -76,7 +76,7 @@
     .theme-btn.active,
     .theme-btn:hover {
       background: var(--gl-primary-muted);
-      color: var(--gl-primary);
+      color: var(--gl-on-surface);
       border-color: transparent;
     }
 
@@ -112,8 +112,9 @@
   <section id="auth-screen" aria-hidden="false">
     <div class="auth-welcome">
       <div class="sidebar-logo" style="border-bottom:none;margin-bottom:26px;padding:0">
-        <div class="sidebar-logo-icon"><span class="material-symbols-outlined"
-            style="font-size:18px;color:#fff">token</span></div>
+        <div class="sidebar-logo-icon">
+          <img src="icon/osmium_logo.svg" alt="Osmium Logo" style="width:18px;height:18px;display:block">
+        </div>
         <div class="sidebar-logo-text">
           <div class="sidebar-logo-name">Osmium</div>
           <div class="sidebar-logo-sub">Team Workspace</div>
@@ -204,7 +205,7 @@
       <!-- Logo -->
       <div class="sidebar-logo">
         <div class="sidebar-logo-icon">
-          <span class="material-symbols-outlined" style="font-size:18px;color:#fff">token</span>
+          <img src="icon/osmium_logo.svg" alt="Osmium Logo" style="width:18px;height:18px;display:block">
         </div>
         <div class="sidebar-logo-text">
           <div class="sidebar-logo-name">Osmium</div>
@@ -348,7 +349,7 @@
             <div class="card metric-card" style="padding:18px">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
                 <div
-                  style="width:36px;height:36px;border-radius:var(--r-md);background:var(--gl-primary-muted);display:flex;align-items:center;justify-content:center;color:var(--gl-primary)">
+                  style="width:36px;height:36px;border-radius:var(--r-md);background:var(--gl-primary-muted);display:flex;align-items:center;justify-content:center;color:var(--gl-on-surface)">
                   <span class="material-symbols-outlined">group</span>
                 </div>
                 <span style="font-size:0.72rem;color:var(--gl-on-surface-4)">Total</span>
@@ -455,7 +456,7 @@
                 <span id="deadline-critical-count"
                   style="font-size:0.68rem;font-weight:700;letter-spacing:0.06em;color:#f5574a;text-transform:uppercase">0 Critical</span>
               </div>
-              <div id="deadlines-list" style="padding:14px 16px">
+              <div id="deadlines-list" style="padding:14px 16px; max-height: 160px; overflow-y: auto;">
                 <div style="display:flex;align-items:center;gap:10px;color:var(--gl-on-surface-4)">
                   <span class="spinner-sm spinner"></span> Loading…
                 </div>
@@ -879,7 +880,7 @@
 ══════════════════════════════════════════════ -->
   <div id="settings-panel">
     <div style="padding:16px 20px;border-bottom:1px solid var(--gl-outline);display:flex;align-items:center;gap:10px">
-      <span class="material-symbols-outlined" style="color:var(--gl-primary)">tune</span>
+      <span class="material-symbols-outlined" style="color:var(--gl-on-surface)">tune</span>
       <span style="font-size:0.95rem;font-weight:700;color:var(--gl-on-surface);flex:1">Settings</span>
       <button class="btn btn-ghost btn-icon" id="settings-close">
         <span class="material-symbols-outlined" style="font-size:18px">close</span>
@@ -999,7 +1000,7 @@
   <div id="add-employee-modal" class="modal-overlay">
     <div class="modal">
       <div class="modal-header">
-        <span class="material-symbols-outlined" style="color:var(--gl-primary)">person_add</span>
+        <span class="material-symbols-outlined" style="color:var(--gl-on-surface)">person_add</span>
         <span id="emp-modal-title" style="font-size:1rem;font-weight:700;color:var(--gl-on-surface);flex:1">Add Employee</span>
         <button class="btn btn-ghost btn-icon" onclick="closeModal('add-employee-modal')">
           <span class="material-symbols-outlined" style="font-size:18px">close</span>
@@ -1120,7 +1121,7 @@
   <div id="add-project-modal" class="modal-overlay">
     <div class="modal">
       <div class="modal-header">
-        <span class="material-symbols-outlined" style="color:var(--gl-primary)">create_new_folder</span>
+        <span class="material-symbols-outlined" style="color:var(--gl-on-surface)">create_new_folder</span>
         <span id="proj-modal-title" style="font-size:1rem;font-weight:700;color:var(--gl-on-surface);flex:1">New Project</span>
         <button class="btn btn-ghost btn-icon" onclick="closeModal('add-project-modal')">
           <span class="material-symbols-outlined" style="font-size:18px">close</span>
