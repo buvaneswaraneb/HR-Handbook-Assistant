@@ -4154,12 +4154,19 @@ body:not(.auth-required) #auth-screen {
 }
 
 .auth-welcome {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   justify-content: center;
   padding: clamp(32px, 7vw, 90px);
   background: var(--gl-surface-lowest);
   border-right: 1px solid var(--gl-outline);
+}
+
+.auth-welcome > *:not(canvas) {
+  position: relative;
+  z-index: 1;
 }
 
 .auth-card-wrap {
@@ -4281,13 +4288,11 @@ body:not(.auth-required) #auth-screen {
 
 .onboarding-spotlight {
   position: fixed;
-  box-sizing: border-box;
-  border: 1.25px solid rgba(199, 210, 221, 0.72);
-  border-radius: 14px;
-  box-shadow:
-    0 0 0 3px rgba(148, 163, 184, 0.08),
-    0 0 24px rgba(90, 191, 232, 0.16);
-  background: rgba(255, 255, 255, 0.012);
+  box-sizing: content-box;
+  padding: 16px;
+  margin-left: -16px;
+  margin-top: -16px;
+  border-radius: 28px;
   pointer-events: none;
   opacity: 0;
   transform: scale(0.985);
@@ -4298,12 +4303,35 @@ body:not(.auth-required) #auth-screen {
     height 0.22s ease,
     opacity 0.16s ease,
     transform 0.16s ease;
+  
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  
+  filter: blur(10px) drop-shadow(0 0 16px rgba(16, 185, 129, 0.8));
+  overflow: hidden;
+}
+
+.onboarding-spotlight::before {
+  content: "";
+  position: absolute;
+  top: calc(50% - 2500px);
+  left: calc(50% - 2500px);
+  width: 5000px;
+  height: 5000px;
+  background: conic-gradient(from 0deg, transparent 0%, rgba(16, 185, 129, 0.3) 25%, #10b981 50%, rgba(16, 185, 129, 0.3) 75%, transparent 100%);
+  animation: spinGlow 2.5s linear infinite;
+  transform-origin: center center;
+}
+
+@keyframes spinGlow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .onboarding-spotlight.visible {
   opacity: 1;
   transform: scale(1);
-  animation: onboardingPulse 2s cubic-bezier(0.2, 0, 0.2, 1) infinite;
 }
 
 .onboarding-tooltip,

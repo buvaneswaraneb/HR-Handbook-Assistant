@@ -64,6 +64,7 @@ export async function initAuth() {
 
   authReady = true;
   renderAuthShell();
+  initAuthCanvas();
   return Boolean(State.auth?.accessToken);
 }
 
@@ -689,9 +690,18 @@ export function renderAuthShell() {
     if (authReady && !hasAuth) {
       // Signed-out state – restore default button
       googleBtn.disabled = false;
+      googleBtn.style.background = '#ffffff';
+      googleBtn.style.color = '#3c4043';
+      googleBtn.style.border = '1px solid #dadce0';
       googleBtn.innerHTML = `
-        <span class="material-symbols-outlined" style="font-size:18px;color:#3dd68c">account_circle</span>
-        Continue with Google`;
+        <svg width="18" height="18" viewBox="0 0 48 48">
+          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.7 17.74 9.5 24 9.5z"/>
+          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+          <path fill="none" d="M0 0h48v48H0z"/>
+        </svg>
+        <span style="font-weight: 500;">Continue with Google</span>`;
     } else if (hasAuth && user && State.auth?.provider === 'google') {
       // Signed-in via Google – show avatar + name inside the button
       const avatarHtml = user.avatar
@@ -708,4 +718,137 @@ export function renderAuthShell() {
   }
 
   updateMobileAuthLock();
+}
+
+function initAuthCanvas() {
+  const canvas = document.getElementById('auth-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let width, height;
+  let particles = [];
+  let mouse = { x: -1000, y: -1000 };
+  
+  // Need to set pointer-events: auto on the canvas so it receives mouse events
+  canvas.style.pointerEvents = 'auto';
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    mouse.x = e.clientX - rect.left;
+    mouse.y = e.clientY - rect.top;
+  });
+  
+  canvas.addEventListener('mouseleave', () => {
+    mouse.x = -1000;
+    mouse.y = -1000;
+  });
+  
+  function resize() {
+    const parent = canvas.parentElement;
+    width = parent.clientWidth;
+    height = parent.clientHeight;
+    canvas.width = width * window.devicePixelRatio;
+    canvas.height = height * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    
+    const area = width * height;
+    const targetCount = Math.floor(area / 16000);
+    if (particles.length < targetCount) {
+      for (let i = particles.length; i < targetCount; i++) particles.push(new Particle());
+    } else {
+      particles = particles.slice(0, targetCount);
+    }
+  }
+  
+  class Particle {
+    constructor() {
+      this.x = Math.random() * (width || 1000);
+      this.y = Math.random() * (height || 1000);
+      this.vx = (Math.random() - 0.5) * 0.3;
+      this.vy = (Math.random() - 0.5) * 0.3;
+      this.baseRadius = Math.random() * 2 + 1;
+      this.radius = this.baseRadius;
+    }
+    update() {
+      this.x += this.vx;
+      this.y += this.vy;
+      if (this.x < 0) { this.x = 0; this.vx *= -1; }
+      if (this.x > width) { this.x = width; this.vx *= -1; }
+      if (this.y < 0) { this.y = 0; this.vy *= -1; }
+      if (this.y > height) { this.y = height; this.vy *= -1; }
+      
+      const dx = this.x - mouse.x;
+      const dy = this.y - mouse.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist < 120) {
+        this.radius = this.baseRadius + (120 - dist) * 0.012; // reduced growth
+      } else {
+        this.radius = this.baseRadius;
+      }
+    }
+    draw(glow) {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+      ctx.fillStyle = glow ? '#6ee7b7' : '#3dd68c';
+      ctx.shadowBlur = glow ? 15 : 12; // reduced glow
+      ctx.shadowColor = glow ? '#6ee7b7' : '#3dd68c';
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  window.addEventListener('resize', resize);
+  setTimeout(resize, 0);
+
+  function animate() {
+    if (!document.body.classList.contains('auth-required')) {
+      requestAnimationFrame(animate);
+      return;
+    }
+    
+    ctx.clearRect(0, 0, width, height);
+    
+    for (let i = 0; i < particles.length; i++) {
+      particles[i].update();
+      
+      const dxMouse = particles[i].x - mouse.x;
+      const dyMouse = particles[i].y - mouse.y;
+      const distMouse = Math.sqrt(dxMouse * dxMouse + dyMouse * dyMouse);
+      const isGlowingNode = distMouse < 120;
+      
+      particles[i].draw(isGlowingNode);
+      
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const distSq = dx * dx + dy * dy;
+        const maxDistSq = 25000;
+        
+        if (distSq < maxDistSq) {
+          const dist = Math.sqrt(distSq);
+          
+          const dxMouseLine = ((particles[i].x + particles[j].x) / 2) - mouse.x;
+          const dyMouseLine = ((particles[i].y + particles[j].y) / 2) - mouse.y;
+          const distMouseLine = Math.sqrt(dxMouseLine * dxMouseLine + dyMouseLine * dyMouseLine);
+          
+          let opacity = (1 - dist / 158) * 0.5;
+          let isGlowingLine = false;
+          
+          if (distMouseLine < 120) {
+            opacity = Math.min(1, opacity + (120 - distMouseLine) * 0.003); // reduced opacity increase
+            isGlowingLine = true;
+          }
+          
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = isGlowingLine ? `rgba(110, 231, 183, ${opacity})` : `rgba(61, 214, 140, ${opacity})`;
+          ctx.lineWidth = isGlowingLine ? 1.5 : 1; // reduced line thickness
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(animate);
+  }
+  animate();
 }

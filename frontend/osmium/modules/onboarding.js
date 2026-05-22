@@ -18,7 +18,7 @@ let dimPanels = [];
 let spotlight;
 let tooltip;
 let modal;
-let currentIndex = 0;
+let currentNodeId = 'start_tutorial';
 let active = false;
 let pendingStart = null;
 let frame = 0;
@@ -26,125 +26,43 @@ let rafQueued = false;
 let currentTarget = null;
 let currentTargetListener = null;
 let currentEventListener = null;
+let currentNoTargetListener = null;
+let currentNoEventListener = null;
 
-const steps = [
-  {
-    kind: 'welcome',
-    title: 'Welcome to Osmium',
-    body: "Let's take a quick tour of the platform.",
-    icon: 'token',
-  },
-  {
-    view: 'dashboard',
-    target: '[data-tour="dashboard-summary"]',
-    title: 'Dashboard',
-    body: 'Track employee statistics, active projects, leave overview, AI access, and the Google Calendar placeholder from the dashboard.',
-    icon: 'dashboard',
-  },
-  {
-    target: '[data-tour="add-employee"]',
-    title: 'Add Employee',
-    body: 'Start by adding employees to your workspace. Click the "+ Add New" button to open the form, or click Next to skip.',
-    icon: 'person_add',
-    preferredPlacement: 'right',
-    spotlightPad: 2,
-    autoAdvanceOnClick: true,
-    closeModal: 'add-employee-modal',
-    nextIndexOnSkip: 8,
-  },
-  {
-    target: '#add-employee-modal .modal',
-    title: 'Employee Profile',
-    body: 'This is the employee profile card where you define all details for the new team member.',
-    icon: 'id_card',
-    spotlightPad: 5,
-  },
-  {
-    target: '#new-emp-name',
-    title: 'Full Name',
-    body: 'Enter the new employee\'s full name here.',
-    icon: 'badge',
-  },
-  {
-    target: '#new-emp-role',
-    title: 'Role',
-    body: 'Select the employee\'s role. This helps organize the team structure.',
-    icon: 'work',
-  },
-  {
-    target: '#new-emp-team',
-    title: 'Team',
-    body: 'Assign them to a team (e.g. Platform, Design, Marketing).',
-    icon: 'groups',
-  },
-  {
-    target: '#add-emp-btn',
-    title: 'Create Employee',
-    body: 'Click "Create Employee" to save the profile and continue.',
-    icon: 'save',
-    advanceOnEvent: 'data:employees:refresh',
-  },
-  {
-    view: 'employees',
-    target: '[data-tour="employees-list"]',
-    title: 'Employee Management',
-    body: 'Browse employees, edit profiles, search by skill or team, and keep availability visible for planning.',
-    icon: 'group',
-  },
-  {
-    view: 'projects',
-    target: '[data-tour="add-project"]',
-    title: 'Add Project',
-    body: 'Create projects with managers, team leads, team members, required skills, and roles needed for delivery.',
-    icon: 'create_new_folder',
-    spotlightPad: 5,
-  },
-  {
-    view: 'canvas',
-    target: '[data-tour="canvas-workspace"]',
-    title: 'Canvas',
-    body: 'Use the canvas to visually organize teams and project hierarchies. Drag employee nodes, connect relationships, and assign manager, team lead, or member roles.',
-    icon: 'hub',
-  },
-  {
-    view: 'tree',
-    target: '[data-tour="org-tree-view"]',
-    title: 'Org Tree',
-    body: 'Review a static organization structure with manager, team lead, and team member rows in one hierarchy view.',
-    icon: 'account_tree',
-  },
-  {
-    view: 'leave',
-    target: '[data-tour="leave-overview"]',
-    title: 'Leave Management',
-    body: 'Understand leave statistics, absence colors, availability awareness, and overview charts for workforce planning.',
-    icon: 'event_busy',
-  },
-  {
-    target: '[data-tour="mini-ai"]',
-    title: 'Mini AI Shortcut',
-    body: 'Open a compact assistant from anywhere in the workspace when you need quick help without leaving your current view.',
-    icon: 'auto_awesome',
-    preferredPlacement: 'bottom',
-    spotlightPad: 7,
-    spotlightRadius: '12px',
-  },
-  {
-    view: 'ai',
-    target: '[data-tour="hr-handbook-view"]',
-    title: 'HR Handbook Assistant',
-    body: 'Use the HR Handbook Assistant to upload or attach PDF handbooks, ask policy questions, view citations, preview sources, and continue handbook conversations.',
-    icon: 'smart_toy',
-    preferredPlacement: 'left',
-    spotlightPad: 8,
-  },
-  {
-    kind: 'complete',
-    title: "You're ready to start using Osmium.",
-    body: 'Explore your workspace, build teams, and use the canvas whenever you want a visual planning view.',
-    icon: 'task_alt',
-  },
-];
+const nodes = {
+  start_tutorial: { kind: 'welcome', title: 'Welcome to Osmium', body: "Let's take a quick tour of the platform.", icon: 'token', next: 'dashboard' },
+  dashboard: { view: 'dashboard', target: '[data-tour="dashboard-summary"]', title: 'Dashboard', body: 'Track employee statistics, active projects, leave overview, AI access, and the Google Calendar placeholder from the dashboard.', icon: 'dashboard', next: 'add_employee_decision' },
+  add_employee_decision: { target: '[data-tour="add-employee"]', title: 'Add Employee', body: 'Start by adding employees to your workspace. Click the "+ Add New" button to open the form, or click Skip to move to Employee Management.', icon: 'person_add', preferredPlacement: 'right', spotlightPad: 2, autoYesOnClick: true, yes: 'selected_full_name_decision', no: 'employee_management', nextIsNo: true },
+  selected_full_name_decision: { target: '#add-employee-modal .modal', title: 'Employee Profile', body: 'This is the employee profile card. Click on the Full Name field to begin.', icon: 'id_card', spotlightPad: 5, listenEvent: 'focus', listenTarget: '#new-emp-name', yes: 'play_textbox_tutorial', listenNoEvent: 'click', listenNoTarget: '#add-employee-modal .btn-ghost', no: 'selected_close_button_decision' },
+  play_textbox_tutorial: { target: '#new-emp-name', title: 'Full Name', body: 'Enter the new employee\'s full name here. This textbox saves automatically.', icon: 'badge', listenEvent: 'input', listenTarget: '#new-emp-name', yes: 'play_textbox_tutorial_email', next: 'play_textbox_tutorial_email', listenNoEvent: 'click', listenNoTarget: '#add-employee-modal .btn-ghost', no: 'selected_close_button_decision' },
+  play_textbox_tutorial_email: { target: '#new-emp-email', title: 'Email', body: 'Enter the employee\'s email address.', icon: 'mail', listenEvent: 'input', listenTarget: '#new-emp-email', yes: 'play_textbox_tutorial_role', next: 'play_textbox_tutorial_role', listenNoEvent: 'click', listenNoTarget: '#add-employee-modal .btn-ghost', no: 'selected_close_button_decision' },
+  play_textbox_tutorial_role: { target: '#new-emp-role', title: 'Role', body: 'Select the employee\'s role from the dropdown.', icon: 'work', listenEvent: 'change', listenTarget: '#new-emp-role', yes: 'play_textbox_tutorial_team', next: 'play_textbox_tutorial_team', listenNoEvent: 'click', listenNoTarget: '#add-employee-modal .btn-ghost', no: 'selected_close_button_decision' },
+  play_textbox_tutorial_team: { target: '#new-emp-team', title: 'Team', body: 'Enter the team name, like "Platform" or "Design".', icon: 'groups', listenEvent: 'input', listenTarget: '#new-emp-team', yes: 'create_employee_btn_decision', next: 'create_employee_btn_decision', listenNoEvent: 'click', listenNoTarget: '#add-employee-modal .btn-ghost', no: 'selected_close_button_decision' },
+  create_employee_btn_decision: { target: '#add-emp-btn', title: 'Create Employee', body: 'Click "Create Employee" to save the profile.', icon: 'save', listenEvent: 'data:employees:refresh', listenTarget: 'global', yes: 'selected_full_name_decision', listenNoEvent: 'invalid', listenNoTarget: '#add-emp-form input', no: 'ask_fill_or_skip' },
+  ask_fill_or_skip: { target: '#add-employee-modal .modal', title: 'Validation Failed', body: 'Please fill all required fields, or skip the step.', icon: 'warning', next: 'selected_full_name_decision' },
+  selected_close_button_decision: { autoTransition: 'employee_management' },
+  employee_management: { view: 'employees', target: '[data-tour="employees-list"]', title: 'Employee Management', body: 'Browse employees, edit profiles, search by skill or team, and keep availability visible for planning.', icon: 'group', next: 'add_project' },
+  add_project: { view: 'projects', target: '[data-tour="add-project"]', title: 'Add Project', body: 'Create projects with managers, team leads, team members, required skills, and roles needed for delivery. Click the Add Project button, or Skip to move to Canvas.', icon: 'create_new_folder', spotlightPad: 5, listenEvent: 'click', listenTarget: '[data-tour="add-project"]', yes: 'highlight_whole_window', next: 'highlight_whole_window', no: 'canvas', nextIsNo: true },
+  highlight_whole_window: { target: '#add-project-modal .modal', title: 'New Project Window', body: 'Here you can define all details for the new project.', icon: 'folder', next: 'any_textbox_clicked_decision', listenNoEvent: 'click', listenNoTarget: '#add-project-modal .btn-ghost', no: 'canvas' },
+  any_textbox_clicked_decision: { target: '#add-project-modal .modal', title: 'New Project Form', body: 'Click on any textbox to learn more, or skip.', icon: 'edit', listenEvent: 'focus', listenTarget: '#add-project-modal input, #add-project-modal textarea', yes: 'play_textbox_tutorial_project', no: 'canvas', listenNoEvent: 'click', listenNoTarget: '#add-project-modal .btn-ghost' },
+  play_textbox_tutorial_project: { target: '#proj-name', title: 'Project Name', body: 'Enter the name of the new project. Required fields have a red asterisk.', icon: 'info', listenEvent: 'input', listenTarget: '#proj-name', yes: 'play_textbox_tutorial_proj_client', next: 'play_textbox_tutorial_proj_client', listenNoEvent: 'click', listenNoTarget: '#add-project-modal .btn-ghost', no: 'canvas' },
+  play_textbox_tutorial_proj_client: { target: '#proj-client', title: 'Client', body: 'Enter the client name (optional).', icon: 'domain', listenEvent: 'input', listenTarget: '#proj-client', yes: 'play_textbox_tutorial_proj_manager', next: 'play_textbox_tutorial_proj_manager', listenNoEvent: 'click', listenNoTarget: '#add-project-modal .btn-ghost', no: 'canvas' },
+  play_textbox_tutorial_proj_manager: { target: '#proj-manager', title: 'Manager', body: 'Assign a manager to lead this project.', icon: 'person', listenEvent: 'change', listenTarget: '#proj-manager', yes: 'skipped_decision', next: 'skipped_decision', listenNoEvent: 'click', listenNoTarget: '#add-project-modal .btn-ghost', no: 'canvas' },
+  skipped_decision: { target: '#add-proj-btn', title: 'Create Project', body: 'Click Create Project to finish, or skip to move on.', icon: 'save', yes: 'canvas', listenNoEvent: 'data:projects:refresh', listenNoTarget: 'global', no: 'create_project_completed' },
+  create_project_completed: { target: '#add-project-modal .modal', title: 'Success!', body: 'Project created successfully!', icon: 'check_circle', next: 'canvas' },
+  canvas: { view: 'canvas', target: '[data-tour="canvas-workspace"]', title: 'Canvas', body: 'Use the canvas to visually organize teams and project hierarchies.', icon: 'hub', listenEvent: 'canvas:selection:change', listenTarget: 'global', yes: 'node_added_decision', next: 'node_added_decision' },
+  node_added_decision: { target: '[data-tour="canvas-workspace"]', title: 'Add Node', body: 'Drag a node from the side panel onto the canvas.', icon: 'drag_indicator', listenEvent: 'canvas:nodes:changed', listenTarget: 'global', yes: 'employee_node_decision', nextIsNo: true, no: 'org_tree' },
+  employee_node_decision: { target: '[data-tour="canvas-workspace"]', title: 'Node Added', body: 'You added an employee node!', icon: 'person', autoYes: true, yes: 'suggest_add_project_node', no: 'skip_decision' },
+  suggest_add_project_node: { target: '[data-tour="canvas-workspace"]', title: 'Project Node', body: 'Now try dragging a project node onto the canvas.', icon: 'folder', listenEvent: 'canvas:nodes:changed', listenTarget: 'global', yes: 'play_project_node_tutorial', nextIsNo: true, no: 'org_tree' },
+  play_project_node_tutorial: { target: '[data-tour="canvas-workspace"]', title: 'Project Nodes', body: 'Project nodes show warnings for missing roles, offer AI auto-assignment, and have an inspector.', icon: 'school', listenEvent: 'click', listenTarget: '[data-tour="org-tree-view"]', yes: 'org_tree', next: 'org_tree' },
+  skip_decision: { autoTransition: 'org_tree' },
+  org_tree: { view: 'tree', target: '[data-tour="org-tree-view"]', title: 'Org Tree', body: 'Review a static organization structure with manager, team lead, and team member rows.', icon: 'account_tree', next: 'osmium_hr_handbook' },
+  osmium_hr_handbook: { view: 'ai', target: '[data-tour="hr-handbook-view"]', title: 'HR Handbook Assistant', body: 'Use the HR Handbook Assistant to ask policy questions, view citations, and preview sources.', icon: 'smart_toy', preferredPlacement: 'left', spotlightPad: 8, next: 'mini_ai_chatbot' },
+  mini_ai_chatbot: { view: 'dashboard', target: '[data-tour="mini-ai"]', title: 'Mini AI Shortcut', body: 'Open a compact assistant from anywhere. Click it now to open, or skip to finish.', icon: 'auto_awesome', preferredPlacement: 'bottom', spotlightPad: 7, spotlightRadius: '12px', listenEvent: 'click', listenTarget: '[data-tour="mini-ai"]', yes: 'open_mini_highlight_explain', nextIsNo: true, no: 'end' },
+  open_mini_highlight_explain: { target: '#mini-ai-window', title: 'Mini AI Panel', body: 'This panel lets you ask questions without leaving your view. Type a message.', icon: 'info', listenEvent: 'input', listenTarget: '#mini-chat-input', yes: 'clicked_textbox_send_decision', next: 'clicked_textbox_send_decision', listenNoEvent: 'click', listenNoTarget: '#mini-ai-close', no: 'end' },
+  clicked_textbox_send_decision: { target: '#mini-chat-input', title: 'Send a message', body: 'Press enter to send a message, or click Next to finish.', icon: 'send', listenEvent: 'keydown', listenTarget: '#mini-chat-input', yes: 'end', next: 'end', listenNoEvent: 'click', listenNoTarget: '#mini-ai-close', no: 'end' },
+  end: { kind: 'complete', title: "You're ready to start using Osmium.", body: 'Explore your workspace, build teams, and use the canvas whenever you want a visual planning view.', icon: 'task_alt', next: null }
+};
 
 export function initOnboarding() {
   ensureRoot();
@@ -175,7 +93,7 @@ export function startOnboardingTour({ force = false } = {}) {
   if (!force && hasCompletedOnboarding()) return;
   clearTimeout(pendingStart);
   active = true;
-  currentIndex = 0;
+  currentNodeId = 'start_tutorial';
   root.classList.add('active');
   root.setAttribute('aria-hidden', 'false');
   renderStep();
@@ -245,8 +163,18 @@ function saveCompletion() {
 }
 
 async function renderStep() {
-  const step = steps[currentIndex];
+  const step = nodes[currentNodeId];
   if (!step) return closeTour();
+
+  if (step.autoTransition) {
+    currentNodeId = step.autoTransition;
+    return renderStep();
+  }
+
+  if (step.autoYes) {
+    currentNodeId = step.yes || step.next;
+    return renderStep();
+  }
 
   if (step.view && State.currentView !== step.view) {
     window.switchViewGlobal?.(step.view);
@@ -298,15 +226,14 @@ function renderTooltip(step) {
       <div class="onboarding-tooltip-icon">
         <span class="material-symbols-outlined">${step.icon || 'info'}</span>
       </div>
-      <div class="onboarding-progress">${currentIndex}/${steps.length - 2}</div>
+      <div class="onboarding-progress">Tutorial</div>
     </div>
     <h3>${escapeHtml(step.title)}</h3>
     <p>${escapeHtml(step.body)}</p>
     <div class="onboarding-tooltip-actions">
       <button type="button" class="btn btn-ghost btn-sm" data-tour-action="skip">Skip Tutorial</button>
       <div class="onboarding-nav-actions">
-        <button type="button" class="btn btn-secondary btn-sm" data-tour-action="back" ${currentIndex <= 1 ? 'disabled' : ''}>Back</button>
-        ${(step.advanceOnEvent || (step.autoAdvanceOnClick && !step.nextIndexOnSkip)) ? '' : `<button type="button" class="btn btn-primary btn-sm" data-tour-action="next">Next</button>`}
+        ${step.hideNext ? '' : `<button type="button" class="btn btn-primary btn-sm" data-tour-action="next">Next</button>`}
       </div>
     </div>
   `;
@@ -318,40 +245,38 @@ function renderTooltip(step) {
   });
 }
 
-function bindActions(container) {
-  container.querySelectorAll('[data-tour-action]').forEach(button => {
-    button.addEventListener('click', () => {
-      const action = button.dataset.tourAction;
-      if (action === 'next') return nextStep();
-      if (action === 'back') return previousStep();
-      if (action === 'skip') return skipOnboarding();
+function bindActions(tooltipEl) {
+  tooltipEl.querySelectorAll('[data-tour-action]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const action = e.target.dataset.tourAction;
+      if (action === 'skip') return advanceTo(nodes[currentNodeId]?.no || 'end');
       if (action === 'dashboard') return completeOnboarding('dashboard');
       if (action === 'canvas') return completeOnboarding('canvas');
+      if (action === 'next') {
+        const step = nodes[currentNodeId];
+        if (step && step.nextIsNo) {
+          return advanceTo(step.no || 'end');
+        }
+        let delay = 0;
+        if (step && step.listenEvent === 'click' && step.listenTarget && step.listenTarget !== 'global') {
+          const el = document.querySelector(step.listenTarget);
+          if (el) {
+            el.click();
+            delay = 400; // Wait for modals/UI to open
+          }
+        }
+        setTimeout(() => advanceTo(step?.next || step?.yes || 'end'), delay);
+        return;
+      }
     });
   });
 }
 
-function nextStep() {
-  const current = steps[currentIndex];
-  if (current && current.nextIndexOnSkip !== undefined) {
-    if (current.closeModal) {
-      const modal = document.getElementById(current.closeModal);
-      if (!modal || !modal.classList.contains('open')) {
-        currentIndex = current.nextIndexOnSkip;
-        renderStep();
-        return;
-      }
-    }
+function advanceTo(nodeId) {
+  if (!nodeId || (nodeId === 'end' && !nodes['end'])) {
+    return closeTour();
   }
-
-  if (currentIndex >= steps.length - 1) return completeOnboarding('dashboard');
-  currentIndex += 1;
-  renderStep();
-}
-
-function previousStep() {
-  if (currentIndex <= 0) return;
-  currentIndex -= 1;
+  currentNodeId = nodeId;
   renderStep();
 }
 
@@ -360,12 +285,22 @@ function closeTour() {
   clearTimeout(pendingStart);
   
   if (currentTarget && currentTargetListener) {
-    currentTarget.removeEventListener('click', currentTargetListener);
+    const elList = currentTargetListener.els || [currentTarget];
+    elList.forEach(el => el?.removeEventListener(currentTargetListener.event, currentTargetListener.handler));
     currentTargetListener = null;
+  }
+  if (currentNoTargetListener) {
+    const elList = currentNoTargetListener.els || [];
+    elList.forEach(el => el?.removeEventListener(currentNoTargetListener.event, currentNoTargetListener.handler));
+    currentNoTargetListener = null;
   }
   if (currentEventListener) {
     State.off(currentEventListener.event, currentEventListener.handler);
     currentEventListener = null;
+  }
+  if (currentNoEventListener) {
+    State.off(currentNoEventListener.event, currentNoEventListener.handler);
+    currentNoEventListener = null;
   }
 
   root?.classList.remove('active', 'is-modal-step', 'is-target-step');
@@ -379,13 +314,10 @@ function onKeyDown(event) {
   if (!active) return;
   if (event.key === 'Escape') {
     event.preventDefault();
-    skipOnboarding();
+    advanceTo(nodes[currentNodeId]?.no || 'end');
   } else if (event.key === 'ArrowRight') {
     event.preventDefault();
-    nextStep();
-  } else if (event.key === 'ArrowLeft') {
-    event.preventDefault();
-    previousStep();
+    advanceTo(nodes[currentNodeId]?.next || nodes[currentNodeId]?.yes || 'end');
   }
 }
 
@@ -396,7 +328,7 @@ function schedulePosition() {
   cancelAnimationFrame(frame);
   frame = requestAnimationFrame(() => {
     rafQueued = false;
-    positionTargetStep(steps[currentIndex]);
+    positionTargetStep(nodes[currentNodeId]);
   });
 }
 
@@ -404,12 +336,22 @@ function positionTargetStep(step) {
   const target = findVisibleTarget(step.target);
   
   if (currentTarget && currentTargetListener) {
-    currentTarget.removeEventListener('click', currentTargetListener);
+    const elList = currentTargetListener.els || [currentTarget];
+    elList.forEach(el => el?.removeEventListener(currentTargetListener.event, currentTargetListener.handler));
     currentTargetListener = null;
+  }
+  if (currentNoTargetListener) {
+    const elList = currentNoTargetListener.els || [];
+    elList.forEach(el => el?.removeEventListener(currentNoTargetListener.event, currentNoTargetListener.handler));
+    currentNoTargetListener = null;
   }
   if (currentEventListener) {
     State.off(currentEventListener.event, currentEventListener.handler);
     currentEventListener = null;
+  }
+  if (currentNoEventListener) {
+    State.off(currentNoEventListener.event, currentNoEventListener.handler);
+    currentNoEventListener = null;
   }
   
   currentTarget = target;
@@ -422,20 +364,59 @@ function positionTargetStep(step) {
     return;
   }
 
-  if (step.autoAdvanceOnClick) {
-    currentTargetListener = () => setTimeout(() => nextStep(), 300);
-    target.addEventListener('click', currentTargetListener, { once: true });
-  }
-  
-  if (step.advanceOnEvent) {
-    currentEventListener = {
-      event: step.advanceOnEvent,
-      handler: () => {
-        // Wait briefly so UI can update (e.g. modal closes)
-        setTimeout(() => nextStep(), 400);
+  if (step.listenEvent) {
+    if (step.listenTarget === 'global') {
+      currentEventListener = {
+        event: step.listenEvent,
+        handler: (e) => {
+          if (step.listenEvent === 'keydown' && e.key !== 'Enter') return;
+          setTimeout(() => advanceTo(step.yes || step.next), 400);
+        }
+      };
+      State.on(currentEventListener.event, currentEventListener.handler);
+    } else {
+      const elList = [...document.querySelectorAll(step.listenTarget)];
+      if (elList.length) {
+        currentTargetListener = {
+          event: step.listenEvent,
+          els: elList,
+          handler: (e) => {
+             if (step.listenEvent === 'keydown' && e.key !== 'Enter') return;
+             setTimeout(() => advanceTo(step.yes || step.next), 400);
+          }
+        };
+        elList.forEach(el => el.addEventListener(currentTargetListener.event, currentTargetListener.handler));
       }
+    }
+  }
+
+  if (step.listenNoEvent) {
+    if (step.listenNoTarget === 'global') {
+      currentNoEventListener = {
+        event: step.listenNoEvent,
+        handler: () => setTimeout(() => advanceTo(step.no), 400)
+      };
+      State.on(currentNoEventListener.event, currentNoEventListener.handler);
+    } else {
+      const elList = [...document.querySelectorAll(step.listenNoTarget)];
+      if (elList.length) {
+        currentNoTargetListener = {
+          event: step.listenNoEvent,
+          els: elList,
+          handler: () => setTimeout(() => advanceTo(step.no), 400)
+        };
+        elList.forEach(el => el.addEventListener(currentNoTargetListener.event, currentNoTargetListener.handler));
+      }
+    }
+  }
+
+  if (step.autoYesOnClick) {
+    currentTargetListener = {
+      event: 'click',
+      els: [target],
+      handler: () => setTimeout(() => advanceTo(step.yes || step.next), 300)
     };
-    State.on(currentEventListener.event, currentEventListener.handler);
+    target?.addEventListener('click', currentTargetListener.handler, { once: true });
   }
 
   root.classList.remove('has-fallback');
