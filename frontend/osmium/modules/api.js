@@ -400,7 +400,8 @@ export async function linkFile(fileId, body) {
 
 // ─── RAG / AI ─────────────────────────────────────────────────
 export async function queryRAG(question, fileIds = [], history = []) {
-  return request('/query', {
+  // Direct RAG queries to the new rag-service on port 8003
+  return request('http://localhost:8003/query', {
     method: 'POST',
     body: JSON.stringify({ question, file_ids: fileIds, history }),
   });
