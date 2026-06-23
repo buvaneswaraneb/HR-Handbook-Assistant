@@ -102,6 +102,99 @@
       text-overflow: ellipsis;
       max-width: 100%;
     }
+
+    /* RAG service offline overlay */
+    #rag-offline-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(10, 12, 18, 0.72);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: inherit;
+      gap: 0;
+      pointer-events: all;
+    }
+
+    #rag-offline-overlay .rag-offline-card {
+      background: linear-gradient(135deg, rgba(30,32,44,0.98) 60%, rgba(42,28,28,0.98) 100%);
+      border: 1px solid rgba(245, 87, 74, 0.28);
+      border-radius: 20px;
+      padding: 44px 48px 40px;
+      max-width: 440px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 8px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(245,87,74,0.10);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+    }
+
+    #rag-offline-overlay .rag-offline-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(245, 87, 74, 0.14);
+      border: 1.5px solid rgba(245, 87, 74, 0.32);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #f5574a;
+      animation: rag-pulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes rag-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 87, 74, 0.30); }
+      50%       { box-shadow: 0 0 0 14px rgba(245, 87, 74, 0); }
+    }
+
+    #rag-offline-overlay .rag-offline-title {
+      font-size: 1.18rem;
+      font-weight: 800;
+      color: var(--gl-on-surface);
+      letter-spacing: -0.025em;
+      line-height: 1.2;
+    }
+
+    #rag-offline-overlay .rag-offline-sub {
+      font-size: 0.84rem;
+      color: var(--gl-on-surface-3);
+      line-height: 1.65;
+      max-width: 340px;
+    }
+
+    #rag-offline-overlay .rag-offline-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 14px;
+      border-radius: 99px;
+      background: rgba(245, 87, 74, 0.12);
+      border: 1px solid rgba(245, 87, 74, 0.28);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #f5574a;
+    }
+
+    #rag-offline-overlay .rag-offline-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #f5574a;
+      animation: rag-dot-blink 1.4s ease-in-out infinite;
+    }
+
+    @keyframes rag-dot-blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
   </style>
 </head>
 
@@ -763,7 +856,7 @@
       </div>
 
       <!-- ── AI ASSISTANT (FULL PAGE) ───────────────────── -->
-      <div id="view-ai" class="view-panel" data-tour="ai-view">
+      <div id="view-ai" class="view-panel" data-tour="ai-view" style="position:relative">
         <aside id="ai-history-sidebar">
           <div id="ai-history-header">
             <div>
@@ -839,6 +932,26 @@
           </div>
         </div>
       </div>
+
+        <!-- RAG service offline overlay (inside #view-ai, position:absolute covers it) -->
+        <div id="rag-offline-overlay" role="status" aria-live="polite">
+          <div class="rag-offline-card">
+            <div class="rag-offline-icon">
+              <span class="material-symbols-outlined" style="font-size:32px">cloud_off</span>
+            </div>
+            <div class="rag-offline-badge">
+              <span class="rag-offline-dot"></span>
+              Service Offline
+            </div>
+            <div class="rag-offline-title">HR Handbook is currently out of service</div>
+            <div class="rag-offline-sub">
+              The RAG (PDF ingestion &amp; handbook search) service is temporarily offline for maintenance.
+              The feature will be restored in a future update. Other workspace features remain fully operational.
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /#view-ai -->
 
     </main>
 
