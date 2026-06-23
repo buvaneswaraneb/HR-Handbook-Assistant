@@ -4,20 +4,12 @@
     {
       "src": "backend/app/api/main.py",
       "use": "@vercel/python"
-    },
-    {
-      "src": "frontend/osmium/**",
-      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "/backend/app/api/main.py"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/frontend/osmium/$1"
+      "dest": "backend/app/api/main.py"
     }
   ]
 }
