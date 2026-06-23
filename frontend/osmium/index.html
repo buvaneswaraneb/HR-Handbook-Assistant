@@ -103,7 +103,10 @@
       max-width: 100%;
     }
 
-    /* RAG service offline overlay */
+    /* RAG service offline overlay
+       NOTE: backdrop-filter must NOT be used here — it breaks the stacking
+       context and causes the blur to bleed across the entire viewport.
+       Use a solid background instead so the overlay stays clipped to #view-ai. */
     #rag-offline-overlay {
       position: absolute;
       inset: 0;
@@ -112,9 +115,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: rgba(10, 12, 18, 0.72);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      background: rgba(10, 12, 18, 0.93);
       border-radius: inherit;
       gap: 0;
       pointer-events: all;
@@ -856,7 +857,7 @@
       </div>
 
       <!-- ── AI ASSISTANT (FULL PAGE) ───────────────────── -->
-      <div id="view-ai" class="view-panel" data-tour="ai-view" style="position:relative">
+      <div id="view-ai" class="view-panel" data-tour="ai-view" style="position:relative;overflow:hidden">
         <aside id="ai-history-sidebar">
           <div id="ai-history-header">
             <div>
