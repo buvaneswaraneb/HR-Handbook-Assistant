@@ -4,6 +4,7 @@ import re
 import uuid
 from io import BytesIO
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import unquote, urlparse
 
 from fastapi import UploadFile
@@ -12,7 +13,10 @@ from app.services.e_r_s.config import get_settings
 from app.services.e_r_s.db import get_db
 from app.services.e_r_s.repositories.file_repo import FileRepository
 from app.services.e_r_s.schemas import FileLinkRequest
-from app.services.ingestion.vector_store import VectorStore
+
+# RAG / vector-store service is offline — import only for type checking.
+if TYPE_CHECKING:
+    from app.services.ingestion.vector_store import VectorStore
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +138,7 @@ def link_file(file_id: str, data: FileLinkRequest, workplace_id: str | None = No
 
 def delete_file(
     file_id: str,
-    vector_store: VectorStore | None = None,
+    vector_store: "VectorStore | None" = None,
     workplace_id: str | None = None,
 ) -> None:
     db   = get_db()
@@ -142,10 +146,10 @@ def delete_file(
     rec  = repo.get_by_id(file_id, workplace_id)
     if rec:
         filename = rec.get("filename")
-        if filename:
+        if filename and vector_store is not None:
+            # RAG service offline — only clean up vectors if a store was supplied.
             try:
-                store = vector_store or VectorStore()
-                removed_vectors = store.delete_by_source(filename, workplace_id=workplace_id)
+                removed_vectors = vector_store.delete_by_source(filename, workplace_id=workplace_id)
                 logger.info("Deleted %d vector chunks for file %s", removed_vectors, filename)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Vector cleanup failed for %s: %s", filename, exc)
