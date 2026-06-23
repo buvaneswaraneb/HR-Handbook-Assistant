@@ -376,7 +376,7 @@ export async function getFiles(department = null) {
 }
 
 export async function uploadFile(formData) {
-  const res = await fetch(apiUrl('/upload'), {
+  const res = await fetch(apiUrl('/files/upload'), {
     method: 'POST',
     headers: { ...tunnelHeaders(), ...authHeaders() },
     body: formData,
@@ -386,7 +386,7 @@ export async function uploadFile(formData) {
     throw new Error(err.detail || `HTTP ${res.status}`);
   }
   const data = await res.json();
-  invalidateApiCache(invalidationPrefixes('/upload'));
+  invalidateApiCache(invalidationPrefixes('/files/upload'));
   return data;
 }
 
