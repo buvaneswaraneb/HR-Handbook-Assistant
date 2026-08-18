@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://buvaneswaraneb.github.io/HR-Handbook-Assistant/sitemap.xml
